@@ -38,6 +38,8 @@
     --success-foreground: 0 0% 98%; /* white */
     --warning: 38 92% 50%; /* #f59e0b - clear orange */
     --warning-foreground: 0 0% 98%; /* white */
+    --info: 217 91% 60%; /* #3b82f6 - clear blue */
+    --info-foreground: 0 0% 98%; /* white */
     --destructive: 0 84% 60%; /* #ef4444 - clear red */
     --destructive-foreground: 0 0% 98%; /* white */
 
@@ -108,6 +110,8 @@
     --success-foreground: 220 27% 8%; /* #0f1419 */
     --warning: 38 92% 60%; /* #fbbf24 - brighter orange */
     --warning-foreground: 220 27% 8%; /* #0f1419 */
+    --info: 217 91% 70%; /* #60a5fa - brighter blue */
+    --info-foreground: 220 27% 8%; /* #0f1419 */
     --destructive: 0 84% 70%; /* #f87171 - softer red */
     --destructive-foreground: 220 27% 8%; /* #0f1419 */
 
@@ -259,6 +263,10 @@
     animation: scaleIn 0.2s ease-out;
   }
 
+  .animate-shimmer {
+    animation: shimmer 2s infinite;
+  }
+
   @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -286,17 +294,52 @@
     }
   }
 
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  /* Micro-interactions */
+  .micro-bounce {
+    transition: transform 0.2s ease-in-out;
+  }
+  
+  .micro-bounce:active {
+    transform: scale(0.95);
+  }
+
+  .hover-lift {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  }
+  
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
   /* Professional Focus States */
   .focus-professional {
     @apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2;
   }
   
-  /* Accessible Interactive Elements */
+  /* Accessible Interactive Elements - Touch-friendly for mobile */
   .interactive-element {
     @apply focus-professional transition-colors duration-200;
     @apply hover:bg-accent hover:text-accent-foreground;
-    min-height: 44px; /* Touch-friendly */
+    min-height: 44px; /* Touch-friendly - Apple HIG recommendation */
     min-width: 44px;
+  }
+
+  /* Touch-friendly buttons and interactive elements */
+  @media (max-width: 768px) {
+    button, a, [role="button"], [tabindex="0"] {
+      min-height: 44px;
+      min-width: 44px;
+    }
   }
 
   /* Professional Loading States */
@@ -326,4 +369,73 @@
   .space-professional-md { @apply space-y-6; }
   .space-professional-lg { @apply space-y-8; }
   .space-professional-xl { @apply space-y-12; }
+
+  /* Consistent spacing utilities */
+  .gap-xs { @apply gap-2; }
+  .gap-sm { @apply gap-4; }
+  .gap-md { @apply gap-6; }
+  .gap-lg { @apply gap-8; }
+  .gap-xl { @apply gap-12; }
+
+  /* Typography consistency */
+  .text-h1 { @apply text-4xl font-bold tracking-tight; }
+  .text-h2 { @apply text-3xl font-bold tracking-tight; }
+  .text-h3 { @apply text-2xl font-semibold tracking-tight; }
+  .text-h4 { @apply text-xl font-semibold; }
+  .text-body { @apply text-base leading-relaxed; }
+  .text-small { @apply text-sm leading-relaxed; }
+
+  /* Smooth transitions */
+  .transition-smooth {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Card hover effects - disabled on touch devices */
+  .card-hover {
+    @apply transition-all duration-300;
+  }
+  
+  @media (hover: hover) and (pointer: fine) {
+    .card-hover:hover {
+      @apply shadow-lg -translate-y-1;
+    }
+  }
+
+  /* Table row zebra striping */
+  .table-zebra tbody tr:nth-child(even) {
+    @apply bg-muted/20;
+  }
+
+  /* Responsive typography */
+  @media (max-width: 640px) {
+    .text-h1 { @apply text-2xl; }
+    .text-h2 { @apply text-xl; }
+    .text-h3 { @apply text-lg; }
+    .text-h4 { @apply text-base; }
+  }
+
+  /* Mobile-first spacing adjustments */
+  @media (max-width: 640px) {
+    .gap-xs { @apply gap-1; }
+    .gap-sm { @apply gap-2; }
+    .gap-md { @apply gap-4; }
+    .gap-lg { @apply gap-6; }
+  }
+
+  /* Safe area insets for mobile devices */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-left {
+    padding-left: env(safe-area-inset-left);
+  }
+  
+  .safe-right {
+    padding-right: env(safe-area-inset-right);
+  }
 }

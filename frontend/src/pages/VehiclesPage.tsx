@@ -48,7 +48,7 @@ type Vehicle = {
   transmission: string | null;
   door_seat: string | null;
   chassis_no: string | null;
-  ps_tw: string | null;
+  plate_number: string | null;
   km: number | null;
   month: number | null;
   fuel: string | null;
@@ -110,14 +110,10 @@ type CostCalculation = {
   profitVsTarget?: number | null;
 };
 
-const currency = (v: number | null | undefined | string) => {
-  if (v == null || v === undefined || v === "") return "-";
-  const num = typeof v === "string" ? parseFloat(v) : v;
-  if (isNaN(num)) return "-";
-  return num.toLocaleString("tr-TR", { style: "currency", currency: "TRY" });
-};
+import { useCurrency } from "@/hooks/useCurrency";
 
 const VehiclesPage = () => {
+  const { formatCurrency: currency } = useCurrency();
   const location = useLocation();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(false);
@@ -167,7 +163,7 @@ const VehiclesPage = () => {
     transmission: "",
     door_seat: "",
     chassis_no: "",
-    ps_tw: "",
+    plate_number: "",
     km: "",
     month: "",
     fuel: "",
@@ -379,7 +375,7 @@ const VehiclesPage = () => {
       transmission: "",
       door_seat: "",
       chassis_no: "",
-      ps_tw: "",
+      plate_number: "",
       km: "",
       month: "",
       fuel: "",
@@ -572,7 +568,7 @@ const VehiclesPage = () => {
       transmission: vehicle.transmission || "",
       door_seat: vehicle.door_seat || "",
       chassis_no: vehicle.chassis_no || "",
-      ps_tw: vehicle.ps_tw || "",
+      plate_number: vehicle.plate_number || "",
       km: vehicle.km?.toString() || "",
       month: vehicle.month?.toString() || "",
       fuel: vehicle.fuel || "",
@@ -885,10 +881,11 @@ const VehiclesPage = () => {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium">PS/TW</label>
+                <label className="text-sm font-medium">Plaka</label>
                 <Input
-                  value={vehicleForm.ps_tw}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, ps_tw: e.target.value })}
+                  value={vehicleForm.plate_number}
+                  onChange={(e) => setVehicleForm({ ...vehicleForm, plate_number: e.target.value })}
+                  placeholder="Örn: 34ABC123"
                 />
               </div>
               <div>
@@ -1417,26 +1414,21 @@ const VehiclesPage = () => {
 
       {/* Detail Modal - Bu modal araç detaylarını, harcamaları ve maliyet hesaplamayı gösterir */}
       <Dialog open={openDetail} onOpenChange={setOpenDetail}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              Araç Detayı: {selectedVehicle?.maker} {selectedVehicle?.model}
-            </DialogTitle>
-            <DialogDescription>
-              Araç bilgileri, fotoğrafları, harcamaları ve maliyet hesaplamalarını görüntüleyebilirsiniz.
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="max-w-4xl h-[70vh] p-0 flex flex-col">
           {selectedVehicle && (
-            <Tabs defaultValue="info" className="mt-4">
-              <TabsList>
-                <TabsTrigger value="info">Bilgiler</TabsTrigger>
-                <TabsTrigger value="images">Fotoğraflar</TabsTrigger>
-                <TabsTrigger value="costs">Harcamalar</TabsTrigger>
-                <TabsTrigger value="documents">Belgeler</TabsTrigger>
-                <TabsTrigger value="calculate">Maliyet Hesaplama</TabsTrigger>
-              </TabsList>
+            <Tabs defaultValue="info" className="w-full flex flex-col flex-1 min-h-0">
+              <div className="px-6 pt-6 pb-0 flex-shrink-0">
+                <TabsList className="grid w-full grid-cols-5">
+                  <TabsTrigger value="info">Bilgiler</TabsTrigger>
+                  <TabsTrigger value="images">Fotoğraflar</TabsTrigger>
+                  <TabsTrigger value="documents">Belgeler</TabsTrigger>
+                  <TabsTrigger value="costs">Harcamalar</TabsTrigger>
+                  <TabsTrigger value="calculate">Maliyet Hesaplama</TabsTrigger>
+                </TabsList>
+              </div>
+              <div className="px-6 pb-6 flex-1 overflow-y-auto min-h-0">
               
-              <TabsContent value="info" className="space-y-4">
+              <TabsContent value="info" className="space-y-4 mt-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div><strong>Marka:</strong> {selectedVehicle.maker || "-"}</div>
                   <div><strong>Model:</strong> {selectedVehicle.model || "-"}</div>
@@ -1444,7 +1436,7 @@ const VehiclesPage = () => {
                   <div><strong>Vites:</strong> {selectedVehicle.transmission || "-"}</div>
                   <div><strong>Kapı/Koltuk:</strong> {selectedVehicle.door_seat || "-"}</div>
                   <div><strong>Şasi No:</strong> {selectedVehicle.chassis_no || "-"}</div>
-                  <div><strong>PS/TW:</strong> {selectedVehicle.ps_tw || "-"}</div>
+                  <div><strong>Plaka:</strong> {selectedVehicle.plate_number || "-"}</div>
                   <div><strong>Km:</strong> {selectedVehicle.km || "-"}</div>
                   <div><strong>Ay:</strong> {selectedVehicle.month || "-"}</div>
                   <div><strong>Yakıt:</strong> {selectedVehicle.fuel || "-"}</div>
@@ -1536,7 +1528,7 @@ const VehiclesPage = () => {
                 )}
               </TabsContent>
 
-              <TabsContent value="images" className="space-y-4">
+              <TabsContent value="images" className="space-y-4 mt-4">
                 <VehicleImageUpload 
                   vehicleId={selectedVehicle.id} 
                   onUpdate={() => {
@@ -1546,89 +1538,7 @@ const VehiclesPage = () => {
                 />
               </TabsContent>
 
-              <TabsContent value="costs" className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-semibold">Harcamalar</h3>
-                  <div className="flex gap-2">
-                    <Select value={costCategoryFilter || "all"} onValueChange={(value) => {
-                      const filterValue = value === "all" ? "" : value;
-                      setCostCategoryFilter(filterValue);
-                      if (selectedVehicle) {
-                        fetchVehicleDetail(selectedVehicle.id, filterValue);
-                      }
-                    }}>
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Kategori Filtrele" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Tümü</SelectItem>
-                        {costCategories.map((cat) => (
-                          <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button onClick={() => openCostModal(selectedVehicle)}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Harcama Ekle
-                    </Button>
-                  </div>
-                </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Harcama Adı</TableHead>
-                      <TableHead>Kategori</TableHead>
-                      <TableHead>Tutar</TableHead>
-                      <TableHead>Tarih</TableHead>
-                      <TableHead>İşlem</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {vehicleCosts.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center">Harcama bulunamadı.</TableCell>
-                      </TableRow>
-                    ) : (
-                      vehicleCosts.map((cost) => {
-                        const category = (cost as any).category || 'other';
-                        const categoryLabel = costCategories.find(c => c.value === category)?.label || 'Diğer';
-                        return (
-                        <TableRow key={cost.id}>
-                          <TableCell>{cost.cost_name}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{categoryLabel}</Badge>
-                          </TableCell>
-                          <TableCell>{currency(cost.amount)}</TableCell>
-                          <TableCell>{cost.date}</TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => openEditCostModal(cost)}
-                                title="Düzenle"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteCost(cost.id)}
-                                title="Sil"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </TabsContent>
-
-              <TabsContent value="documents" className="space-y-4">
+              <TabsContent value="documents" className="space-y-4 mt-4">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="font-semibold">Araç Belgeleri</h3>
                   <Button onClick={() => setShowDocumentDialog(true)} size="sm">
@@ -1712,7 +1622,89 @@ const VehiclesPage = () => {
                 )}
               </TabsContent>
 
-              <TabsContent value="calculate" className="space-y-4">
+              <TabsContent value="costs" className="space-y-4 mt-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-semibold">Harcamalar</h3>
+                  <div className="flex gap-2">
+                    <Select value={costCategoryFilter || "all"} onValueChange={(value) => {
+                      const filterValue = value === "all" ? "" : value;
+                      setCostCategoryFilter(filterValue);
+                      if (selectedVehicle) {
+                        fetchVehicleDetail(selectedVehicle.id, filterValue);
+                      }
+                    }}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Kategori Filtrele" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Tümü</SelectItem>
+                        {costCategories.map((cat) => (
+                          <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button onClick={() => openCostModal(selectedVehicle)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Harcama Ekle
+                    </Button>
+                  </div>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Harcama Adı</TableHead>
+                      <TableHead>Kategori</TableHead>
+                      <TableHead>Tutar</TableHead>
+                      <TableHead>Tarih</TableHead>
+                      <TableHead>İşlem</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {vehicleCosts.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center">Harcama bulunamadı.</TableCell>
+                      </TableRow>
+                    ) : (
+                      vehicleCosts.map((cost) => {
+                        const category = (cost as any).category || 'other';
+                        const categoryLabel = costCategories.find(c => c.value === category)?.label || 'Diğer';
+                        return (
+                        <TableRow key={cost.id}>
+                          <TableCell>{cost.cost_name}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{categoryLabel}</Badge>
+                          </TableCell>
+                          <TableCell>{currency(cost.amount)}</TableCell>
+                          <TableCell>{cost.date}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEditCostModal(cost)}
+                                title="Düzenle"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteCost(cost.id)}
+                                title="Sil"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </TabsContent>
+
+              <TabsContent value="calculate" className="space-y-4 mt-4">
                 <div className="flex justify-between items-center">
                   <h3 className="font-semibold">Maliyet Hesaplama</h3>
                   <Button onClick={() => fetchCostCalculation(selectedVehicle.id)}>
@@ -1819,6 +1811,7 @@ const VehiclesPage = () => {
                   </div>
                 )}
               </TabsContent>
+              </div>
             </Tabs>
           )}
         </DialogContent>
@@ -1883,10 +1876,11 @@ const VehiclesPage = () => {
               />
             </div>
             <div>
-              <label className="text-sm font-medium">PS/TW</label>
+              <label className="text-sm font-medium">Plaka</label>
               <Input
-                value={vehicleForm.ps_tw}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, ps_tw: e.target.value })}
+                value={vehicleForm.plate_number}
+                onChange={(e) => setVehicleForm({ ...vehicleForm, plate_number: e.target.value })}
+                placeholder="Örn: 34ABC123"
               />
             </div>
             <div>

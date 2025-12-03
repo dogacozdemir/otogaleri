@@ -22,6 +22,7 @@ import {
   Car,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrency } from "@/hooks/useCurrency";
 import {
   LineChart,
   Line,
@@ -78,6 +79,7 @@ interface DateRangeData {
 
 const AccountingPage = () => {
   const { toast } = useToast();
+  const { formatCurrency } = useCurrency();
   const [activeTab, setActiveTab] = useState("overview");
   const [incomeList, setIncomeList] = useState<IncomeItem[]>([]);
   const [expensesList, setExpensesList] = useState<ExpenseItem[]>([]);
@@ -291,15 +293,6 @@ const AccountingPage = () => {
         variant: "destructive",
       });
     }
-  };
-
-  const formatCurrency = (amount: number | string) => {
-    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
-    if (isNaN(numAmount)) return "₺0,00";
-    return new Intl.NumberFormat("tr-TR", {
-      style: "currency",
-      currency: "TRY",
-    }).format(numAmount);
   };
 
   const formatDate = (dateString: string) => {

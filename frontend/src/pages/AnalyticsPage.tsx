@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { useTranslation } from "react-i18next";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,18 +8,32 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, FileText, Calendar, Mail, Trash2, Play, Download } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus, FileText, Trash2, Play } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { BrandProfit, TopProfitable, SalesDuration } from "@/types/analytics";
+import { BrandProfitChart } from "@/components/charts/BrandProfitChart";
+import { TopProfitableChart } from "@/components/charts/TopProfitableChart";
+import { SalesDurationChart } from "@/components/charts/SalesDurationChart";
+import { BrandProfitTable } from "@/components/tables/BrandProfitTable";
+import { TopProfitableTable } from "@/components/tables/TopProfitableTable";
+import { SalesDurationTable } from "@/components/tables/SalesDurationTable";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 
 export default function AnalyticsPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const [brandProfit, setBrandProfit] = useState<any[]>([]);
-  const [topProfitable, setTopProfitable] = useState<any[]>([]);
-  const [salesDuration, setSalesDuration] = useState<any[]>([]);
+  const [brandProfit, setBrandProfit] = useState<BrandProfit[]>([]);
+  const [topProfitable, setTopProfitable] = useState<TopProfitable[]>([]);
+  const [salesDuration, setSalesDuration] = useState<SalesDuration[]>([]);
   const [loading, setLoading] = useState(true);
   const [customReports, setCustomReports] = useState<any[]>([]);
   const [showReportDialog, setShowReportDialog] = useState(false);
+  const [showBrandTable, setShowBrandTable] = useState(false);
+  const [showTopProfitableTable, setShowTopProfitableTable] = useState(false);
+  const [showSalesDurationTable, setShowSalesDurationTable] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [reportToDelete, setReportToDelete] = useState<number | null>(null);
   const [reportForm, setReportForm] = useState({
     name: "",
     description: "",
@@ -36,6 +49,7 @@ export default function AnalyticsPage() {
 
   const fetchAnalytics = async () => {
     try {
+      setLoading(true);
       const [brandRes, topRes, durationRes, reportsRes] = await Promise.all([
         api.get("/analytics/brand-profit?limit=10"),
         api.get("/analytics/top-profitable?limit=10"),
@@ -48,16 +62,14 @@ export default function AnalyticsPage() {
       setCustomReports(reportsRes.data || []);
     } catch (err) {
       console.error("Failed to fetch analytics", err);
+      toast({
+        title: "Hata",
+        description: "Analitik veriler yüklenirken bir hata oluştu",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
-  };
-
-  const formatCurrency = (amount: number | null | undefined | string) => {
-    if (amount == null || amount === undefined || amount === "") return "-";
-    const num = typeof amount === "string" ? parseFloat(amount) : amount;
-    if (isNaN(num)) return "-";
-    return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(num);
   };
 
   if (loading) {
@@ -66,7 +78,15 @@ export default function AnalyticsPage() {
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">{t("analytics.title")}</h1>
         </div>
-        <div className="text-muted-foreground">Yükleniyor...</div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardContent className="p-6">
+                <div className="h-64 bg-muted animate-pulse rounded-lg" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     );
   }
@@ -85,125 +105,40 @@ export default function AnalyticsPage() {
         </TabsList>
 
         <TabsContent value="analytics" className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("analytics.brandProfit")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-medium">{t("analytics.brand")}</th>
-                    <th className="px-4 py-3 text-right text-sm font-medium">{t("analytics.vehicleCount")}</th>
-                    <th className="px-4 py-3 text-right text-sm font-medium">{t("analytics.soldCount")}</th>
-                    <th className="px-4 py-3 text-right text-sm font-medium">{t("analytics.totalProfit")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {brandProfit.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
-                        Veri bulunamadı
-                      </td>
-                    </tr>
-                  ) : (
-                    brandProfit.map((b, idx) => (
-                      <tr key={idx} className="border-t border-border hover:bg-accent/50">
-                        <td className="px-4 py-3">{b.brand || "-"}</td>
-                        <td className="px-4 py-3 text-right">{b.vehicle_count}</td>
-                        <td className="px-4 py-3 text-right">{b.sold_count}</td>
-                        <td className="px-4 py-3 text-right font-semibold">{formatCurrency(b.total_profit || 0)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Brand Profit Chart */}
+          <BrandProfitChart
+            data={brandProfit}
+            onViewDetails={() => setShowBrandTable(true)}
+          />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("analytics.topProfitable")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-medium">{t("analytics.vehicle")}</th>
-                    <th className="px-4 py-3 text-right text-sm font-medium">Satış Fiyatı</th>
-                    <th className="px-4 py-3 text-right text-sm font-medium">{t("analytics.profit")}</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">{t("analytics.saleDate")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topProfitable.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
-                        Veri bulunamadı
-                      </td>
-                    </tr>
-                  ) : (
-                    topProfitable.map((v) => (
-                      <tr key={v.id} className="border-t border-border hover:bg-accent/50">
-                        <td className="px-4 py-3">
-                          {v.maker || "-"} {v.model || ""} {v.year || ""}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          {formatCurrency(v.sale_price || 0)}
-                        </td>
-                        <td className="px-4 py-3 text-right font-semibold text-success">
-                          {formatCurrency(v.profit || 0)}
-                        </td>
-                        <td className="px-4 py-3">{v.sale_date ? new Date(v.sale_date).toLocaleDateString("tr-TR") : "-"}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Top Profitable Chart */}
+          <TopProfitableChart
+            data={topProfitable}
+            onViewDetails={() => setShowTopProfitableTable(true)}
+          />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("analytics.salesDuration")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-medium">{t("analytics.brand")}</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">{t("analytics.model")}</th>
-                    <th className="px-4 py-3 text-right text-sm font-medium">{t("analytics.avgDays")}</th>
-                    <th className="px-4 py-3 text-right text-sm font-medium">{t("analytics.totalSales")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {salesDuration.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
-                        Veri bulunamadı
-                      </td>
-                    </tr>
-                  ) : (
-                    salesDuration.map((s, idx) => (
-                      <tr key={idx} className="border-t border-border hover:bg-accent/50">
-                        <td className="px-4 py-3">{s.brand || "-"}</td>
-                        <td className="px-4 py-3">{s.model || "-"}</td>
-                        <td className="px-4 py-3 text-right">{Math.round(s.avg_days_to_sell || 0)}</td>
-                        <td className="px-4 py-3 text-right">{s.total_sales}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Sales Duration Chart */}
+          <SalesDurationChart
+            data={salesDuration}
+            onViewDetails={() => setShowSalesDurationTable(true)}
+          />
+
+          {/* Table Dialogs */}
+          <BrandProfitTable
+            data={brandProfit}
+            open={showBrandTable}
+            onOpenChange={setShowBrandTable}
+          />
+          <TopProfitableTable
+            data={topProfitable}
+            open={showTopProfitableTable}
+            onOpenChange={setShowTopProfitableTable}
+          />
+          <SalesDurationTable
+            data={salesDuration}
+            open={showSalesDurationTable}
+            onOpenChange={setShowSalesDurationTable}
+          />
         </TabsContent>
 
         <TabsContent value="reports" className="space-y-6">
@@ -275,20 +210,9 @@ export default function AnalyticsPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={async () => {
-                          if (confirm("Bu raporu silmek istediğinize emin misiniz?")) {
-                            try {
-                              await api.delete(`/reports/${report.id}`);
-                              toast({ title: "Başarılı", description: "Rapor silindi" });
-                              fetchAnalytics();
-                            } catch (error: any) {
-                              toast({
-                                title: "Hata",
-                                description: error?.response?.data?.error || "Rapor silinemedi",
-                                variant: "destructive",
-                              });
-                            }
-                          }
+                        onClick={() => {
+                          setReportToDelete(report.id);
+                          setShowDeleteConfirm(true);
                         }}
                       >
                         <Trash2 className="w-4 h-4" />
@@ -380,14 +304,14 @@ export default function AnalyticsPage() {
             <div>
               <label className="text-sm font-medium">Zamanlama (Opsiyonel)</label>
               <Select
-                value={reportForm.schedule_type}
-                onValueChange={(value) => setReportForm({ ...reportForm, schedule_type: value })}
+                value={reportForm.schedule_type || "none"}
+                onValueChange={(value) => setReportForm({ ...reportForm, schedule_type: value === "none" ? "" : value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Zamanlama seçin" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Zamanlanmamış</SelectItem>
+                  <SelectItem value="none">Zamanlanmamış</SelectItem>
                   <SelectItem value="daily">Günlük</SelectItem>
                   <SelectItem value="weekly">Haftalık</SelectItem>
                   <SelectItem value="monthly">Aylık</SelectItem>
@@ -450,6 +374,32 @@ export default function AnalyticsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmationDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        onConfirm={async () => {
+          if (reportToDelete) {
+            try {
+              await api.delete(`/reports/${reportToDelete}`);
+              toast({ title: "Başarılı", description: "Rapor silindi" });
+              fetchAnalytics();
+            } catch (error: any) {
+              toast({
+                title: "Hata",
+                description: error?.response?.data?.error || "Rapor silinemedi",
+                variant: "destructive",
+              });
+            }
+          }
+        }}
+        title="Raporu Sil"
+        description="Bu raporu silmek istediğinize emin misiniz? Bu işlem geri alınamaz."
+        confirmText="Sil"
+        cancelText="İptal"
+        variant="destructive"
+      />
     </div>
   );
 }

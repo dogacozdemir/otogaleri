@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Search, Phone, UserPlus, Filter, Plus, List, Table, X } from "lucide-react";
+import { Search, Phone, UserPlus, Filter, List, Table, X } from "lucide-react";
 import { api } from "@/api";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrency } from "@/hooks/useCurrency";
 
 interface CustomerSegment {
   id: number;
@@ -34,6 +35,7 @@ interface CustomerSegments {
 const CustomerList = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { formatCurrency } = useCurrency();
   const [segments, setSegments] = useState<CustomerSegments | null>(null);
   const [allCustomers, setAllCustomers] = useState<CustomerSegment[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -85,9 +87,6 @@ const CustomerList = () => {
       setLoading(false);
     }
   };
-
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(amount || 0);
 
   const formatDate = (dateString?: string | null) =>
     dateString ? new Date(dateString).toLocaleDateString("tr-TR") : "Yok";

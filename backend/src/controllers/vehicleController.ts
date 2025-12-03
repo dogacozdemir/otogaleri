@@ -44,9 +44,9 @@ export async function listVehicles(req: AuthRequest, res: Response) {
   }
 
   if (search) {
-    query += " AND (v.maker LIKE ? OR v.model LIKE ? OR v.chassis_no LIKE ?)";
+    query += " AND (v.maker LIKE ? OR v.model LIKE ? OR v.chassis_no LIKE ? OR v.plate_number LIKE ?)";
     const searchParam = `%${search}%`;
-    params.push(searchParam, searchParam, searchParam);
+    params.push(searchParam, searchParam, searchParam, searchParam);
   }
 
   query += " ORDER BY v.created_at DESC LIMIT ? OFFSET ?";

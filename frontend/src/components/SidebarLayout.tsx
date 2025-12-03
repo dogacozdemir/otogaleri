@@ -11,12 +11,15 @@ import {
   TrendingUp,
   Plus,
   Users,
-  Wallet
+  Wallet,
+  Package,
+  Settings
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import GlobalSearch from "./GlobalSearch";
 import NotificationBell from "./NotificationBell";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useTenant } from "@/contexts/TenantContext";
 
 const menuItems = [
   { 
@@ -61,15 +64,29 @@ const menuItems = [
     icon: Wallet,
     description: "Gelir ve gider yönetimi"
   },
+  { 
+    name: "Stok", 
+    path: "/inventory", 
+    icon: Package,
+    description: "Stok takibi ve ürün yönetimi"
+  },
+  { 
+    name: "Ayarlar", 
+    path: "/settings", 
+    icon: Settings,
+    description: "Galeri ayarları ve genel yapılandırma"
+  },
 ];
 
 const SidebarLayout = () => {
   const [open, setOpen] = useState(false);
-  const [user, setUser] = useState<{ name?: string; galleryName?: string } | null>(null);
+  const [user, setUser] = useState<{ name?: string } | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const { tenant } = useTenant();
 
   // Load user from localStorage
   const loadUser = () => {
@@ -77,7 +94,7 @@ const SidebarLayout = () => {
       const token = localStorage.getItem("otogaleri_token");
       if (token) {
         // Decode token to get user info (simplified)
-        const userData = { name: "Admin", galleryName: "Oto Galeri" };
+        const userData = { name: "Admin" };
         setUser(userData);
       }
     } catch (e) {
@@ -96,7 +113,19 @@ const SidebarLayout = () => {
     navigate("/login", { replace: true });
   };
 
-  const galleryName = user?.galleryName ?? "Oto Galeri";
+  const galleryName = tenant?.name ?? "Oto Galeri";
+  
+  // Get user initials for avatar
+  const getUserInitials = () => {
+    if (user?.name) {
+      const parts = user.name.trim().split(" ");
+      if (parts.length >= 2) {
+        return (parts[0][0] + parts[1][0]).toUpperCase();
+      }
+      return user.name[0].toUpperCase();
+    }
+    return "U";
+  };
 
   // ESC ile kapatma
   useEffect(() => {
@@ -125,16 +154,19 @@ const SidebarLayout = () => {
       if (!target.closest('.quick-actions-dropdown')) {
         setDropdownOpen(false);
       }
+      if (!target.closest('.profile-dropdown')) {
+        setProfileDropdownOpen(false);
+      }
     };
 
-    if (dropdownOpen) {
+    if (dropdownOpen || profileDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [dropdownOpen]);
+  }, [dropdownOpen, profileDropdownOpen]);
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -313,11 +345,55 @@ const SidebarLayout = () => {
                   )}
                 </div>
                 
-                {/* User Avatar */}
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-trustworthy rounded-xl flex items-center justify-center shadow-professional-sm">
-                  <span className="text-white font-bold text-xs sm:text-sm">
-                    {user?.name?.charAt(0) || "O"}
-                  </span>
+                {/* User Avatar with Dropdown */}
+                <div className="relative profile-dropdown">
+                  <button
+                    onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                    className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-primary/20 to-primary/30 rounded-full flex items-center justify-center shadow-professional-sm hover:shadow-professional-md transition-all duration-200 border-2 border-primary/30"
+                    aria-label="Profil menüsü"
+                  >
+                    <span className="text-primary font-bold text-xs sm:text-sm">
+                      {getUserInitials()}
+                    </span>
+                  </button>
+
+                  {/* Profile Dropdown Menu */}
+                  {profileDropdownOpen && (
+                    <div className="absolute right-0 top-12 w-56 bg-card border border-border rounded-xl shadow-professional-lg z-50 animate-fade-in">
+                      <div className="p-2">
+                        <button
+                          onClick={() => {
+                            setProfileDropdownOpen(false);
+                            navigate('/settings');
+                          }}
+                          className="w-full flex items-center space-x-3 p-3 text-left rounded-lg hover:bg-accent transition-colors duration-200"
+                        >
+                          <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+                            <Settings className="w-4 h-4 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">Ayarlar</p>
+                            <p className="text-xs text-muted-foreground">Galeri ayarları</p>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setProfileDropdownOpen(false);
+                            handleLogout();
+                          }}
+                          className="w-full flex items-center space-x-3 p-3 text-left rounded-lg hover:bg-destructive/10 transition-colors duration-200 text-destructive"
+                        >
+                          <div className="w-8 h-8 bg-destructive/10 rounded-lg flex items-center justify-center">
+                            <LogOut className="w-4 h-4 text-destructive" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">Çıkış Yap</p>
+                            <p className="text-xs text-muted-foreground">Güvenli çıkış</p>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

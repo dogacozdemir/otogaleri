@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrency } from "@/hooks/useCurrency";
 
 interface Customer {
   id: number;
@@ -68,6 +69,7 @@ const CustomerDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { formatCurrency } = useCurrency();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [sales, setSales] = useState<VehicleSale[]>([]);
   const [notFound, setNotFound] = useState(false);
@@ -181,11 +183,6 @@ const CustomerDetails: React.FC = () => {
   const formatDate = (isoString?: string | null) => {
     if (!isoString) return "-";
     return format(new Date(isoString), "dd MMMM yyyy", { locale: tr });
-  };
-
-  const formatCurrency = (amount?: number) => {
-    if (amount === undefined || amount === null || Number.isNaN(amount)) return "-";
-    return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(amount);
   };
 
   const getCustomerSegment = (totalSpent: number, saleCount: number) => {

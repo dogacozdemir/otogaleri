@@ -59,7 +59,8 @@ export async function globalSearch(req: AuthRequest, res: Response) {
           v.features,
           v.km,
           v.grade,
-          v.ps_tw,
+          v.plate_number,
+          v.chassis_no,
           v.created_at,
           'vehicle' as type,
           CONCAT('/vehicles/', v.id) as url
@@ -75,7 +76,7 @@ export async function globalSearch(req: AuthRequest, res: Response) {
           v.transmission LIKE ? OR
           v.other LIKE ? OR
           v.grade LIKE ? OR
-          v.ps_tw LIKE ? OR
+          v.plate_number LIKE ? OR
           CAST(v.km AS CHAR) LIKE ? OR
           CAST(v.year AS CHAR) LIKE ? OR
           CAST(v.cc AS CHAR) LIKE ? OR
@@ -97,7 +98,7 @@ export async function globalSearch(req: AuthRequest, res: Response) {
         searchTerm, // v.transmission
         searchTerm, // v.other
         searchTerm, // v.grade
-        searchTerm, // v.ps_tw
+        searchTerm, // v.plate_number
         searchTerm, // CAST(v.km AS CHAR)
         searchTerm, // CAST(v.year AS CHAR)
         searchTerm, // CAST(v.cc AS CHAR)

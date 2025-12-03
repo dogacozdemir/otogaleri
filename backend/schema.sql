@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS vehicles (
   transmission VARCHAR(50) NULL,
   door_seat VARCHAR(50) NULL,
   chassis_no VARCHAR(100) NULL,
-  ps_tw VARCHAR(50) NULL,
+  plate_number VARCHAR(20) NULL,
   km INT NULL,
   month INT NULL,
   fuel VARCHAR(50) NULL,
