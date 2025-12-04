@@ -103,6 +103,44 @@ export async function getCustomerById(req: AuthRequest, res: Response) {
       [req.tenantId, customer.name, customer.phone]
     );
 
+    // Her satış için taksit bilgilerini ekle
+    const salesArray = sales as any[];
+    for (const sale of salesArray) {
+      if (sale.vehicle_id) {
+        const [installmentRows] = await dbPool.query(
+          `SELECT vis.*, 
+            (SELECT COALESCE(SUM(amount * fx_rate_to_base), 0)
+             FROM vehicle_installment_payments
+             WHERE installment_sale_id = vis.id) as total_paid,
+            (vis.total_amount * vis.fx_rate_to_base) - 
+            (SELECT COALESCE(SUM(amount * fx_rate_to_base), 0)
+             FROM vehicle_installment_payments
+             WHERE installment_sale_id = vis.id) as remaining_balance
+           FROM vehicle_installment_sales vis
+           WHERE vis.vehicle_id = ? AND vis.tenant_id = ?
+           ORDER BY vis.created_at DESC
+           LIMIT 1`,
+          [sale.vehicle_id, req.tenantId]
+        );
+        const installmentRowsArray = installmentRows as any[];
+        if (installmentRowsArray.length > 0) {
+          const installmentSale = installmentRowsArray[0];
+          const [paymentRows] = await dbPool.query(
+            `SELECT * FROM vehicle_installment_payments
+             WHERE installment_sale_id = ?
+             ORDER BY payment_date ASC, installment_number ASC`,
+            [installmentSale.id]
+          );
+          sale.installment = {
+            ...installmentSale,
+            payments: paymentRows,
+          };
+          sale.installment_sale_id = installmentSale.id;
+          sale.installment_remaining_balance = Number(installmentSale.remaining_balance);
+        }
+      }
+    }
+
     // Müşterinin gelir kayıtlarını getir
     const [income] = await dbPool.query(
       `SELECT * FROM income 
@@ -112,7 +150,6 @@ export async function getCustomerById(req: AuthRequest, res: Response) {
     );
 
     // İstatistikler
-    const salesArray = sales as any[];
     const totalSales = salesArray.length;
     const totalSpent = salesArray.reduce((sum, s) => sum + (Number(s.sale_amount) * Number(s.sale_fx_rate_to_base) || 0), 0);
     const lastSaleDate = salesArray.length > 0 ? salesArray[0].sale_date : null;

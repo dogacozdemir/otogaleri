@@ -8,6 +8,7 @@ export interface DashboardStats {
   totalSales: number;
   totalProfit: number;
   totalBranches?: number;
+  activeInstallmentCount?: number;
 }
 
 export interface Followup {

@@ -32,6 +32,7 @@ import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrency } from "@/hooks/useCurrency";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface Customer {
   id: number;
@@ -63,6 +64,29 @@ interface VehicleSale {
   primary_image_url: string | null;
   branch_name: string | null;
   staff_name: string | null;
+  vehicle_id?: number | null;
+  installment_sale_id?: number | null;
+  installment_remaining_balance?: number | null;
+  installment?: {
+    id: number;
+    total_amount: number;
+    down_payment: number;
+    installment_count: number;
+    installment_amount: number;
+    currency: string;
+    status: 'active' | 'completed' | 'cancelled';
+    total_paid: number;
+    remaining_balance: number;
+    payments: Array<{
+      id: number;
+      payment_type: 'down_payment' | 'installment';
+      installment_number: number | null;
+      amount: number;
+      currency: string;
+      payment_date: string;
+      notes: string | null;
+    }>;
+  } | null;
 }
 
 const CustomerDetails: React.FC = () => {
@@ -183,6 +207,26 @@ const CustomerDetails: React.FC = () => {
   const formatDate = (isoString?: string | null) => {
     if (!isoString) return "-";
     return format(new Date(isoString), "dd MMMM yyyy", { locale: tr });
+  };
+
+  // Tarih formatlama fonksiyonu: 2025-12-04T21:00:00.000Z -> 4/12/2025 21:00
+  const formatDateTime = (dateString: string | null | undefined): string => {
+    if (!dateString) return "-";
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString;
+      
+      const day = date.getDate();
+      const month = date.getMonth() + 1;
+      const year = date.getFullYear();
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      
+      return `${day}/${month}/${year} ${hours}:${minutes}`;
+    } catch (error) {
+      return dateString;
+    }
   };
 
   const getCustomerSegment = (totalSpent: number, saleCount: number) => {
@@ -447,6 +491,77 @@ const CustomerDetails: React.FC = () => {
                               </div>
                             )}
                           </div>
+                          {/* Taksitli Satış Bilgileri */}
+                          {sale.installment && (
+                            <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                              <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-semibold">Taksitli Satış Bilgileri</h3>
+                                {sale.installment.status === 'active' && sale.installment.remaining_balance > 0 && (
+                                  <Badge variant="outline" className="bg-orange-100 text-orange-800">
+                                    Kalan Borç: {formatCurrency(sale.installment.remaining_balance)}
+                                  </Badge>
+                                )}
+                                {sale.installment.status === 'completed' && (
+                                  <Badge variant="outline" className="bg-green-100 text-green-800">
+                                    Tamamlandı
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div><strong>Toplam Satış Fiyatı:</strong> {formatCurrency(sale.installment.total_amount)}</div>
+                                <div><strong>Peşinat:</strong> {formatCurrency(sale.installment.down_payment)}</div>
+                                <div><strong>Taksit Sayısı:</strong> {sale.installment.installment_count}</div>
+                                <div><strong>Taksit Tutarı:</strong> {formatCurrency(sale.installment.installment_amount)}</div>
+                                <div><strong>Ödenen Toplam:</strong> {formatCurrency(sale.installment.total_paid)}</div>
+                                <div><strong>Kalan Borç:</strong> 
+                                  <span className={sale.installment.remaining_balance > 0 ? "text-orange-600 font-semibold ml-2" : "text-green-600 font-semibold ml-2"}>
+                                    {sale.installment.remaining_balance > 0 
+                                      ? formatCurrency(sale.installment.remaining_balance) 
+                                      : "Tamamlandı"}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="mt-4">
+                                <h4 className="font-semibold mb-2">Ödeme Geçmişi</h4>
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Tarih</TableHead>
+                                      <TableHead>Tip</TableHead>
+                                      <TableHead>Taksit No</TableHead>
+                                      <TableHead>Tutar</TableHead>
+                                      <TableHead>Notlar</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {sale.installment.payments && sale.installment.payments.length > 0 ? (
+                                      sale.installment.payments.map((payment: any) => (
+                                        <TableRow key={payment.id}>
+                                          <TableCell>{formatDateTime(payment.payment_date)}</TableCell>
+                                          <TableCell>
+                                            <Badge variant={payment.payment_type === 'down_payment' ? 'default' : 'secondary'}>
+                                              {payment.payment_type === 'down_payment' ? 'Peşinat' : 'Taksit'}
+                                            </Badge>
+                                          </TableCell>
+                                          <TableCell>
+                                            {payment.installment_number !== null && payment.installment_number !== undefined 
+                                              ? payment.installment_number 
+                                              : '-'}
+                                          </TableCell>
+                                          <TableCell>{formatCurrency(payment.amount)}</TableCell>
+                                          <TableCell>{payment.notes || '-'}</TableCell>
+                                        </TableRow>
+                                      ))
+                                    ) : (
+                                      <TableRow>
+                                        <TableCell colSpan={5} className="text-center">Ödeme kaydı bulunamadı.</TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))

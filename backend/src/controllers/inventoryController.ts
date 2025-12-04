@@ -490,3 +490,92 @@ export async function getAnalytics(req: AuthRequest, res: Response) {
     res.status(500).json({ error: "Failed to get analytics" });
   }
 }
+
+// Dashboard için stok istatistikleri - Toplam ürün, aylık değişim, en çok satan
+export async function getInventoryStats(req: AuthRequest, res: Response) {
+  try {
+    // Toplam ürün sayısı
+    const [totalRows] = await dbPool.query(
+      `SELECT COUNT(*) as total FROM inventory_products WHERE tenant_id = ?`,
+      [req.tenantId]
+    );
+    const totalProducts = Number((totalRows as any[])[0]?.total || 0);
+
+    // Bu ay ve önceki ay ürün sayıları (created_at'e göre)
+    const [monthlyRows] = await dbPool.query(
+      `SELECT 
+        DATE_FORMAT(created_at, '%Y-%m') as month,
+        COUNT(*) as product_count
+      FROM inventory_products
+      WHERE tenant_id = ? 
+        AND created_at >= DATE_SUB(CURDATE(), INTERVAL 2 MONTH)
+      GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+      ORDER BY month DESC
+      LIMIT 2`,
+      [req.tenantId]
+    );
+
+    const monthlyArray = monthlyRows as any[];
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const lastMonth = new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().slice(0, 7);
+
+    const currentMonthData = monthlyArray.find((r: any) => r.month === currentMonth);
+    const lastMonthData = monthlyArray.find((r: any) => r.month === lastMonth);
+
+    const currentCount = Number(currentMonthData?.product_count || 0);
+    const lastCount = Number(lastMonthData?.product_count || 0);
+    const changePercent = lastCount > 0 
+      ? ((currentCount - lastCount) / lastCount * 100).toFixed(1)
+      : currentCount > 0 ? "100" : "0";
+
+    // En çok satılan ürün (sales_count'a göre)
+    // Eğer hiç satış yoksa, en azından bir ürün göster (sales_count = 0 olsa bile)
+    const [topSellingRows] = await dbPool.query(
+      `SELECT 
+        name,
+        sales_count
+      FROM inventory_products
+      WHERE tenant_id = ?
+      ORDER BY sales_count DESC, name ASC
+      LIMIT 1`,
+      [req.tenantId]
+    );
+
+    const topSellingRowsArray = topSellingRows as any[];
+    const topSellingRow = topSellingRowsArray.length > 0 ? topSellingRowsArray[0] : null;
+
+    // Eğer ürün varsa ama topSelling null ise, ilk ürünü al
+    let finalTopSelling = null;
+    if (topSellingRow) {
+      finalTopSelling = {
+        name: topSellingRow.name || "Bilinmeyen Ürün",
+        salesCount: Number(topSellingRow.sales_count || 0)
+      };
+    } else if (totalProducts > 0) {
+      // Eğer hiç ürün bulunamadıysa ama toplam ürün varsa, ilk ürünü al
+      const [firstProductRows] = await dbPool.query(
+        `SELECT name, sales_count FROM inventory_products WHERE tenant_id = ? ORDER BY name ASC LIMIT 1`,
+        [req.tenantId]
+      );
+      const firstProduct = (firstProductRows as any[])[0];
+      if (firstProduct) {
+        finalTopSelling = {
+          name: firstProduct.name || "Bilinmeyen Ürün",
+          salesCount: Number(firstProduct.sales_count || 0)
+        };
+      }
+    }
+
+    res.json({
+      totalProducts,
+      currentMonth: currentCount,
+      lastMonth: lastCount,
+      changePercent: parseFloat(changePercent),
+      trend: currentCount > lastCount ? "up" : currentCount < lastCount ? "down" : "neutral",
+      topSelling: finalTopSelling
+    });
+  } catch (err) {
+    console.error("[inventory] Stats error", err);
+    res.status(500).json({ error: "Failed to get inventory stats" });
+  }
+}

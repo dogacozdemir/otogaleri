@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import { api } from "@/api";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Plus, Search, Edit, Trash2, 
   Calculator, CheckCircle, XCircle, Image as ImageIcon, FileDown, BarChart3, List, Grid3x3, Eye,
-  FileText, Upload
+  FileText, Upload, AlertCircle
 } from "lucide-react";
 import {
   BarChart,
@@ -80,6 +80,28 @@ type Vehicle = {
     key_count: number | null;
     sale_date: string;
   } | null;
+  installment_sale_id?: number | null;
+  installment_remaining_balance?: number | null;
+  installment?: {
+    id: number;
+    total_amount: number;
+    down_payment: number;
+    installment_count: number;
+    installment_amount: number;
+    currency: string;
+    status: 'active' | 'completed' | 'cancelled';
+    total_paid: number;
+    remaining_balance: number;
+    payments: Array<{
+      id: number;
+      payment_type: 'down_payment' | 'installment';
+      installment_number: number | null;
+      amount: number;
+      currency: string;
+      payment_date: string;
+      notes: string | null;
+    }>;
+  } | null;
 };
 
 type VehicleCost = {
@@ -112,6 +134,132 @@ type CostCalculation = {
 
 import { useCurrency } from "@/hooks/useCurrency";
 
+// Tarih formatlama fonksiyonu: 2025-12-04T21:00:00.000Z -> 4/12/2025 21:00
+const formatDateTime = (dateString: string | null | undefined): string => {
+  if (!dateString) return "-";
+  
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString; // Geçersiz tarih ise olduğu gibi döndür
+    
+    const day = date.getDate();
+    const month = date.getMonth() + 1;
+    const year = date.getFullYear();
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
+  } catch (error) {
+    return dateString; // Hata durumunda orijinal değeri döndür
+  }
+};
+
+// Sadece tarih formatlama: 2025-12-04T21:00:00.000Z -> 4/12/2025
+const formatDate = (dateString: string | null | undefined): string => {
+  if (!dateString) return "-";
+  
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    
+    const day = date.getDate();
+    const month = date.getMonth() + 1;
+    const year = date.getFullYear();
+    
+    return `${day}/${month}/${year}`;
+  } catch (error) {
+    return dateString;
+  }
+};
+
+// Ödenen taksit sayısını hesapla (peşinat hariç, sadece taksit ödemeleri)
+const getPaidInstallmentCount = (vehicle: Vehicle): number => {
+  if (!vehicle.installment || !vehicle.installment.payments || vehicle.installment.payments.length === 0) {
+    return 0;
+  }
+  
+  // Sadece 'installment' tipindeki ödemeleri say (peşinat hariç)
+  const installmentPayments = vehicle.installment.payments.filter(
+    (p: any) => p.payment_type === 'installment'
+  );
+  
+  return installmentPayments.length;
+};
+
+// Taksit gecikmesi kontrolü - son taksit ödemesi 30+ gün geçmişse gün sayısını döner
+const getInstallmentOverdueDays = (vehicle: Vehicle): number | null => {
+  if (!vehicle.installment || !vehicle.installment.payments || vehicle.installment.payments.length === 0) {
+    return null;
+  }
+  
+  // Sadece taksit ödemelerini al (peşinat hariç)
+  const installmentPayments = vehicle.installment.payments.filter(
+    (p: any) => p.payment_type === 'installment'
+  );
+  
+  if (installmentPayments.length === 0) {
+    // Eğer hiç taksit ödemesi yoksa, peşinat tarihini kontrol et
+    const downPayment = vehicle.installment.payments.find((p: any) => p.payment_type === 'down_payment');
+    if (!downPayment) return null;
+    
+    const downPaymentDate = new Date(downPayment.payment_date);
+    const today = new Date();
+    const diffTime = today.getTime() - downPaymentDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Eğer peşinat tarihinden 30+ gün geçtiyse ve hiç taksit ödemesi yoksa, gecikmiş sayılır
+    return diffDays >= 30 ? diffDays : null;
+  }
+  
+  // Son taksit ödeme tarihini bul
+  const lastInstallmentPayment = installmentPayments
+    .map(p => new Date(p.payment_date))
+    .sort((a, b) => b.getTime() - a.getTime())[0];
+  
+  if (!lastInstallmentPayment) return null;
+  
+  const today = new Date();
+  const diffTime = today.getTime() - lastInstallmentPayment.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  
+  return diffDays >= 30 ? diffDays : null;
+};
+
+// Taksit durum bilgisini döner
+const getInstallmentStatus = (vehicle: Vehicle): {
+  isInstallment: boolean;
+  paidCount: number;
+  totalCount: number;
+  isOverdue: boolean;
+  overdueDays: number | null;
+} => {
+  const isInstallment = !!vehicle.installment_sale_id;
+  
+  // Eğer installment bilgisi yoksa, sadece isInstallment döndür
+  if (!vehicle.installment) {
+    return {
+      isInstallment,
+      paidCount: 0,
+      totalCount: 0,
+      isOverdue: false,
+      overdueDays: null,
+    };
+  }
+  
+  const paidCount = getPaidInstallmentCount(vehicle);
+  const totalCount = vehicle.installment.installment_count || 0;
+  const overdueDays = getInstallmentOverdueDays(vehicle);
+  const isOverdue = overdueDays !== null;
+  
+  return {
+    isInstallment,
+    paidCount,
+    totalCount,
+    isOverdue,
+    overdueDays,
+  };
+};
+
 const VehiclesPage = () => {
   const { formatCurrency: currency } = useCurrency();
   const location = useLocation();
@@ -123,6 +271,8 @@ const VehiclesPage = () => {
   const [stockStatusFilter, setStockStatusFilter] = useState<string>("");
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [viewMode, setViewMode] = useState<'table' | 'list'>('table');
+  const [activeTab, setActiveTab] = useState<string>("vehicles");
+  const [soldVehiclesFilter, setSoldVehiclesFilter] = useState<string>("all");
 
   // Modal states
   const [openAdd, setOpenAdd] = useState(false);
@@ -130,8 +280,18 @@ const VehiclesPage = () => {
   const [openDetail, setOpenDetail] = useState(false);
   const [openCost, setOpenCost] = useState(false);
   const [openEditCost, setOpenEditCost] = useState(false);
-  const [openCalculate, setOpenCalculate] = useState(false);
+  // const [openCalculate, setOpenCalculate] = useState(false); // Unused - keeping for potential future use
   const [openSell, setOpenSell] = useState(false);
+  const [openPayment, setOpenPayment] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    installment_sale_id: "",
+    payment_type: "installment",
+    installment_number: "",
+    amount: "",
+    currency: "TRY",
+    payment_date: new Date().toISOString().split('T')[0],
+    notes: ""
+  });
 
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [vehicleCosts, setVehicleCosts] = useState<VehicleCost[]>([]);
@@ -200,7 +360,11 @@ const VehiclesPage = () => {
     plate_number: "",
     key_count: "",
     sale_price: "",
-    sale_date: new Date().toISOString().split('T')[0]
+    sale_date: new Date().toISOString().split('T')[0],
+    payment_type: "cash",
+    down_payment: "",
+    installment_count: "",
+    installment_amount: ""
   });
 
   const { toast } = useToast();
@@ -300,7 +464,8 @@ const VehiclesPage = () => {
       // Backend'den gelen veri yapısını düzelt
       setSelectedVehicle({
         ...vehicleData,
-        sale_info: vehicleData.sale_info || null
+        sale_info: vehicleData.sale_info || null,
+        installment: vehicleData.installment || null
       });
       
       // Harcamaları getir (kategori filtresi ile)
@@ -541,9 +706,28 @@ const VehiclesPage = () => {
   };
 
   const openDetailModal = async (vehicle: Vehicle) => {
-    setSelectedVehicle(vehicle);
-    setOpenDetail(true);
-    await fetchVehicleDetail(vehicle.id);
+    try {
+      // Önce selectedVehicle'ı set et
+      setSelectedVehicle(vehicle);
+      // Modal'ı aç
+      setOpenDetail(true);
+      // Detayları arka planda yükle
+      fetchVehicleDetail(vehicle.id).catch((error: any) => {
+        console.error("Error fetching vehicle detail:", error);
+        toast({
+          title: "Uyarı",
+          description: "Araç detayları yüklenirken bir hata oluştu. Bazı bilgiler eksik olabilir.",
+          variant: "default"
+        });
+      });
+    } catch (error: any) {
+      console.error("Error opening detail modal:", error);
+      toast({
+        title: "Hata",
+        description: "Modal açılırken bir hata oluştu.",
+        variant: "destructive"
+      });
+    }
   };
 
   const openEditModal = (vehicle: Vehicle) => {
@@ -602,12 +786,6 @@ const VehiclesPage = () => {
     setOpenCost(true);
   };
 
-  const openCalculateModal = async (vehicle: Vehicle) => {
-    setSelectedVehicle(vehicle);
-    setOpenCalculate(true);
-    await fetchCostCalculation(vehicle.id);
-    await fetchVehicleDocuments(vehicle.id);
-  };
 
   const openSellModal = (vehicle: Vehicle) => {
     setSelectedVehicle(vehicle);
@@ -618,7 +796,11 @@ const VehiclesPage = () => {
       plate_number: "",
       key_count: "",
       sale_price: vehicle.sale_price?.toString() || "",
-      sale_date: new Date().toISOString().split('T')[0]
+      sale_date: new Date().toISOString().split('T')[0],
+      payment_type: "cash",
+      down_payment: "",
+      installment_count: "",
+      installment_amount: ""
     });
     setOpenSell(true);
   };
@@ -741,16 +923,31 @@ const VehiclesPage = () => {
       });
       return;
     }
+    if (sellForm.payment_type === "installment") {
+      if (!sellForm.down_payment || !sellForm.installment_count || !sellForm.installment_amount) {
+        toast({ 
+          title: "Uyarı", 
+          description: "Taksitli satış için peşinat, taksit sayısı ve taksit tutarı zorunludur." 
+        });
+        return;
+      }
+    }
     try {
       const payload: any = {
         customer_name: sellForm.customer_name,
         sale_date: sellForm.sale_date,
-        sale_amount: Number(sellForm.sale_price)
+        sale_amount: Number(sellForm.sale_price),
+        payment_type: sellForm.payment_type
       };
       if (sellForm.customer_phone) payload.customer_phone = sellForm.customer_phone;
       if (sellForm.customer_address) payload.customer_address = sellForm.customer_address;
       if (sellForm.plate_number) payload.plate_number = sellForm.plate_number;
       if (sellForm.key_count) payload.key_count = Number(sellForm.key_count);
+      if (sellForm.payment_type === "installment") {
+        payload.down_payment = Number(sellForm.down_payment);
+        payload.installment_count = Number(sellForm.installment_count);
+        payload.installment_amount = Number(sellForm.installment_amount);
+      }
 
       await api.post(`/vehicles/${selectedVehicle.id}/sell`, payload);
       toast({ title: "Başarılı", description: "Araç satıldı olarak işaretlendi." });
@@ -768,6 +965,86 @@ const VehiclesPage = () => {
   const filteredVehicles = useMemo(() => {
     return vehicles;
   }, [vehicles, query]);
+
+  const soldVehicles = useMemo(() => {
+    return vehicles.filter(v => v.is_sold);
+  }, [vehicles]);
+
+  const handleAddPayment = async () => {
+    if (!paymentForm.installment_sale_id || !paymentForm.amount || !paymentForm.payment_date) {
+      toast({ 
+        title: "Uyarı", 
+        description: "Taksit satış ID, tutar ve ödeme tarihi zorunludur." 
+      });
+      return;
+    }
+    if (paymentForm.payment_type === "installment" && !paymentForm.installment_number) {
+      toast({ 
+        title: "Uyarı", 
+        description: "Taksit numarası zorunludur." 
+      });
+      return;
+    }
+    try {
+      const payload: any = {
+        installment_sale_id: Number(paymentForm.installment_sale_id),
+        payment_type: paymentForm.payment_type,
+        amount: Number(paymentForm.amount),
+        currency: paymentForm.currency,
+        payment_date: paymentForm.payment_date
+      };
+      if (paymentForm.payment_type === "installment") {
+        payload.installment_number = Number(paymentForm.installment_number);
+      }
+      if (paymentForm.notes) {
+        payload.notes = paymentForm.notes;
+      }
+
+      await api.post(`/installments/payments`, payload);
+      toast({ title: "Başarılı", description: "Ödeme kaydedildi." });
+      setOpenPayment(false);
+      setPaymentForm({
+        installment_sale_id: "",
+        payment_type: "installment",
+        installment_number: "",
+        amount: "",
+        currency: "TRY",
+        payment_date: new Date().toISOString().split('T')[0],
+        notes: ""
+      });
+      if (selectedVehicle) {
+        await fetchVehicleDetail(selectedVehicle.id);
+      }
+      fetchVehicles();
+    } catch (e: any) {
+      toast({ 
+        title: "Hata", 
+        description: e?.response?.data?.error || e?.response?.data?.message || "Ödeme kaydedilemedi.", 
+        variant: "destructive" 
+      });
+    }
+  };
+
+  const filteredSoldVehicles = useMemo(() => {
+    let filtered = soldVehicles;
+    
+    if (soldVehiclesFilter === "cash") {
+      filtered = filtered.filter(v => !v.installment_sale_id);
+    } else if (soldVehiclesFilter === "installment_pending") {
+      filtered = filtered.filter(v => 
+        v.installment_sale_id && 
+        v.installment_remaining_balance && 
+        v.installment_remaining_balance > 0
+      );
+    } else if (soldVehiclesFilter === "installment_completed") {
+      filtered = filtered.filter(v => 
+        v.installment_sale_id && 
+        (!v.installment_remaining_balance || v.installment_remaining_balance <= 0)
+      );
+    }
+    
+    return filtered;
+  }, [soldVehicles, soldVehiclesFilter]);
 
   // Rapor verilerini yükle
   const fetchReports = async () => {
@@ -801,9 +1078,10 @@ const VehiclesPage = () => {
 
   return (
     <div className="space-y-6 p-6">
-      <Tabs defaultValue="vehicles" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-6">
           <TabsTrigger value="vehicles">Araçlar</TabsTrigger>
+          <TabsTrigger value="sold">Satılan Araçlar</TabsTrigger>
           <TabsTrigger value="reports" onClick={fetchReports}>
             <BarChart3 className="h-4 w-4 mr-2" />
             Raporlar
@@ -1184,8 +1462,22 @@ const VehiclesPage = () => {
                           </div>
                         )}
                         <div>
-                          <div className="font-medium">
+                          <div className="font-medium flex items-center gap-2">
                             {vehicle.maker || "-"} {vehicle.model || ""}
+                            {(() => {
+                              const overdueDays = getInstallmentOverdueDays(vehicle);
+                              if (overdueDays !== null) {
+                                return (
+                                  <div className="relative group">
+                                    <AlertCircle className="h-4 w-4 text-orange-500" />
+                                    <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-50">
+                                      Son taksit ödemesinin üzerinden {overdueDays} gün geçti.
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
                           </div>
                           {vehicle.chassis_no && (
                             <div className="text-sm text-muted-foreground">
@@ -1201,18 +1493,46 @@ const VehiclesPage = () => {
                     <TableCell>{currency(vehicle.total_costs)}</TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1">
-                        {vehicle.is_sold ? (
-                          <Badge variant="default" className="bg-green-500">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Satıldı
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary">
-                            <XCircle className="h-3 w-3 mr-1" />
-                            Satılmadı
-                          </Badge>
-                        )}
-                        {vehicle.stock_status && (
+                        {(() => {
+                          const status = getInstallmentStatus(vehicle);
+                          if (vehicle.is_sold) {
+                            if (status.isInstallment) {
+                              return (
+                                <>
+                                  <Badge variant="default" className="bg-green-500">
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    Taksitle Satıldı
+                                  </Badge>
+                                  {status.isOverdue ? (
+                                    <Badge variant="destructive" className="flex items-center gap-1">
+                                      <AlertCircle className="h-3 w-3" />
+                                      Gecikmiş Taksit
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="bg-orange-100 text-orange-800">
+                                      {status.paidCount}/{status.totalCount}
+                                    </Badge>
+                                  )}
+                                </>
+                              );
+                            } else {
+                              return (
+                                <Badge variant="default" className="bg-green-500">
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Satıldı
+                                </Badge>
+                              );
+                            }
+                          } else {
+                            return (
+                              <Badge variant="secondary">
+                                <XCircle className="h-3 w-3 mr-1" />
+                                Satılmadı
+                              </Badge>
+                            );
+                          }
+                        })()}
+                        {vehicle.stock_status && !getInstallmentStatus(vehicle).isInstallment && (
                           <Badge 
                             variant="outline" 
                             className={
@@ -1304,25 +1624,67 @@ const VehiclesPage = () => {
                           <ImageIcon className="h-12 w-12 text-muted-foreground" />
                         </div>
                       )}
-                      <div className="absolute top-2 right-2 flex gap-1">
-                        {vehicle.is_sold ? (
-                          <Badge variant="default" className="bg-green-500">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Satıldı
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary">
-                            <XCircle className="h-3 w-3 mr-1" />
-                            Satılmadı
-                          </Badge>
-                        )}
+                      <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
+                        {(() => {
+                          const status = getInstallmentStatus(vehicle);
+                          if (vehicle.is_sold) {
+                            if (status.isInstallment) {
+                              return (
+                                <>
+                                  <Badge variant="default" className="bg-green-500">
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    Taksitle Satıldı
+                                  </Badge>
+                                  {status.isOverdue ? (
+                                    <Badge variant="destructive" className="flex items-center gap-1">
+                                      <AlertCircle className="h-3 w-3" />
+                                      Gecikmiş
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="bg-orange-100 text-orange-800">
+                                      {status.paidCount}/{status.totalCount}
+                                    </Badge>
+                                  )}
+                                </>
+                              );
+                            } else {
+                              return (
+                                <Badge variant="default" className="bg-green-500">
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Satıldı
+                                </Badge>
+                              );
+                            }
+                          } else {
+                            return (
+                              <Badge variant="secondary">
+                                <XCircle className="h-3 w-3 mr-1" />
+                                Satılmadı
+                              </Badge>
+                            );
+                          }
+                        })()}
                       </div>
                     </div>
                     <CardContent className="p-4">
                       <div className="space-y-3">
                         <div>
-                          <h3 className="font-semibold text-lg">
+                          <h3 className="font-semibold text-lg flex items-center gap-2">
                             {vehicle.maker || "-"} {vehicle.model || ""}
+                            {(() => {
+                              const overdueDays = getInstallmentOverdueDays(vehicle);
+                              if (overdueDays !== null) {
+                                return (
+                                  <div className="relative group">
+                                    <AlertCircle className="h-4 w-4 text-orange-500" />
+                                    <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-50">
+                                      Son taksit ödemesinin üzerinden {overdueDays} gün geçti.
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
                           </h3>
                           {vehicle.year && (
                             <p className="text-sm text-muted-foreground">{vehicle.year}</p>
@@ -1345,7 +1707,27 @@ const VehiclesPage = () => {
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-1">
-                          {vehicle.stock_status && (
+                          {(() => {
+                            const status = getInstallmentStatus(vehicle);
+                            if (vehicle.is_sold && status.isInstallment) {
+                              if (status.isOverdue) {
+                                return (
+                                  <Badge variant="destructive" className="flex items-center gap-1">
+                                    <AlertCircle className="h-3 w-3" />
+                                    Gecikmiş Taksit
+                                  </Badge>
+                                );
+                              } else {
+                                return (
+                                  <Badge variant="outline" className="bg-orange-100 text-orange-800">
+                                    {status.paidCount}/{status.totalCount}
+                                  </Badge>
+                                );
+                              }
+                            }
+                            return null;
+                          })()}
+                          {vehicle.stock_status && !getInstallmentStatus(vehicle).isInstallment && (
                             <Badge 
                               variant="outline" 
                               className={
@@ -1411,15 +1793,33 @@ const VehiclesPage = () => {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
 
       {/* Detail Modal - Bu modal araç detaylarını, harcamaları ve maliyet hesaplamayı gösterir */}
-      <Dialog open={openDetail} onOpenChange={setOpenDetail}>
-        <DialogContent className="max-w-4xl h-[70vh] p-0 flex flex-col">
-          {selectedVehicle && (
+      <Dialog 
+        open={openDetail} 
+        onOpenChange={(open) => {
+          console.log("Dialog onOpenChange called with:", open, "current openDetail:", openDetail);
+          setOpenDetail(open);
+        }}
+      >
+        <DialogContent className="max-w-4xl h-[70vh] p-0 flex flex-col" onOpenAutoFocus={() => {
+          console.log("DialogContent onOpenAutoFocus called");
+        }}>
+          <DialogHeader className="px-6 pt-6 pb-0">
+            <DialogTitle>
+              {selectedVehicle ? `${selectedVehicle.maker || ""} ${selectedVehicle.model || ""}`.trim() || "Araç Detayları" : "Araç Detayları"}
+            </DialogTitle>
+            <DialogDescription>
+              Araç bilgileri, satış detayları ve taksit takibi
+            </DialogDescription>
+          </DialogHeader>
+          {selectedVehicle ? (
             <Tabs defaultValue="info" className="w-full flex flex-col flex-1 min-h-0">
-              <div className="px-6 pt-6 pb-0 flex-shrink-0">
-                <TabsList className="grid w-full grid-cols-5">
+              <div className="px-6 pt-4 pb-0 flex-shrink-0">
+                <TabsList className="grid w-full grid-cols-6">
                   <TabsTrigger value="info">Bilgiler</TabsTrigger>
+                  <TabsTrigger value="delivery">Satış</TabsTrigger>
                   <TabsTrigger value="images">Fotoğraflar</TabsTrigger>
                   <TabsTrigger value="documents">Belgeler</TabsTrigger>
                   <TabsTrigger value="costs">Harcamalar</TabsTrigger>
@@ -1445,14 +1845,36 @@ const VehiclesPage = () => {
                   <div><strong>Renk:</strong> {selectedVehicle.color || "-"}</div>
                   <div><strong>Önerilen Satış Fiyatı:</strong> {currency(selectedVehicle.sale_price)}</div>
                   <div><strong>Ödenen:</strong> {currency(selectedVehicle.paid)}</div>
-                  <div><strong>Teslimat Tarihi:</strong> {selectedVehicle.delivery_date || "-"}</div>
-                  <div><strong>Teslimat Saati:</strong> {selectedVehicle.delivery_time || "-"}</div>
                   {selectedVehicle.other && (
                     <div className="col-span-2"><strong>Diğer:</strong> {selectedVehicle.other}</div>
                   )}
                 </div>
+              </TabsContent>
+
+              <TabsContent value="delivery" className="space-y-4 mt-4">
+                {/* Teslimat Bilgileri */}
+                <div className="p-4 bg-gray-50 dark:bg-gray-900/20 rounded-lg">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <strong>Teslimat Tarihi:</strong> {formatDate(selectedVehicle.delivery_date)}
+                    </div>
+                    <div>
+                      <strong>Teslimat Saati:</strong> {
+                        selectedVehicle.delivery_time 
+                          ? (selectedVehicle.delivery_time.includes('T') 
+                              ? formatDateTime(selectedVehicle.delivery_time).split(' ')[1] 
+                              : selectedVehicle.delivery_time)
+                          : (selectedVehicle.delivery_date 
+                              ? formatDateTime(selectedVehicle.delivery_date).split(' ')[1] 
+                              : "-")
+                      }
+                    </div>
+                  </div>
+                </div>
+
+                {/* Satış Bilgileri */}
                 {selectedVehicle.sale_info && (
-                  <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                     <div className="flex justify-between items-center mb-2">
                       <h3 className="font-semibold">Satış Bilgileri</h3>
                       <div className="flex gap-2">
@@ -1522,8 +1944,102 @@ const VehiclesPage = () => {
                       <div><strong>Adres:</strong> {selectedVehicle.sale_info.customer_address || "-"}</div>
                       <div><strong>Plaka:</strong> {selectedVehicle.sale_info.plate_number || "-"}</div>
                       <div><strong>Anahtar Sayısı:</strong> {selectedVehicle.sale_info.key_count || "-"}</div>
-                      <div><strong>Satış Tarihi:</strong> {selectedVehicle.sale_info.sale_date}</div>
+                      <div><strong>Satış Tarihi:</strong> {formatDateTime(selectedVehicle.sale_info.sale_date)}</div>
                     </div>
+                  </div>
+                )}
+
+                {/* Taksitli Satış Bilgileri */}
+                {selectedVehicle.installment && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="font-semibold">Taksitli Satış Bilgileri</h3>
+                      {selectedVehicle.installment.status === 'active' && selectedVehicle.installment.remaining_balance > 0 && (
+                        <Badge variant="outline" className="bg-orange-100 text-orange-800">
+                          Kalan Borç: {currency(selectedVehicle.installment.remaining_balance)}
+                        </Badge>
+                      )}
+                      {selectedVehicle.installment.status === 'completed' && (
+                        <Badge variant="outline" className="bg-green-100 text-green-800">
+                          Tamamlandı
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div><strong>Toplam Satış Fiyatı:</strong> {currency(selectedVehicle.installment.total_amount)}</div>
+                      <div><strong>Peşinat:</strong> {currency(selectedVehicle.installment.down_payment)}</div>
+                      <div><strong>Taksit Sayısı:</strong> {selectedVehicle.installment.installment_count}</div>
+                      <div><strong>Taksit Tutarı:</strong> {currency(selectedVehicle.installment.installment_amount)}</div>
+                      <div><strong>Ödenen Toplam:</strong> {currency(selectedVehicle.installment.total_paid)}</div>
+                      <div><strong>Kalan Borç:</strong> 
+                        <span className={selectedVehicle.installment.remaining_balance > 0 ? "text-orange-600 font-semibold ml-2" : "text-green-600 font-semibold ml-2"}>
+                          {selectedVehicle.installment.remaining_balance > 0 
+                            ? currency(selectedVehicle.installment.remaining_balance) 
+                            : "Tamamlandı"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <h4 className="font-semibold mb-2">Ödeme Geçmişi</h4>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Tarih</TableHead>
+                            <TableHead>Tip</TableHead>
+                            <TableHead>Taksit No</TableHead>
+                            <TableHead>Tutar</TableHead>
+                            <TableHead>Notlar</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedVehicle.installment.payments && selectedVehicle.installment.payments.length > 0 ? (
+                            selectedVehicle.installment.payments.map((payment: any) => (
+                              <TableRow key={payment.id}>
+                                <TableCell>{formatDateTime(payment.payment_date)}</TableCell>
+                                <TableCell>
+                                  <Badge variant={payment.payment_type === 'down_payment' ? 'default' : 'secondary'}>
+                                    {payment.payment_type === 'down_payment' ? 'Peşinat' : 'Taksit'}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  {payment.installment_number !== null && payment.installment_number !== undefined 
+                                    ? payment.installment_number 
+                                    : '-'}
+                                </TableCell>
+                                <TableCell>{currency(payment.amount)}</TableCell>
+                                <TableCell>{payment.notes || '-'}</TableCell>
+                              </TableRow>
+                            ))
+                          ) : (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center">Ödeme kaydı bulunamadı.</TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    {selectedVehicle.installment && selectedVehicle.installment.status === 'active' && selectedVehicle.installment.remaining_balance > 0 && (
+                      <div className="mt-4">
+                        <Button
+                          onClick={() => {
+                            if (selectedVehicle.installment) {
+                              setPaymentForm({
+                                installment_sale_id: selectedVehicle.installment.id.toString(),
+                                payment_type: "installment",
+                                installment_number: "",
+                                amount: selectedVehicle.installment.installment_amount.toString(),
+                                currency: selectedVehicle.installment.currency,
+                                payment_date: new Date().toISOString().split('T')[0],
+                                notes: ""
+                              });
+                              setOpenPayment(true);
+                            }
+                          }}
+                        >
+                          Yeni Ödeme Ekle
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </TabsContent>
@@ -1675,7 +2191,7 @@ const VehiclesPage = () => {
                             <Badge variant="outline">{categoryLabel}</Badge>
                           </TableCell>
                           <TableCell>{currency(cost.amount)}</TableCell>
-                          <TableCell>{cost.date}</TableCell>
+                          <TableCell>{formatDate(cost.date)}</TableCell>
                           <TableCell>
                             <div className="flex gap-2">
                               <Button
@@ -1813,6 +2329,11 @@ const VehiclesPage = () => {
               </TabsContent>
               </div>
             </Tabs>
+          ) : (
+            <div className="p-6 text-center">
+              <p>Yükleniyor...</p>
+              <p className="text-sm text-muted-foreground mt-2">Araç bilgileri yükleniyor...</p>
+            </div>
           )}
         </DialogContent>
       </Dialog>
@@ -2252,15 +2773,91 @@ const VehiclesPage = () => {
               />
             </div>
             <div>
-              <label className="text-sm font-medium">Satış Fiyatı</label>
+              <label className="text-sm font-medium">Satış Fiyatı *</label>
               <Input
                 type="number"
                 step="0.01"
                 value={sellForm.sale_price}
-                onChange={(e) => setSellForm({ ...sellForm, sale_price: e.target.value })}
+                onChange={(e) => {
+                  const salePrice = e.target.value;
+                  setSellForm({ ...sellForm, sale_price: salePrice });
+                  // Taksit tutarını otomatik hesapla
+                  if (sellForm.payment_type === "installment" && sellForm.down_payment && sellForm.installment_count) {
+                    const remaining = Number(salePrice) - Number(sellForm.down_payment);
+                    const installmentAmount = remaining / Number(sellForm.installment_count);
+                    setSellForm(prev => ({ ...prev, sale_price: salePrice, installment_amount: installmentAmount.toFixed(2) }));
+                  }
+                }}
                 placeholder="Satış fiyatını girin"
               />
             </div>
+            <div>
+              <label className="text-sm font-medium">Ödeme Tipi *</label>
+              <Select
+                value={sellForm.payment_type}
+                onValueChange={(value) => setSellForm({ ...sellForm, payment_type: value, down_payment: "", installment_count: "", installment_amount: "" })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Ödeme tipi seçin" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Peşin</SelectItem>
+                  <SelectItem value="installment">Taksitli</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {sellForm.payment_type === "installment" && (
+              <>
+                <div>
+                  <label className="text-sm font-medium">Peşinat *</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={sellForm.down_payment}
+                    onChange={(e) => {
+                      const downPayment = e.target.value;
+                      setSellForm({ ...sellForm, down_payment: downPayment });
+                      // Taksit tutarını otomatik hesapla
+                      if (sellForm.sale_price && sellForm.installment_count) {
+                        const remaining = Number(sellForm.sale_price) - Number(downPayment);
+                        const installmentAmount = remaining / Number(sellForm.installment_count);
+                        setSellForm(prev => ({ ...prev, down_payment: downPayment, installment_amount: installmentAmount.toFixed(2) }));
+                      }
+                    }}
+                    placeholder="Peşinat tutarını girin"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Taksit Sayısı *</label>
+                  <Input
+                    type="number"
+                    value={sellForm.installment_count}
+                    onChange={(e) => {
+                      const installmentCount = e.target.value;
+                      setSellForm({ ...sellForm, installment_count: installmentCount });
+                      // Taksit tutarını otomatik hesapla
+                      if (sellForm.sale_price && sellForm.down_payment) {
+                        const remaining = Number(sellForm.sale_price) - Number(sellForm.down_payment);
+                        const installmentAmount = remaining / Number(installmentCount);
+                        setSellForm(prev => ({ ...prev, installment_count: installmentCount, installment_amount: installmentAmount.toFixed(2) }));
+                      }
+                    }}
+                    placeholder="Taksit sayısını girin"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Taksit Tutarı</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={sellForm.installment_amount}
+                    readOnly
+                    placeholder="Otomatik hesaplanır"
+                    className="bg-muted"
+                  />
+                </div>
+              </>
+            )}
             <div>
               <label className="text-sm font-medium">Satış Tarihi *</label>
               <Input
@@ -2273,6 +2870,103 @@ const VehiclesPage = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpenSell(false)}>İptal</Button>
             <Button onClick={handleSell}>Satıldı Olarak İşaretle</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Modal */}
+      <Dialog open={openPayment} onOpenChange={setOpenPayment}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Taksit Ödemesi Ekle</DialogTitle>
+            <DialogDescription>
+              Taksit ödemesi bilgilerini girin.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <label className="text-sm font-medium">Ödeme Tipi *</label>
+              <Select
+                value={paymentForm.payment_type}
+                onValueChange={(value) => setPaymentForm({ ...paymentForm, payment_type: value, installment_number: "" })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Ödeme tipi seçin" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="down_payment">Peşinat</SelectItem>
+                  <SelectItem value="installment">Taksit</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {paymentForm.payment_type === "installment" && (
+              <div>
+                <label className="text-sm font-medium">Taksit Numarası *</label>
+                <Input
+                  type="number"
+                  value={paymentForm.installment_number}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, installment_number: e.target.value })}
+                  placeholder="Taksit numarasını girin"
+                />
+              </div>
+            )}
+            <div>
+              <label className="text-sm font-medium">Tutar *</label>
+              <Input
+                type="number"
+                step="0.01"
+                value={paymentForm.amount}
+                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                placeholder="Ödeme tutarını girin"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Para Birimi</label>
+              <Select
+                value={paymentForm.currency}
+                onValueChange={(value) => setPaymentForm({ ...paymentForm, currency: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Para birimi seçin" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TRY">TRY</SelectItem>
+                  <SelectItem value="USD">USD</SelectItem>
+                  <SelectItem value="EUR">EUR</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Ödeme Tarihi *</label>
+              <Input
+                type="date"
+                value={paymentForm.payment_date}
+                onChange={(e) => setPaymentForm({ ...paymentForm, payment_date: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Notlar</label>
+              <Input
+                value={paymentForm.notes}
+                onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                placeholder="Opsiyonel notlar"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setOpenPayment(false);
+              setPaymentForm({
+                installment_sale_id: "",
+                payment_type: "installment",
+                installment_number: "",
+                amount: "",
+                currency: "TRY",
+                payment_date: new Date().toISOString().split('T')[0],
+                notes: ""
+              });
+            }}>İptal</Button>
+            <Button onClick={handleAddPayment}>Ödeme Ekle</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2394,6 +3088,188 @@ const VehiclesPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+        <TabsContent value="sold" className="space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold">Satılan Araçlar</h1>
+              <p className="text-muted-foreground mt-2">Satılan araçların listesi ve taksit takibi</p>
+            </div>
+          </div>
+
+          {/* Filters */}
+          <div className="flex gap-4 items-center">
+            <Select value={soldVehiclesFilter} onValueChange={setSoldVehiclesFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Filtrele" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tümü</SelectItem>
+                <SelectItem value="cash">Peşin Satılanlar</SelectItem>
+                <SelectItem value="installment_pending">Taksitli - Kalan Borç Var</SelectItem>
+                <SelectItem value="installment_completed">Taksitli - Tamamlandı</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Sold Vehicles Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Satılan Araç Listesi</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Marka/Model</TableHead>
+                    <TableHead>Yıl</TableHead>
+                    <TableHead>Şasi No</TableHead>
+                    <TableHead>Satış Fiyatı</TableHead>
+                    <TableHead>Peşinat</TableHead>
+                    <TableHead>Kalan Borç</TableHead>
+                    <TableHead>Durum</TableHead>
+                    <TableHead>İşlemler</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center">Yükleniyor...</TableCell>
+                    </TableRow>
+                  ) : filteredSoldVehicles.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center">Satılan araç bulunamadı.</TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredSoldVehicles.map((vehicle) => (
+                      <TableRow key={vehicle.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            {vehicle.primary_image_url ? (
+                              <img
+                                src={vehicle.primary_image_url.startsWith('http') 
+                                  ? vehicle.primary_image_url 
+                                  : vehicle.primary_image_url.startsWith('/uploads')
+                                  ? `http://localhost:5005${vehicle.primary_image_url}`
+                                  : vehicle.primary_image_url}
+                                alt={`${vehicle.maker} ${vehicle.model}`}
+                                className="w-16 h-16 object-cover rounded"
+                                loading="lazy"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <div className="w-16 h-16 bg-muted rounded flex items-center justify-center">
+                                <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div>
+                              <div className="font-medium flex items-center gap-2">
+                                {vehicle.maker || "-"} {vehicle.model || ""}
+                                {(() => {
+                                  const overdueDays = getInstallmentOverdueDays(vehicle);
+                                  if (overdueDays !== null) {
+                                    return (
+                                      <div className="relative group">
+                                        <AlertCircle className="h-4 w-4 text-orange-500" />
+                                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-50">
+                                          Son taksit ödemesinin üzerinden {overdueDays} gün geçti.
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                              </div>
+                              {vehicle.chassis_no && (
+                                <div className="text-sm text-muted-foreground">
+                                  {vehicle.chassis_no}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>{vehicle.year || "-"}</TableCell>
+                        <TableCell>{vehicle.chassis_no || "-"}</TableCell>
+                        <TableCell>{currency(vehicle.sale_price)}</TableCell>
+                        <TableCell>
+                          {vehicle.installment?.down_payment 
+                            ? currency(vehicle.installment.down_payment)
+                            : "-"}
+                        </TableCell>
+                        <TableCell>
+                          {vehicle.installment_remaining_balance && vehicle.installment_remaining_balance > 0
+                            ? (
+                              <span className="text-orange-600 font-semibold">
+                                {currency(vehicle.installment_remaining_balance)}
+                              </span>
+                            )
+                            : vehicle.installment_sale_id
+                            ? (
+                              <span className="text-green-600">Tamamlandı</span>
+                            )
+                            : "-"}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            {(() => {
+                              const status = getInstallmentStatus(vehicle);
+                              if (status.isInstallment) {
+                                return (
+                                  <>
+                                    <Badge variant="default" className="bg-green-500">
+                                      <CheckCircle className="h-3 w-3 mr-1" />
+                                      Taksitle Satıldı
+                                    </Badge>
+                                    {status.isOverdue ? (
+                                      <Badge variant="destructive" className="flex items-center gap-1">
+                                        <AlertCircle className="h-3 w-3" />
+                                        Gecikmiş Taksit
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="bg-orange-100 text-orange-800">
+                                        {status.paidCount}/{status.totalCount}
+                                      </Badge>
+                                    )}
+                                  </>
+                                );
+                              } else {
+                                return (
+                                  <Badge variant="default" className="bg-green-500">
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    Satıldı
+                                  </Badge>
+                                );
+                              }
+                            })()}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                openDetailModal(vehicle);
+                              }}
+                              title="Detay"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="reports" className="space-y-6">
@@ -2555,7 +3431,7 @@ const VehiclesPage = () => {
                             <TableCell>{currency(vehicle.sale_price)}</TableCell>
                             <TableCell>{currency(vehicle.total_costs)}</TableCell>
                             <TableCell className="font-semibold text-green-600">{currency(vehicle.profit)}</TableCell>
-                            <TableCell>{vehicle.sale_date ? new Date(vehicle.sale_date).toLocaleDateString('tr-TR') : '-'}</TableCell>
+                            <TableCell>{formatDateTime(vehicle.sale_date)}</TableCell>
                             <TableCell>{vehicle.customer_name || '-'}</TableCell>
                           </TableRow>
                         ))}

@@ -17,6 +17,10 @@ export async function markVehicleAsSold(req: AuthRequest, res: Response) {
     sale_amount,
     sale_currency,
     sale_date,
+    payment_type,
+    down_payment,
+    installment_count,
+    installment_amount,
   } = req.body;
 
   if (!customer_name || !sale_amount || !sale_date) {
@@ -151,6 +155,61 @@ export async function markVehicleAsSold(req: AuthRequest, res: Response) {
       await conn.rollback();
       conn.release();
       return res.status(500).json({ error: "Failed to save vehicle sale" });
+    }
+
+    // Eğer taksitli satış ise, taksitli satış kaydı oluştur
+    if (payment_type === "installment") {
+      if (!down_payment || !installment_count || !installment_amount) {
+        await conn.rollback();
+        conn.release();
+        return res.status(400).json({ error: "down_payment, installment_count, and installment_amount are required for installment sales" });
+      }
+
+      await conn.query(
+        `INSERT INTO vehicle_installment_sales (
+          tenant_id, vehicle_id, sale_id,
+          total_amount, down_payment, installment_count, installment_amount,
+          currency, fx_rate_to_base, sale_date, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')`,
+        [
+          req.tenantId,
+          vehicle_id,
+          saleId,
+          sale_amount,
+          down_payment,
+          installment_count,
+          installment_amount,
+          finalSaleCurrency,
+          saleFxRate,
+          sale_date,
+        ]
+      );
+
+      const [installmentRows] = await conn.query(
+        "SELECT id FROM vehicle_installment_sales WHERE sale_id = ? AND tenant_id = ?",
+        [saleId, req.tenantId]
+      );
+      const installmentRowsArray = installmentRows as any[];
+      const installmentSaleId = installmentRowsArray[0]?.id;
+
+      if (installmentSaleId) {
+        // Peşinat ödemesini kaydet
+        await conn.query(
+          `INSERT INTO vehicle_installment_payments (
+            tenant_id, installment_sale_id,
+            payment_type, installment_number,
+            amount, currency, fx_rate_to_base, payment_date
+          ) VALUES (?, ?, 'down_payment', 0, ?, ?, ?, ?)`,
+          [
+            req.tenantId,
+            installmentSaleId,
+            down_payment,
+            finalSaleCurrency,
+            saleFxRate,
+            sale_date,
+          ]
+        );
+      }
     }
 
     await conn.commit();

@@ -1,7 +1,7 @@
 import axios from "axios";
 import { FREECURRENCY_API_BASE, FREECURRENCY_API_KEY } from "../config/currency";
 
-export type SupportedCurrency = "TRY" | "USD" | "EUR" | "GBP";
+export type SupportedCurrency = "TRY" | "USD" | "EUR" | "GBP" | "JPY";
 
 export interface FxRate {
   base: string;

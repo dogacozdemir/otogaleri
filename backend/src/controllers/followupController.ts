@@ -250,7 +250,7 @@ export async function deleteFollowup(req: AuthRequest, res: Response) {
   }
 }
 
-// Bugünkü takip görevleri
+// Bugünkü takip görevleri (artık tüm görevleri getiriyor)
 export async function getTodayFollowups(req: AuthRequest, res: Response) {
   try {
     const [rows] = await dbPool.query(
@@ -269,15 +269,14 @@ export async function getTodayFollowups(req: AuthRequest, res: Response) {
       LEFT JOIN customers c ON f.customer_id = c.id
       WHERE f.tenant_id = ? 
         AND f.status = 'pending'
-        AND f.followup_date <= CURDATE()
-      ORDER BY f.followup_time ASC`,
+      ORDER BY f.followup_date ASC, f.followup_time ASC`,
       [req.tenantId]
     );
 
     res.json(rows);
   } catch (err) {
     console.error("[followup] Today followups error", err);
-    res.status(500).json({ error: "Failed to get today followups" });
+    res.status(500).json({ error: "Failed to get followups" });
   }
 }
 

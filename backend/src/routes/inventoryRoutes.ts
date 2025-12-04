@@ -10,6 +10,7 @@ import {
   handleExit,
   listMovements,
   getAnalytics,
+  getInventoryStats,
 } from "../controllers/inventoryController";
 
 const router = Router();
@@ -31,5 +32,6 @@ router.get("/:id/movements", listMovements);
 
 // Analytics
 router.get("/analytics/overview", getAnalytics);
+router.get("/analytics/stats", getInventoryStats);
 
 export default router;

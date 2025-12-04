@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import GlobalSearch from "./GlobalSearch";
-import NotificationBell from "./NotificationBell";
+import CurrencyConverterPopover from "./CurrencyConverterPopover";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTenant } from "@/contexts/TenantContext";
 
@@ -303,9 +303,9 @@ const SidebarLayout = () => {
                   <ThemeToggle />
                 </div>
                 
-                {/* Notification Bell */}
+                {/* Currency Converter */}
                 <div className="flex items-center">
-                  <NotificationBell />
+                  <CurrencyConverterPopover />
                 </div>
                 
                 {/* Quick Actions Button */}

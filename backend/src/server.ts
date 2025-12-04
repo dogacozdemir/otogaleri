@@ -17,6 +17,8 @@ import reportRoutes from "./routes/reportRoutes";
 import searchRoutes from "./routes/searchRoutes";
 import inventoryRoutes from "./routes/inventoryRoutes";
 import tenantRoutes from "./routes/tenantRoutes";
+import installmentRoutes from "./routes/installmentRoutes";
+import currencyRoutes from "./routes/currencyRoutes";
 import path from "path";
 
 const app = express();
@@ -76,6 +78,8 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/tenant", tenantRoutes);
+app.use("/api/installments", installmentRoutes);
+app.use("/api/currency", currencyRoutes);
 
 const PORT = process.env.PORT || 5005;
 
