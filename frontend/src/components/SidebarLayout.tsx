@@ -264,58 +264,58 @@ const SidebarLayout = () => {
 
       {/* Main content */}
       <div className="flex flex-col flex-1 min-h-screen">
-        <header className="w-full bg-card/95 backdrop-blur-md shadow-professional-sm border-b border-border sticky top-0 z-20">
-          <div className="app-container py-3 sm:py-4">
-            <div className="flex items-center justify-between">
+        <header className="w-full bg-card/95 backdrop-blur-md shadow-professional-sm border-b border-border sticky top-0 z-20 min-h-[72px] flex-shrink-0">
+          <div className="w-full px-4 sm:px-6 lg:px-8 py-3 sm:py-4 h-full">
+            <div className="flex items-center justify-between h-full max-w-[1400px] mx-auto">
               {/* Left Section - Menu & Brand */}
-              <div className="flex items-center space-x-3 sm:space-x-6">
+              <div className="flex items-center space-x-3 sm:space-x-6 flex-1 min-w-0">
                 <button 
                   onClick={() => setOpen(true)}
-                  className="interactive-element p-2 sm:p-3 rounded-xl bg-accent/50 hover:bg-accent"
+                  className="interactive-element p-2 sm:p-3 rounded-xl bg-accent/50 hover:bg-accent flex-shrink-0"
                   aria-label="Menüyü aç"
                 >
                   <Menu className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                 </button>
-                <div className="border-l border-border pl-3 sm:pl-6">
-                  <h2 className="text-lg sm:text-xl font-bold text-primary">
+                <div className="border-l border-border pl-3 sm:pl-6 flex-shrink-0 min-w-0">
+                  <h2 className="text-lg sm:text-xl font-bold text-primary truncate">
                     {isMobile ? galleryName.split(' ')[0] : galleryName}
                   </h2>
-                  <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">
+                  <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block min-h-[16px]">
                     {menuItems.find(item => item.path === location.pathname)?.description || "Profesyonel Yönetim Paneli"}
                   </p>
                 </div>
                 
                 {/* Global Search - Hidden on small mobile */}
-                <div className="hidden sm:block flex-1 max-w-sm">
+                <div className="hidden sm:block flex-shrink-0 w-[200px] lg:w-[280px]">
                   <GlobalSearch />
                 </div>
               </div>
               
               {/* Right Section - Status & User */}
-              <div className="flex items-center space-x-2 sm:space-x-6">
+              <div className="flex items-center space-x-2 sm:space-x-6 flex-shrink-0">
                 {/* Mobile Search */}
-                <div className="sm:hidden">
+                <div className="sm:hidden flex-shrink-0">
                   <GlobalSearch />
                 </div>
                 
                 {/* Theme Toggle */}
-                <div className="flex items-center">
+                <div className="flex items-center flex-shrink-0">
                   <ThemeToggle />
                 </div>
                 
                 {/* Currency Converter */}
-                <div className="flex items-center">
+                <div className="flex items-center flex-shrink-0">
                   <CurrencyConverterPopover />
                 </div>
                 
                 {/* Quick Actions Button */}
-                <div className="relative quick-actions-dropdown">
+                <div className="relative quick-actions-dropdown flex-shrink-0">
                   <button 
                     onClick={() => setDropdownOpen(!dropdownOpen)}
-                    className="flex items-center space-x-2 px-3 py-2 bg-gradient-trustworthy rounded-xl shadow-professional-sm hover:shadow-professional-md transition-all duration-200"
+                    className="flex items-center space-x-2 px-3 py-2 bg-gradient-trustworthy rounded-xl shadow-professional-sm hover:shadow-professional-md transition-all duration-200 whitespace-nowrap"
                   >
-                    <Plus className="w-5 h-5 text-white" />
-                    <span className="text-white font-medium text-sm">Hızlı İşlemler</span>
+                    <Plus className="w-5 h-5 text-white flex-shrink-0" />
+                    <span className="text-white font-medium text-sm hidden sm:inline">Hızlı İşlemler</span>
                   </button>
                   
                   {/* Dropdown Menu */}
@@ -346,10 +346,10 @@ const SidebarLayout = () => {
                 </div>
                 
                 {/* User Avatar with Dropdown */}
-                <div className="relative profile-dropdown">
+                <div className="relative profile-dropdown flex-shrink-0">
                   <button
                     onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                    className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-primary/20 to-primary/30 rounded-full flex items-center justify-center shadow-professional-sm hover:shadow-professional-md transition-all duration-200 border-2 border-primary/30"
+                    className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-primary/20 to-primary/30 rounded-full flex items-center justify-center shadow-professional-sm hover:shadow-professional-md transition-all duration-200 border-2 border-primary/30 flex-shrink-0"
                     aria-label="Profil menüsü"
                   >
                     <span className="text-primary font-bold text-xs sm:text-sm">
@@ -401,8 +401,10 @@ const SidebarLayout = () => {
         </header>
 
         <main className="flex-1 bg-background dark:bg-background">
-          <div className="page-container px-4 sm:px-6 lg:px-8">
-            <Outlet />
+          <div className="w-full px-4 sm:px-6 lg:px-8">
+            <div className="max-w-[1400px] mx-auto">
+              <Outlet />
+            </div>
           </div>
         </main>
       </div>

@@ -271,6 +271,7 @@ const VehiclesPage = () => {
   const [stockStatusFilter, setStockStatusFilter] = useState<string>("");
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [viewMode, setViewMode] = useState<'table' | 'list'>('table');
+  const [soldViewMode, setSoldViewMode] = useState<'table' | 'list'>('table');
   const [activeTab, setActiveTab] = useState<string>("vehicles");
   const [soldVehiclesFilter, setSoldVehiclesFilter] = useState<string>("all");
 
@@ -1028,6 +1029,18 @@ const VehiclesPage = () => {
   const filteredSoldVehicles = useMemo(() => {
     let filtered = soldVehicles;
     
+    // Search query filtresi
+    if (query) {
+      const searchLower = query.toLowerCase();
+      filtered = filtered.filter(v => 
+        (v.maker && v.maker.toLowerCase().includes(searchLower)) ||
+        (v.model && v.model.toLowerCase().includes(searchLower)) ||
+        (v.chassis_no && v.chassis_no.toLowerCase().includes(searchLower)) ||
+        (v.plate_number && v.plate_number.toLowerCase().includes(searchLower))
+      );
+    }
+    
+    // Satış tipi filtresi
     if (soldVehiclesFilter === "cash") {
       filtered = filtered.filter(v => !v.installment_sale_id);
     } else if (soldVehiclesFilter === "installment_pending") {
@@ -1044,7 +1057,7 @@ const VehiclesPage = () => {
     }
     
     return filtered;
-  }, [soldVehicles, soldVehiclesFilter]);
+  }, [soldVehicles, soldVehiclesFilter, query]);
 
   // Rapor verilerini yükle
   const fetchReports = async () => {
@@ -1077,280 +1090,271 @@ const VehiclesPage = () => {
   };
 
   return (
-    <div className="space-y-6 p-6">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-6">
-          <TabsTrigger value="vehicles">Araçlar</TabsTrigger>
-          <TabsTrigger value="sold">Satılan Araçlar</TabsTrigger>
-          <TabsTrigger value="reports" onClick={fetchReports}>
-            <BarChart3 className="h-4 w-4 mr-2" />
-            Raporlar
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="vehicles" className="space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Oto Galeri</h1>
           <p className="text-muted-foreground mt-2">Araç yönetimi ve satış takibi</p>
         </div>
-        <Dialog open={openAdd} onOpenChange={setOpenAdd}>
-          <DialogTrigger asChild>
-            <Button onClick={resetVehicleForm}>
-              <Plus className="h-4 w-4 mr-2" />
-              Yeni Araç Ekle
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Yeni Araç Ekle</DialogTitle>
-              <DialogDescription>
-                Tüm alanlar opsiyoneldir, istediğiniz bilgileri girebilirsiniz.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid grid-cols-2 gap-4 mt-4">
-              <div>
-                <label className="text-sm font-medium">Marka</label>
-                <Input
-                  value={vehicleForm.maker}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, maker: e.target.value })}
-                  placeholder="Örn: Toyota"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Model</label>
-                <Input
-                  value={vehicleForm.model}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, model: e.target.value })}
-                  placeholder="Örn: Corolla"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Yıl</label>
-                <Input
-                  type="number"
-                  value={vehicleForm.year}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, year: e.target.value })}
-                  placeholder="Örn: 2023"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Vites</label>
-                <Input
-                  value={vehicleForm.transmission}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, transmission: e.target.value })}
-                  placeholder="Örn: Otomatik"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Kapı/Koltuk</label>
-                <Input
-                  value={vehicleForm.door_seat}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, door_seat: e.target.value })}
-                  placeholder="Örn: 5/5"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Şasi No</label>
-                <Input
-                  value={vehicleForm.chassis_no}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, chassis_no: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Plaka</label>
-                <Input
-                  value={vehicleForm.plate_number}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, plate_number: e.target.value })}
-                  placeholder="Örn: 34ABC123"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Km</label>
-                <Input
-                  type="number"
-                  value={vehicleForm.km}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, km: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Ay</label>
-                <Input
-                  type="number"
-                  value={vehicleForm.month}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, month: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Yakıt</label>
-                <Input
-                  value={vehicleForm.fuel}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, fuel: e.target.value })}
-                  placeholder="Örn: Benzin"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Sınıf</label>
-                <Input
-                  value={vehicleForm.grade}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, grade: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">CC</label>
-                <Input
-                  type="number"
-                  value={vehicleForm.cc}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, cc: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Renk</label>
-                <Input
-                  value={vehicleForm.color}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, color: e.target.value })}
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="text-sm font-medium">Diğer</label>
-                <Input
-                  value={vehicleForm.other}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, other: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Önerilen Satış Fiyatı</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={vehicleForm.sale_price}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, sale_price: e.target.value })}
-                  placeholder="Önerilen satış fiyatı (opsiyonel)"
-                />
-              </div>
-              <div className="col-span-2 grid grid-cols-2 gap-2">
+        {activeTab === "vehicles" && (
+          <Dialog open={openAdd} onOpenChange={setOpenAdd}>
+            <DialogTrigger asChild>
+              <Button onClick={resetVehicleForm}>
+                <Plus className="h-4 w-4 mr-2" />
+                Yeni Araç Ekle
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Yeni Araç Ekle</DialogTitle>
+                <DialogDescription>
+                  Tüm alanlar opsiyoneldir, istediğiniz bilgileri girebilirsiniz.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid grid-cols-2 gap-4 mt-4">
                 <div>
-                  <label className="text-sm font-medium">Ödenen</label>
+                  <label className="text-sm font-medium">Marka</label>
                   <Input
-                    type="number"
-                    step="0.01"
-                    value={vehicleForm.paid}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, paid: e.target.value })}
+                    value={vehicleForm.maker}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, maker: e.target.value })}
+                    placeholder="Örn: Toyota"
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Döviz</label>
+                  <label className="text-sm font-medium">Model</label>
+                  <Input
+                    value={vehicleForm.model}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, model: e.target.value })}
+                    placeholder="Örn: Corolla"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Yıl</label>
+                  <Input
+                    type="number"
+                    value={vehicleForm.year}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, year: e.target.value })}
+                    placeholder="Örn: 2023"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Vites</label>
+                  <Input
+                    value={vehicleForm.transmission}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, transmission: e.target.value })}
+                    placeholder="Örn: Otomatik"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Kapı/Koltuk</label>
+                  <Input
+                    value={vehicleForm.door_seat}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, door_seat: e.target.value })}
+                    placeholder="Örn: 5/5"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Şasi No</label>
+                  <Input
+                    value={vehicleForm.chassis_no}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, chassis_no: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Plaka</label>
+                  <Input
+                    value={vehicleForm.plate_number}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, plate_number: e.target.value })}
+                    placeholder="Örn: 34ABC123"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Km</label>
+                  <Input
+                    type="number"
+                    value={vehicleForm.km}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, km: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Ay</label>
+                  <Input
+                    type="number"
+                    value={vehicleForm.month}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, month: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Yakıt</label>
+                  <Input
+                    value={vehicleForm.fuel}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, fuel: e.target.value })}
+                    placeholder="Örn: Benzin"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Sınıf</label>
+                  <Input
+                    value={vehicleForm.grade}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, grade: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">CC</label>
+                  <Input
+                    type="number"
+                    value={vehicleForm.cc}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, cc: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Renk</label>
+                  <Input
+                    value={vehicleForm.color}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, color: e.target.value })}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-sm font-medium">Diğer</label>
+                  <Input
+                    value={vehicleForm.other}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, other: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Önerilen Satış Fiyatı</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={vehicleForm.sale_price}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, sale_price: e.target.value })}
+                    placeholder="Önerilen satış fiyatı (opsiyonel)"
+                  />
+                </div>
+                <div className="col-span-2 grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-sm font-medium">Ödenen</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={vehicleForm.paid}
+                      onChange={(e) => setVehicleForm({ ...vehicleForm, paid: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Döviz</label>
+                    <Select
+                      value={vehicleForm.purchase_currency}
+                      onValueChange={(value) => setVehicleForm({ ...vehicleForm, purchase_currency: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Döviz seçin" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="TRY">TRY</SelectItem>
+                        <SelectItem value="USD">USD</SelectItem>
+                        <SelectItem value="EUR">EUR</SelectItem>
+                        <SelectItem value="GBP">GBP</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Teslimat Tarihi</label>
+                  <Input
+                    type="date"
+                    value={vehicleForm.delivery_date}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, delivery_date: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Teslimat Saati</label>
+                  <Input
+                    type="time"
+                    value={vehicleForm.delivery_time}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, delivery_time: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Araç Durumu</label>
                   <Select
-                    value={vehicleForm.purchase_currency}
-                    onValueChange={(value) => setVehicleForm({ ...vehicleForm, purchase_currency: value })}
+                    value={vehicleForm.status || "used"}
+                    onValueChange={(value) => setVehicleForm({ ...vehicleForm, status: value })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Döviz seçin" />
+                      <SelectValue placeholder="Araç durumu seçin" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="TRY">TRY</SelectItem>
-                      <SelectItem value="USD">USD</SelectItem>
-                      <SelectItem value="EUR">EUR</SelectItem>
-                      <SelectItem value="GBP">GBP</SelectItem>
+                      <SelectItem value="new">Sıfır</SelectItem>
+                      <SelectItem value="used">İkinci El</SelectItem>
+                      <SelectItem value="damaged">Hasarlı</SelectItem>
+                      <SelectItem value="repaired">Onarılmış</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+                <div>
+                  <label className="text-sm font-medium">Stok Durumu</label>
+                  <Select
+                    value={vehicleForm.stock_status || "in_stock"}
+                    onValueChange={(value) => setVehicleForm({ ...vehicleForm, stock_status: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Stok durumu seçin" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="in_stock">Stokta</SelectItem>
+                      <SelectItem value="on_sale">Satışta</SelectItem>
+                      <SelectItem value="reserved">Rezerve</SelectItem>
+                      <SelectItem value="sold">Satıldı</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Lokasyon</label>
+                  <Input
+                    value={vehicleForm.location}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, location: e.target.value })}
+                    placeholder="Örn: Şube A, Park Yeri 5"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Hedef Kar (Opsiyonel)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={vehicleForm.target_profit}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, target_profit: e.target.value })}
+                    placeholder="Hedef kar tutarı"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-sm font-medium">Sözleşme PDF (Opsiyonel)</label>
+                  <Input
+                    type="file"
+                    accept=".pdf"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        // Önce araç oluştur, sonra PDF yükle
+                        // Bu işlem handleAddVehicle içinde yapılacak
+                        setVehicleForm({ ...vehicleForm, contract_pdf: file });
+                      }
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Araç eklenirken sözleşme PDF'i yüklenecektir</p>
+                </div>
               </div>
-              <div>
-                <label className="text-sm font-medium">Teslimat Tarihi</label>
-                <Input
-                  type="date"
-                  value={vehicleForm.delivery_date}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, delivery_date: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Teslimat Saati</label>
-                <Input
-                  type="time"
-                  value={vehicleForm.delivery_time}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, delivery_time: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Araç Durumu</label>
-                <Select
-                  value={vehicleForm.status || "used"}
-                  onValueChange={(value) => setVehicleForm({ ...vehicleForm, status: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Araç durumu seçin" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="new">Sıfır</SelectItem>
-                    <SelectItem value="used">İkinci El</SelectItem>
-                    <SelectItem value="damaged">Hasarlı</SelectItem>
-                    <SelectItem value="repaired">Onarılmış</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Stok Durumu</label>
-                <Select
-                  value={vehicleForm.stock_status || "in_stock"}
-                  onValueChange={(value) => setVehicleForm({ ...vehicleForm, stock_status: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Stok durumu seçin" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="in_stock">Stokta</SelectItem>
-                    <SelectItem value="on_sale">Satışta</SelectItem>
-                    <SelectItem value="reserved">Rezerve</SelectItem>
-                    <SelectItem value="sold">Satıldı</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Lokasyon</label>
-                <Input
-                  value={vehicleForm.location}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, location: e.target.value })}
-                  placeholder="Örn: Şube A, Park Yeri 5"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Hedef Kar (Opsiyonel)</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={vehicleForm.target_profit}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, target_profit: e.target.value })}
-                  placeholder="Hedef kar tutarı"
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="text-sm font-medium">Sözleşme PDF (Opsiyonel)</label>
-                <Input
-                  type="file"
-                  accept=".pdf"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      // Önce araç oluştur, sonra PDF yükle
-                      // Bu işlem handleAddVehicle içinde yapılacak
-                      setVehicleForm({ ...vehicleForm, contract_pdf: file });
-                    }
-                  }}
-                />
-                <p className="text-xs text-muted-foreground mt-1">Araç eklenirken sözleşme PDF'i yüklenecektir</p>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setOpenAdd(false)}>İptal</Button>
-              <Button onClick={handleAddVehicle}>Ekle</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setOpenAdd(false)}>İptal</Button>
+                <Button onClick={handleAddVehicle}>Ekle</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
-      {/* Filters */}
+      {/* Search and Filters - Shared for both tabs */}
       <div className="flex gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -1361,42 +1365,84 @@ const VehiclesPage = () => {
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
-        <Select value={isSoldFilter || "all"} onValueChange={(value) => setIsSoldFilter(value === "all" ? "" : value)}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Satış Durumu" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tümü</SelectItem>
-            <SelectItem value="false">Satılmamış</SelectItem>
-            <SelectItem value="true">Satılmış</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={statusFilter || "all"} onValueChange={(value) => setStatusFilter(value === "all" ? "" : value)}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Araç Durumu" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tümü</SelectItem>
-            <SelectItem value="new">Sıfır</SelectItem>
-            <SelectItem value="used">İkinci El</SelectItem>
-            <SelectItem value="damaged">Hasarlı</SelectItem>
-            <SelectItem value="repaired">Onarılmış</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={stockStatusFilter || "all"} onValueChange={(value) => setStockStatusFilter(value === "all" ? "" : value)}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Stok Durumu" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tümü</SelectItem>
-            <SelectItem value="in_stock">Stokta</SelectItem>
-            <SelectItem value="on_sale">Satışta</SelectItem>
-            <SelectItem value="reserved">Rezerve</SelectItem>
-            <SelectItem value="sold">Satıldı</SelectItem>
-          </SelectContent>
-        </Select>
+        {activeTab === "vehicles" && (
+          <>
+            <Select value={isSoldFilter || "all"} onValueChange={(value) => setIsSoldFilter(value === "all" ? "" : value)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Satış Durumu" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tümü</SelectItem>
+                <SelectItem value="false">Satılmamış</SelectItem>
+                <SelectItem value="true">Satılmış</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter || "all"} onValueChange={(value) => setStatusFilter(value === "all" ? "" : value)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Araç Durumu" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tümü</SelectItem>
+                <SelectItem value="new">Sıfır</SelectItem>
+                <SelectItem value="used">İkinci El</SelectItem>
+                <SelectItem value="damaged">Hasarlı</SelectItem>
+                <SelectItem value="repaired">Onarılmış</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={stockStatusFilter || "all"} onValueChange={(value) => setStockStatusFilter(value === "all" ? "" : value)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Stok Durumu" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tümü</SelectItem>
+                <SelectItem value="in_stock">Stokta</SelectItem>
+                <SelectItem value="on_sale">Satışta</SelectItem>
+                <SelectItem value="reserved">Rezerve</SelectItem>
+                <SelectItem value="sold">Satıldı</SelectItem>
+              </SelectContent>
+            </Select>
+          </>
+        )}
+        {activeTab === "sold" && (
+          <Select value={soldVehiclesFilter} onValueChange={setSoldVehiclesFilter}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Filtrele" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tümü</SelectItem>
+              <SelectItem value="cash">Peşin Satılanlar</SelectItem>
+              <SelectItem value="installment_pending">Taksitli - Kalan Borç Var</SelectItem>
+              <SelectItem value="installment_completed">Taksitli - Tamamlandı</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3 bg-card border border-border rounded-xl p-1.5 shadow-sm h-auto mb-6">
+          <TabsTrigger 
+            value="vehicles"
+            className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-md rounded-lg transition-all min-h-[3.5rem] data-[state=active]:bg-[#001f3f] hover:bg-muted/50"
+          >
+            Araçlar
+          </TabsTrigger>
+          <TabsTrigger 
+            value="sold"
+            className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-md rounded-lg transition-all min-h-[3.5rem] data-[state=active]:bg-[#001f3f] hover:bg-muted/50"
+          >
+            Satılan Araçlar
+          </TabsTrigger>
+          <TabsTrigger 
+            value="reports" 
+            onClick={fetchReports}
+            className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-md rounded-lg transition-all min-h-[3.5rem] data-[state=active]:bg-[#001f3f] hover:bg-muted/50"
+          >
+            <BarChart3 className="h-5 w-5 mr-2" />
+            Raporlar
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="vehicles" className="space-y-6">
       {/* Vehicles Table/List */}
       <Card>
         <CardHeader>
@@ -3090,36 +3136,26 @@ const VehiclesPage = () => {
       </Dialog>
 
         <TabsContent value="sold" className="space-y-6">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">Satılan Araçlar</h1>
-              <p className="text-muted-foreground mt-2">Satılan araçların listesi ve taksit takibi</p>
-            </div>
-          </div>
-
-          {/* Filters */}
-          <div className="flex gap-4 items-center">
-            <Select value={soldVehiclesFilter} onValueChange={setSoldVehiclesFilter}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Filtrele" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tümü</SelectItem>
-                <SelectItem value="cash">Peşin Satılanlar</SelectItem>
-                <SelectItem value="installment_pending">Taksitli - Kalan Borç Var</SelectItem>
-                <SelectItem value="installment_completed">Taksitli - Tamamlandı</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Sold Vehicles Table */}
+          {/* Sold Vehicles Table/List */}
           <Card>
             <CardHeader>
-              <CardTitle>Satılan Araç Listesi</CardTitle>
+              <div className="flex justify-between items-center">
+                <CardTitle>Satılan Araç Listesi</CardTitle>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Grid3x3 className={`h-4 w-4 ${soldViewMode === 'list' ? 'text-primary' : 'text-muted-foreground'}`} />
+                    <Switch
+                      checked={soldViewMode === 'list'}
+                      onCheckedChange={(checked) => setSoldViewMode(checked ? 'list' : 'table')}
+                    />
+                    <List className={`h-4 w-4 ${soldViewMode === 'table' ? 'text-primary' : 'text-muted-foreground'}`} />
+                  </div>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <Table>
+              {soldViewMode === 'table' ? (
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Marka/Model</TableHead>
@@ -3268,6 +3304,161 @@ const VehiclesPage = () => {
                   )}
                 </TableBody>
               </Table>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {loading ? (
+                    <div className="col-span-full text-center py-12">Yükleniyor...</div>
+                  ) : filteredSoldVehicles.length === 0 ? (
+                    <div className="col-span-full text-center py-12">Satılan araç bulunamadı.</div>
+                  ) : (
+                    filteredSoldVehicles.map((vehicle) => (
+                      <Card key={vehicle.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                        <div className="relative">
+                          {vehicle.primary_image_url ? (
+                            <img
+                              src={vehicle.primary_image_url.startsWith('http') 
+                                ? vehicle.primary_image_url 
+                                : vehicle.primary_image_url.startsWith('/uploads')
+                                ? `http://localhost:5005${vehicle.primary_image_url}`
+                                : vehicle.primary_image_url}
+                              alt={`${vehicle.maker} ${vehicle.model}`}
+                              className="w-full h-48 object-cover"
+                              loading="lazy"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-48 bg-muted flex items-center justify-center">
+                              <ImageIcon className="h-12 w-12 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
+                            {(() => {
+                              const status = getInstallmentStatus(vehicle);
+                              if (status.isInstallment) {
+                                return (
+                                  <>
+                                    <Badge variant="default" className="bg-green-500">
+                                      <CheckCircle className="h-3 w-3 mr-1" />
+                                      Taksitle Satıldı
+                                    </Badge>
+                                    {status.isOverdue ? (
+                                      <Badge variant="destructive" className="flex items-center gap-1">
+                                        <AlertCircle className="h-3 w-3" />
+                                        Gecikmiş
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="bg-orange-100 text-orange-800">
+                                        {status.paidCount}/{status.totalCount}
+                                      </Badge>
+                                    )}
+                                  </>
+                                );
+                              } else {
+                                return (
+                                  <Badge variant="default" className="bg-green-500">
+                                    <CheckCircle className="h-3 w-3 mr-1" />
+                                    Satıldı
+                                  </Badge>
+                                );
+                              }
+                            })()}
+                          </div>
+                        </div>
+                        <CardContent className="p-4">
+                          <div className="space-y-3">
+                            <div>
+                              <h3 className="font-semibold text-lg flex items-center gap-2">
+                                {vehicle.maker || "-"} {vehicle.model || ""}
+                                {(() => {
+                                  const overdueDays = getInstallmentOverdueDays(vehicle);
+                                  if (overdueDays !== null) {
+                                    return (
+                                      <div className="relative group">
+                                        <AlertCircle className="h-4 w-4 text-orange-500" />
+                                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-50">
+                                          Son taksit ödemesinin üzerinden {overdueDays} gün geçti.
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                              </h3>
+                              {vehicle.year && (
+                                <p className="text-sm text-muted-foreground">{vehicle.year}</p>
+                              )}
+                            </div>
+                            {vehicle.chassis_no && (
+                              <div className="text-sm">
+                                <span className="text-muted-foreground">Şasi No: </span>
+                                <span className="font-medium">{vehicle.chassis_no}</span>
+                              </div>
+                            )}
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div>
+                                <span className="text-muted-foreground">Satış Fiyatı:</span>
+                                <div className="font-semibold">{currency(vehicle.sale_price)}</div>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">Peşinat:</span>
+                                <div className="font-semibold">
+                                  {vehicle.installment ? currency(vehicle.installment.down_payment) : currency(vehicle.sale_price)}
+                                </div>
+                              </div>
+                            </div>
+                            {vehicle.installment && vehicle.installment.remaining_balance > 0 && (
+                              <div className="text-sm">
+                                <span className="text-muted-foreground">Kalan Borç: </span>
+                                <span className="font-semibold text-orange-600">{currency(vehicle.installment.remaining_balance)}</span>
+                              </div>
+                            )}
+                            <div className="flex flex-wrap gap-1">
+                              {(() => {
+                                const status = getInstallmentStatus(vehicle);
+                                if (status.isInstallment) {
+                                  if (status.isOverdue) {
+                                    return (
+                                      <Badge variant="destructive" className="flex items-center gap-1">
+                                        <AlertCircle className="h-3 w-3" />
+                                        Gecikmiş Taksit
+                                      </Badge>
+                                    );
+                                  } else {
+                                    return (
+                                      <Badge variant="outline" className="bg-orange-100 text-orange-800">
+                                        {status.paidCount}/{status.totalCount}
+                                      </Badge>
+                                    );
+                                  }
+                                }
+                                return null;
+                              })()}
+                              {vehicle.location && (
+                                <Badge variant="outline" className="text-xs">
+                                  📍 {vehicle.location}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex gap-2 pt-2 border-t">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openDetailModal(vehicle)}
+                                className="flex-1"
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                Detay
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

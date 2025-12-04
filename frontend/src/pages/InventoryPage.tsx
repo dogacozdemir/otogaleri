@@ -437,7 +437,7 @@ const InventoryPage = () => {
   };
 
   return (
-    <div className="space-professional-lg animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>

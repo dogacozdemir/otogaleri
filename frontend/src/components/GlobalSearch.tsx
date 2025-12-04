@@ -59,7 +59,7 @@ const GlobalSearch = ({ className }: GlobalSearchProps) => {
   const navigate = useNavigate();
 
   const searchRef = useRef<HTMLInputElement>(null);
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceRef = useRef<number | null>(null);
 
   // Keyboard shortcut (Ctrl/Cmd + K)
   useEffect(() => {
@@ -275,7 +275,7 @@ const GlobalSearch = ({ className }: GlobalSearchProps) => {
       {/* Search Trigger Button */}
       <Button
         variant="outline"
-        className={`relative h-9 w-full justify-start text-sm text-muted-foreground sm:pr-12 md:w-40 lg:w-64 ${className}`}
+        className={`relative h-9 w-full justify-start text-sm text-muted-foreground sm:pr-12 ${className}`}
         onClick={() => setIsOpen(true)}
       >
         <Search className="mr-2 h-4 w-4" />
