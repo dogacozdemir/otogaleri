@@ -222,7 +222,7 @@ const VehicleImageUpload: React.FC<VehicleImageUploadProps> = ({ vehicleId, onUp
     }
   };
 
-  // API base URL'ini al (development için localhost:5005)
+  // API base URL'ini al
   const getImageUrl = (url: string) => {
     if (!url) return '';
     if (url.startsWith('http://') || url.startsWith('https://')) return url;

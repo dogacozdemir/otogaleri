@@ -167,7 +167,7 @@ const GlobalSearch = ({ className }: GlobalSearchProps) => {
     }
     
     // Debounce search
-    debounceRef.current = setTimeout(() => {
+    debounceRef.current = window.setTimeout(() => {
       if (value.length >= 2) {
         performSearch(value);
         fetchSuggestions(value);

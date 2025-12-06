@@ -133,6 +133,7 @@ type CostCalculation = {
 };
 
 import { useCurrency } from "@/hooks/useCurrency";
+import { getApiBaseUrl } from "@/lib/utils";
 
 // Tarih formatlama fonksiyonu: 2025-12-04T21:00:00.000Z -> 4/12/2025 21:00
 const formatDateTime = (dateString: string | null | undefined): string => {
@@ -1493,7 +1494,7 @@ const VehiclesPage = () => {
                             src={vehicle.primary_image_url.startsWith('http') 
                               ? vehicle.primary_image_url 
                               : vehicle.primary_image_url.startsWith('/uploads')
-                              ? `http://localhost:5005${vehicle.primary_image_url}`
+                              ? `${getApiBaseUrl()}${vehicle.primary_image_url}`
                               : vehicle.primary_image_url}
                             alt={`${vehicle.maker} ${vehicle.model}`}
                             className="w-16 h-16 object-cover rounded"
@@ -2146,7 +2147,7 @@ const VehiclesPage = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => window.open(`http://localhost:5005${doc.file_path}`, "_blank")}
+                              onClick={() => window.open(`${getApiBaseUrl()}${doc.file_path}`, "_blank")}
                             >
                               <Eye className="w-4 h-4" />
                             </Button>

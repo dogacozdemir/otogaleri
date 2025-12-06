@@ -861,7 +861,7 @@ const InventoryPage = () => {
                     )}
 
                     {filtered.map((p) => {
-                      const trackStock = p.track_stock === true || p.track_stock === 1;
+                      const trackStock = p.track_stock === true || (p.track_stock as any) === 1;
                       const low = trackStock && p.current_stock <= p.min_stock;
                       return (
                         <TableRow
@@ -885,14 +885,14 @@ const InventoryPage = () => {
                           <TableCell className="text-muted-foreground">{p.category || "-"}</TableCell>
                           <TableCell>{getProductTypeBadge(p)}</TableCell>
                           <TableCell className="text-right text-foreground">
-                            {p.track_stock === true || p.track_stock === 1 ? (
+                            {(p.track_stock === true || (p.track_stock as any) === 1) ? (
                               `${p.current_stock} ${p.unit}`
                             ) : (
                               <span className="text-2xl font-bold text-primary">∞</span>
                             )}
                           </TableCell>
                           <TableCell className="text-right text-muted-foreground">
-                            {p.track_stock === true || p.track_stock === 1 ? p.min_stock : "-"}
+                            {(p.track_stock === true || (p.track_stock as any) === 1) ? p.min_stock : "-"}
                           </TableCell>
                           <TableCell className="text-right text-muted-foreground">
                             {p.sales_count}
@@ -986,7 +986,7 @@ const InventoryPage = () => {
                           <TableCell className="font-medium text-foreground">{p.name}</TableCell>
                           <TableCell className="text-muted-foreground">{p.category || "-"}</TableCell>
                           <TableCell className="text-right text-foreground">
-                            {p.track_stock === true || p.track_stock === 1 ? (
+                            {(p.track_stock === true || (p.track_stock as any) === 1) ? (
                               `${p.current_stock} ${p.unit}`
                             ) : (
                               <span className="text-2xl font-bold text-primary">∞</span>
@@ -1041,14 +1041,14 @@ const InventoryPage = () => {
                           <TableCell className="font-medium text-foreground">{p.name}</TableCell>
                           <TableCell className="text-muted-foreground">{p.category || "-"}</TableCell>
                           <TableCell className="text-right text-foreground">
-                            {p.track_stock === true || p.track_stock === 1 ? (
+                            {(p.track_stock === true || (p.track_stock as any) === 1) ? (
                               `${p.current_stock} ${p.unit}`
                             ) : (
                               <span className="text-2xl font-bold text-primary">∞</span>
                             )}
                           </TableCell>
                           <TableCell className="text-right text-muted-foreground">
-                            {p.track_stock === true || p.track_stock === 1 ? p.min_stock : "-"}
+                            {(p.track_stock === true || (p.track_stock as any) === 1) ? p.min_stock : "-"}
                           </TableCell>
                           <TableCell className="text-right text-muted-foreground">
                             {currency(p.cost_price)}
@@ -1263,7 +1263,7 @@ const InventoryPage = () => {
                   type="number"
                   min="1"
                   max={
-                    exitTarget?.track_stock === true || exitTarget?.track_stock === 1
+                    exitTarget?.track_stock === true || (exitTarget?.track_stock as any) === 1
                       ? exitTarget?.current_stock || 999
                       : 999999
                   }
@@ -1272,7 +1272,7 @@ const InventoryPage = () => {
                   className="bg-background border-border text-foreground"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  {exitTarget?.track_stock === true || exitTarget?.track_stock === 1 ? (
+                  {(exitTarget?.track_stock === true || (exitTarget?.track_stock as any) === 1) ? (
                     `Mevcut: ${exitTarget?.current_stock || 0} ${exitTarget?.unit}`
                   ) : (
                     "Stok takibi yapılmıyor"

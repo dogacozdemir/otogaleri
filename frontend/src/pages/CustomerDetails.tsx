@@ -19,11 +19,8 @@ import {
   Mail,
   MapPin,
   CheckCircle,
-  Clock,
-  XCircle,
   FileText,
   Upload,
-  Camera,
   Trash2,
   Star,
 } from "lucide-react";
@@ -31,6 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
+import { getApiBaseUrl } from "@/lib/utils";
 import { useCurrency } from "@/hooks/useCurrency";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -439,7 +437,7 @@ const CustomerDetails: React.FC = () => {
                               src={sale.primary_image_url.startsWith('http') 
                                 ? sale.primary_image_url 
                                 : sale.primary_image_url.startsWith('/uploads')
-                                ? `http://localhost:5005${sale.primary_image_url}`
+                                ? `${getApiBaseUrl()}${sale.primary_image_url}`
                                 : sale.primary_image_url}
                               alt={`${sale.maker} ${sale.model}`}
                               className="w-24 h-24 object-cover rounded-lg"
@@ -682,7 +680,7 @@ const CustomerDetails: React.FC = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => window.open(`http://localhost:5005${doc.file_path}`, "_blank")}
+                                onClick={() => window.open(`${getApiBaseUrl()}${doc.file_path}`, "_blank")}
                               >
                                 Görüntüle
                               </Button>
