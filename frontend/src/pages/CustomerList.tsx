@@ -79,6 +79,7 @@ const CustomerList = () => {
   const fetchAllCustomers = async () => {
     try {
       const response = await api.get("/customers");
+      // Backend returns { customers: [...], pagination: {...} }
       const customers = response.data?.customers || [];
       setAllCustomers(customers);
       setLoading(false);
@@ -182,7 +183,7 @@ const CustomerList = () => {
     };
 
     return (
-      <Card key={keyPrefix ? `${keyPrefix}-${customer.id}` : customer.id} className="hover:shadow-md transition-shadow">
+      <Card key={keyPrefix ? `${keyPrefix}-${customer.id}` : customer.id}>
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
@@ -438,22 +439,8 @@ const CustomerList = () => {
   return (
     <>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Müşteri Yönetimi</h1>
-            <p className="text-muted-foreground mt-1">Müşteri segmentleri ve CRM sistemi</p>
-          </div>
-          <div className="flex items-center space-x-3">
-            <Button onClick={() => setShowNewCustomer(true)}>
-              <UserPlus className="w-4 h-4 mr-2" />
-              Yeni Müşteri
-            </Button>
-          </div>
-        </div>
-
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -508,20 +495,20 @@ const CustomerList = () => {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 bg-card border border-border rounded-xl p-1 shadow-sm h-auto">
+          <TabsList className="grid w-full grid-cols-2 bg-card border border-border rounded-xl p-1.5 shadow-sm h-auto mb-6">
             <TabsTrigger
               value="all"
-              className="flex flex-col items-center space-y-1 px-3 py-3 text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm rounded-lg font-semibold min-h-[3rem]"
+              className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-colors duration-200 ease-in-out min-h-[3.5rem] data-[state=active]:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 hover:bg-muted/70"
             >
-              <UserPlus className="w-4 h-4" />
-              <span className="text-xs">Tümü ({allCustomers.length})</span>
+              <UserPlus className="w-4 h-4 mr-2" />
+              Tümü ({allCustomers.length})
             </TabsTrigger>
             <TabsTrigger
               value="segments"
-              className="flex flex-col items-center space-y-1 px-3 py-3 text-muted-foreground data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-sm rounded-lg font-semibold min-h-[3rem]"
+              className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-colors duration-200 ease-in-out min-h-[3.5rem] data-[state=active]:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 hover:bg-muted/70"
             >
-              <Filter className="w-4 h-4" />
-              <span className="text-xs">Segment</span>
+              <Filter className="w-4 h-4 mr-2" />
+              Segment
             </TabsTrigger>
           </TabsList>
 
@@ -574,27 +561,33 @@ const CustomerList = () => {
                 )}
               </div>
 
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-muted-foreground">Görünüm:</span>
-                <div className="flex bg-muted rounded-lg p-1">
-                  <Button
-                    variant={viewMode === "list" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setViewMode("list")}
-                    className="h-8 px-3"
-                  >
-                    <List className="w-4 h-4 mr-2" />
-                    Liste
-                  </Button>
-                  <Button
-                    variant={viewMode === "table" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setViewMode("table")}
-                    className="h-8 px-3"
-                  >
-                    <Table className="w-4 h-4 mr-2" />
-                    Tablo
-                  </Button>
+              <div className="flex items-center space-x-3">
+                <Button onClick={() => setShowNewCustomer(true)}>
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Yeni Müşteri
+                </Button>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-muted-foreground">Görünüm:</span>
+                  <div className="flex bg-muted rounded-lg p-1">
+                    <Button
+                      variant={viewMode === "list" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setViewMode("list")}
+                      className="h-8 px-3"
+                    >
+                      <List className="w-4 h-4 mr-2" />
+                      Liste
+                    </Button>
+                    <Button
+                      variant={viewMode === "table" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setViewMode("table")}
+                      className="h-8 px-3"
+                    >
+                      <Table className="w-4 h-4 mr-2" />
+                      Tablo
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>

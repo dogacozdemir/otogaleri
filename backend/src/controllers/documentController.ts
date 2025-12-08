@@ -148,7 +148,7 @@ export async function getExpiringVehicleDocuments(req: AuthRequest, res: Respons
         d.*,
         v.maker,
         v.model,
-        v.year,
+        v.production_year as year,
         DATEDIFF(d.expiry_date, CURDATE()) as days_until_expiry
       FROM vehicle_documents d
       LEFT JOIN vehicles v ON d.vehicle_id = v.id

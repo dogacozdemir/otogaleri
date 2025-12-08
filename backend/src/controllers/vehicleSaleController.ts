@@ -21,6 +21,7 @@ export async function markVehicleAsSold(req: AuthRequest, res: Response) {
     down_payment,
     installment_count,
     installment_amount,
+    custom_rate,
   } = req.body;
 
   if (!customer_name || !sale_amount || !sale_date) {
@@ -62,11 +63,16 @@ export async function markVehicleAsSold(req: AuthRequest, res: Response) {
 
     let saleFxRate = 1;
     if (finalSaleCurrency !== baseCurrency) {
-      saleFxRate = await getOrFetchRate(
-        finalSaleCurrency as SupportedCurrency,
-        baseCurrency as SupportedCurrency,
-        sale_date
-      );
+      // If custom_rate is provided, use it; otherwise fetch from API
+      if (custom_rate !== undefined && custom_rate !== null) {
+        saleFxRate = Number(custom_rate);
+      } else {
+        saleFxRate = await getOrFetchRate(
+          finalSaleCurrency as SupportedCurrency,
+          baseCurrency as SupportedCurrency,
+          sale_date
+        );
+      }
     }
 
     const saleAmountBase = Number(sale_amount) * saleFxRate;

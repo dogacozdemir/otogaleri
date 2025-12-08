@@ -9,8 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, FileText, Trash2, Play } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Plus, FileText, Trash2, Play, BarChart3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrency } from "@/hooks/useCurrency";
 import { BrandProfit, TopProfitable, SalesDuration } from "@/types/analytics";
 import { BrandProfitChart } from "@/components/charts/BrandProfitChart";
 import { TopProfitableChart } from "@/components/charts/TopProfitableChart";
@@ -19,10 +21,39 @@ import { BrandProfitTable } from "@/components/tables/BrandProfitTable";
 import { TopProfitableTable } from "@/components/tables/TopProfitableTable";
 import { SalesDurationTable } from "@/components/tables/SalesDurationTable";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend
+} from "recharts";
+
+const formatDateTime = (dateString: string | null | undefined): string => {
+  if (!dateString) return "-";
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("tr-TR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return dateString;
+  }
+};
 
 export default function AnalyticsPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
+  const { formatCurrency: currency } = useCurrency();
   const [brandProfit, setBrandProfit] = useState<BrandProfit[]>([]);
   const [topProfitable, setTopProfitable] = useState<TopProfitable[]>([]);
   const [salesDuration, setSalesDuration] = useState<SalesDuration[]>([]);
@@ -42,6 +73,15 @@ export default function AnalyticsPage() {
     schedule_type: "",
     recipients: "",
   });
+
+  // Vehicle Reports States (moved from VehiclesPage)
+  const [vehicleReportsLoading, setVehicleReportsLoading] = useState(false);
+  const [vehicleBrandProfit, setVehicleBrandProfit] = useState<any[]>([]);
+  const [vehicleModelProfit, setVehicleModelProfit] = useState<any[]>([]);
+  const [vehicleTopProfitable, setVehicleTopProfitable] = useState<any[]>([]);
+  const [vehicleSalesDuration, setVehicleSalesDuration] = useState<any>(null);
+  const [vehicleMonthlyComparison, setVehicleMonthlyComparison] = useState<any[]>([]);
+  const [vehicleCategoryCosts, setVehicleCategoryCosts] = useState<any[]>([]);
 
   useEffect(() => {
     fetchAnalytics();
@@ -72,20 +112,48 @@ export default function AnalyticsPage() {
     }
   };
 
+  const fetchVehicleReports = async () => {
+    setVehicleReportsLoading(true);
+    try {
+      const [brandRes, modelRes, topRes, durationRes, monthlyRes, categoryRes] = await Promise.all([
+        api.get('/vehicles/analytics/brand-profit?limit=10'),
+        api.get('/vehicles/analytics/model-profit?limit=10'),
+        api.get('/vehicles/analytics/top-profitable?limit=10'),
+        api.get('/vehicles/analytics/sales-duration'),
+        api.get('/vehicles/analytics/monthly-comparison?months=12'),
+        api.get('/vehicles/analytics/category-costs')
+      ]);
+      setVehicleBrandProfit(brandRes.data || []);
+      setVehicleModelProfit(modelRes.data || []);
+      setVehicleTopProfitable(topRes.data || []);
+      setVehicleSalesDuration(durationRes.data || null);
+      setVehicleMonthlyComparison(monthlyRes.data || []);
+      setVehicleCategoryCosts(categoryRes.data || []);
+    } catch (e: any) {
+      console.error('Rapor yükleme hatası:', e);
+      toast({
+        title: "Hata",
+        description: "Raporlar yüklenemedi.",
+        variant: "destructive"
+      });
+    } finally {
+      setVehicleReportsLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">{t("analytics.title")}</h1>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <div className="h-64 bg-muted animate-pulse rounded-lg" />
-              </CardContent>
-            </Card>
-          ))}
+        <div className="pt-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <Card key={i}>
+                <CardContent className="p-6">
+                  <div className="h-64 bg-muted animate-pulse rounded-lg" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -93,16 +161,30 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">{t("analytics.title")}</h1>
-        <p className="text-muted-foreground mt-1">Analitik ve raporlar</p>
-      </div>
-
-      <Tabs defaultValue="analytics" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="analytics">Analitikler</TabsTrigger>
-          <TabsTrigger value="reports">Özelleştirilmiş Raporlar</TabsTrigger>
-        </TabsList>
+      <div className="pt-4">
+        <Tabs defaultValue="analytics" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 bg-card border border-border rounded-xl p-1.5 shadow-sm h-auto mb-6">
+            <TabsTrigger 
+              value="analytics"
+              className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-colors duration-200 ease-in-out min-h-[3.5rem] data-[state=active]:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 hover:bg-muted/70"
+            >
+              Analitikler
+            </TabsTrigger>
+            <TabsTrigger 
+              value="vehicle-reports"
+              onClick={fetchVehicleReports}
+              className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-colors duration-200 ease-in-out min-h-[3.5rem] data-[state=active]:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 hover:bg-muted/70"
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Araç Raporları
+            </TabsTrigger>
+            <TabsTrigger 
+              value="reports"
+              className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-colors duration-200 ease-in-out min-h-[3.5rem] data-[state=active]:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 hover:bg-muted/70"
+            >
+              Özelleştirilmiş Raporlar
+            </TabsTrigger>
+          </TabsList>
 
         <TabsContent value="analytics" className="space-y-6">
           {/* Brand Profit Chart */}
@@ -141,6 +223,272 @@ export default function AnalyticsPage() {
           />
         </TabsContent>
 
+        <TabsContent value="vehicle-reports" className="space-y-6">
+          {vehicleReportsLoading ? (
+            <div className="text-center py-12">Raporlar yükleniyor...</div>
+          ) : (
+            <>
+              {/* Ortalama Satış Süresi */}
+              {vehicleSalesDuration && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Ortalama Satış Süresi</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <div className="text-2xl font-bold">{vehicleSalesDuration.avg_days ? Math.round(vehicleSalesDuration.avg_days) : 0}</div>
+                        <div className="text-sm text-muted-foreground">Ortalama Gün</div>
+                      </div>
+                      <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                        <div className="text-2xl font-bold">{vehicleSalesDuration.min_days || 0}</div>
+                        <div className="text-sm text-muted-foreground">En Kısa Süre</div>
+                      </div>
+                      <div className="text-center p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                        <div className="text-2xl font-bold">{vehicleSalesDuration.max_days || 0}</div>
+                        <div className="text-sm text-muted-foreground">En Uzun Süre</div>
+                      </div>
+                    </div>
+                    <div className="mt-4 text-center text-sm text-muted-foreground">
+                      Toplam Satış: {vehicleSalesDuration.total_sales || 0}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Marka Bazlı Kar Analizi */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Marka Bazlı Kar Analizi</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {vehicleBrandProfit.length > 0 ? (
+                    <div className="space-y-4">
+                      <ResponsiveContainer width="100%" height={300} minHeight={300}>
+                        <BarChart data={vehicleBrandProfit}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="brand" />
+                          <YAxis />
+                          <Tooltip formatter={(value: any) => `${parseFloat(value).toFixed(2)} TL`} />
+                          <Legend />
+                          <Bar dataKey="total_profit" fill="#8884d8" name="Toplam Kar" />
+                          <Bar dataKey="total_revenue" fill="#82ca9d" name="Toplam Gelir" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Marka</TableHead>
+                            <TableHead>Araç Sayısı</TableHead>
+                            <TableHead>Satılan</TableHead>
+                            <TableHead>Toplam Gelir</TableHead>
+                            <TableHead>Toplam Maliyet</TableHead>
+                            <TableHead>Toplam Kar</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {vehicleBrandProfit.map((brand, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell>{brand.brand || '-'}</TableCell>
+                              <TableCell>{brand.vehicle_count}</TableCell>
+                              <TableCell>{brand.sold_count}</TableCell>
+                              <TableCell>{currency(brand.total_revenue)}</TableCell>
+                              <TableCell>{currency(brand.total_costs)}</TableCell>
+                              <TableCell className="font-semibold">{currency(brand.total_profit)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">Marka bazlı veri bulunamadı.</div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Model Bazlı Kar Analizi */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Model Bazlı Kar Analizi</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {vehicleModelProfit.length > 0 ? (
+                    <div className="space-y-4">
+                      <ResponsiveContainer width="100%" height={300} minHeight={300}>
+                        <BarChart data={vehicleModelProfit}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="model" />
+                          <YAxis />
+                          <Tooltip formatter={(value: any) => `${parseFloat(value).toFixed(2)} TL`} />
+                          <Legend />
+                          <Bar dataKey="total_profit" fill="#8884d8" name="Toplam Kar" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Marka</TableHead>
+                            <TableHead>Model</TableHead>
+                            <TableHead>Araç Sayısı</TableHead>
+                            <TableHead>Satılan</TableHead>
+                            <TableHead>Toplam Kar</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {vehicleModelProfit.map((model, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell>{model.brand || '-'}</TableCell>
+                              <TableCell>{model.model || '-'}</TableCell>
+                              <TableCell>{model.vehicle_count}</TableCell>
+                              <TableCell>{model.sold_count}</TableCell>
+                              <TableCell className="font-semibold">{currency(model.total_profit)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">Model bazlı veri bulunamadı.</div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* En Karlı Araçlar */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>En Karlı Araçlar</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {vehicleTopProfitable.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Marka/Model</TableHead>
+                          <TableHead>Yıl</TableHead>
+                          <TableHead>Şasi No</TableHead>
+                          <TableHead>Satış Fiyatı</TableHead>
+                          <TableHead>Toplam Maliyet</TableHead>
+                          <TableHead>Kar</TableHead>
+                          <TableHead>Satış Tarihi</TableHead>
+                          <TableHead>Müşteri</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {vehicleTopProfitable.map((vehicle) => (
+                          <TableRow key={vehicle.id}>
+                            <TableCell>{vehicle.maker || '-'} {vehicle.model || ''}</TableCell>
+                            <TableCell>{vehicle.year || '-'}</TableCell>
+                            <TableCell>{vehicle.chassis_no || '-'}</TableCell>
+                            <TableCell>{currency(vehicle.sale_price)}</TableCell>
+                            <TableCell>{currency(vehicle.total_costs)}</TableCell>
+                            <TableCell className="font-semibold text-green-600">{currency(vehicle.profit)}</TableCell>
+                            <TableCell>{formatDateTime(vehicle.sale_date)}</TableCell>
+                            <TableCell>{vehicle.customer_name || '-'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">En karlı araç verisi bulunamadı.</div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Aylık Karşılaştırma */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Aylık Karşılaştırma</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {vehicleMonthlyComparison.length > 0 ? (
+                    <div className="space-y-4">
+                      <ResponsiveContainer width="100%" height={400} minHeight={400}>
+                        <LineChart data={vehicleMonthlyComparison}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="month" />
+                          <YAxis />
+                          <Tooltip formatter={(value: any) => `${parseFloat(value).toFixed(2)} TL`} />
+                          <Legend />
+                          <Line type="monotone" dataKey="total_revenue" stroke="#8884d8" name="Toplam Gelir" />
+                          <Line type="monotone" dataKey="total_costs" stroke="#ff7300" name="Toplam Maliyet" />
+                          <Line type="monotone" dataKey="total_profit" stroke="#82ca9d" name="Toplam Kar" />
+                        </LineChart>
+                      </ResponsiveContainer>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Ay</TableHead>
+                            <TableHead>Satış Sayısı</TableHead>
+                            <TableHead>Toplam Gelir</TableHead>
+                            <TableHead>Toplam Maliyet</TableHead>
+                            <TableHead>Toplam Kar</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {vehicleMonthlyComparison.map((month, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell>{month.month}</TableCell>
+                              <TableCell>{month.sales_count}</TableCell>
+                              <TableCell>{currency(month.total_revenue)}</TableCell>
+                              <TableCell>{currency(month.total_costs)}</TableCell>
+                              <TableCell className="font-semibold">{currency(month.total_profit)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">Aylık karşılaştırma verisi bulunamadı.</div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Kategori Bazlı Harcama Analizi */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Kategori Bazlı Harcama Analizi</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {vehicleCategoryCosts.length > 0 ? (
+                    <div className="space-y-4">
+                      <ResponsiveContainer width="100%" height={300} minHeight={300}>
+                        <BarChart data={vehicleCategoryCosts}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="category_name" />
+                          <YAxis />
+                          <Tooltip formatter={(value: any) => `${parseFloat(value).toFixed(2)} TL`} />
+                          <Legend />
+                          <Bar dataKey="total_amount" fill="#8884d8" name="Toplam Tutar" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Kategori</TableHead>
+                            <TableHead>Harcama Sayısı</TableHead>
+                            <TableHead>Toplam Tutar</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {vehicleCategoryCosts.map((cat, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell>{cat.category_name || cat.category || '-'}</TableCell>
+                              <TableCell>{cat.cost_count || 0}</TableCell>
+                              <TableCell className="font-semibold">{currency(cat.total_amount)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">Kategori bazlı veri bulunamadı.</div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </TabsContent>
+
         <TabsContent value="reports" className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold">Özelleştirilmiş Raporlar</h2>
@@ -153,7 +501,7 @@ export default function AnalyticsPage() {
           {customReports.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {customReports.map((report) => (
-                <Card key={report.id} className="hover:shadow-lg transition-shadow">
+                <Card key={report.id}>
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <CardTitle className="text-lg">{report.name}</CardTitle>
@@ -235,7 +583,8 @@ export default function AnalyticsPage() {
             </Card>
           )}
         </TabsContent>
-      </Tabs>
+        </Tabs>
+      </div>
 
       {/* Create Report Dialog */}
       <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>

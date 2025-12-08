@@ -48,7 +48,7 @@ export const TopProfitableChart = ({ data, onViewDetails }: TopProfitableChartPr
         )
       }
     >
-      <ResponsiveContainer width="100%" height={350}>
+      <ResponsiveContainer width="100%" height={350} minHeight={350}>
         <BarChart
           data={chartData}
           layout="vertical"

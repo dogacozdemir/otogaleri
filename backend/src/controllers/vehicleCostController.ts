@@ -29,31 +29,39 @@ export async function listVehicleCosts(req: AuthRequest, res: Response) {
 
 export async function addVehicleCost(req: AuthRequest, res: Response) {
   const vehicle_id = req.params.vehicle_id || req.params.id;
-  const { cost_name, amount, currency, cost_date, category } = req.body;
+  const { cost_name, amount, currency, cost_date, category, custom_rate } = req.body;
 
   if (!cost_name || !amount || !cost_date) {
     return res.status(400).json({ error: "Cost name, amount, and date required" });
   }
 
   try {
+    // Format date to YYYY-MM-DD (MySQL DATE format)
+    const formattedDate = new Date(cost_date).toISOString().split('T')[0];
+    
     const [tenantRows] = await dbPool.query("SELECT default_currency FROM tenants WHERE id = ?", [req.tenantId]);
     const baseCurrency = (tenantRows as any[])[0]?.default_currency || "TRY";
     const costCurrency = currency || baseCurrency;
 
     let fxRate = 1;
     if (costCurrency !== baseCurrency) {
-      fxRate = await getOrFetchRate(
-        costCurrency as SupportedCurrency,
-        baseCurrency as SupportedCurrency,
-        cost_date
-      );
+      // If custom_rate is provided, use it; otherwise fetch from API
+      if (custom_rate !== undefined && custom_rate !== null) {
+        fxRate = Number(custom_rate);
+      } else {
+        fxRate = await getOrFetchRate(
+          costCurrency as SupportedCurrency,
+          baseCurrency as SupportedCurrency,
+          formattedDate
+        );
+      }
     }
 
     const amountBase = Number(amount) * fxRate;
 
     const [result] = await dbPool.query(
       "INSERT INTO vehicle_costs (tenant_id, vehicle_id, cost_name, amount, currency, fx_rate_to_base, cost_date, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      [req.tenantId, vehicle_id, cost_name, amount, costCurrency, fxRate, cost_date, category || "other"]
+      [req.tenantId, vehicle_id, cost_name, amount, costCurrency, fxRate, formattedDate, category || "other"]
     );
 
     const costId = (result as any).insertId;
@@ -69,25 +77,33 @@ export async function addVehicleCost(req: AuthRequest, res: Response) {
 export async function updateVehicleCost(req: AuthRequest, res: Response) {
   const vehicle_id = req.params.vehicle_id || req.params.id;
   const { cost_id } = req.params;
-  const { cost_name, amount, currency, cost_date, category } = req.body;
+  const { cost_name, amount, currency, cost_date, category, custom_rate } = req.body;
 
   try {
+    // Format date to YYYY-MM-DD (MySQL DATE format)
+    const formattedDate = cost_date ? new Date(cost_date).toISOString().split('T')[0] : null;
+    
     const [tenantRows] = await dbPool.query("SELECT default_currency FROM tenants WHERE id = ?", [req.tenantId]);
     const baseCurrency = (tenantRows as any[])[0]?.default_currency || "TRY";
     const costCurrency = currency || baseCurrency;
 
     let fxRate = 1;
-    if (costCurrency !== baseCurrency && cost_date) {
-      fxRate = await getOrFetchRate(
-        costCurrency as SupportedCurrency,
-        baseCurrency as SupportedCurrency,
-        cost_date
-      );
+    if (costCurrency !== baseCurrency && formattedDate) {
+      // If custom_rate is provided, use it; otherwise fetch from API
+      if (custom_rate !== undefined && custom_rate !== null) {
+        fxRate = Number(custom_rate);
+      } else {
+        fxRate = await getOrFetchRate(
+          costCurrency as SupportedCurrency,
+          baseCurrency as SupportedCurrency,
+          formattedDate
+        );
+      }
     }
 
     await dbPool.query(
       "UPDATE vehicle_costs SET cost_name = ?, amount = ?, currency = ?, fx_rate_to_base = ?, cost_date = ?, category = ? WHERE id = ? AND vehicle_id = ? AND tenant_id = ?",
-      [cost_name, amount, costCurrency, fxRate, cost_date, category, cost_id, vehicle_id, req.tenantId]
+      [cost_name, amount, costCurrency, fxRate, formattedDate, category, cost_id, vehicle_id, req.tenantId]
     );
 
     const [rows] = await dbPool.query("SELECT * FROM vehicle_costs WHERE id = ?", [cost_id]);

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import { dbPool } from "../config/database";
 
 const JWT_SECRET = process.env.JWT_SECRET || "otogaleri-secret-change-in-production";
 
@@ -9,7 +10,7 @@ export interface AuthRequest extends Request {
   userRole?: string;
 }
 
-export function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
+export async function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
     return res.status(401).json({ error: "Unauthorized" });
@@ -22,6 +23,22 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
       userId: number;
       role: string;
     };
+    
+    // Check if user is active
+    const [userRows] = await dbPool.query(
+      "SELECT is_active FROM users WHERE id = ? AND tenant_id = ?",
+      [decoded.userId, decoded.tenantId]
+    );
+    const user = (userRows as any[])[0];
+    
+    if (!user) {
+      return res.status(401).json({ error: "User not found" });
+    }
+    
+    if (!user.is_active) {
+      return res.status(401).json({ error: "User account is inactive" });
+    }
+    
     req.tenantId = decoded.tenantId;
     req.userId = decoded.userId;
     req.userRole = decoded.role;

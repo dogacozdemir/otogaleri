@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { authMiddleware } from "../middleware/auth";
 import { tenantGuard } from "../middleware/tenantGuard";
+import { paginationValidator } from "../middleware/paginationValidator";
+import { inputSanitizer } from "../middleware/inputSanitizer";
 import {
   listCustomers,
   getCustomerById,
@@ -19,9 +21,10 @@ const router = Router();
 
 router.use(authMiddleware);
 router.use(tenantGuard);
+router.use(inputSanitizer);
 
 // Customer CRUD
-router.get("/", listCustomers);
+router.get("/", paginationValidator, listCustomers);
 router.post("/", createCustomer);
 router.get("/segments", getCustomerSegments);
 router.get("/:id", getCustomerById);

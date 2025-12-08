@@ -33,15 +33,19 @@
     --accent: 220 60% 97%; /* #f0f4ff - very light blue */
     --accent-foreground: 220 100% 25%; /* #003d82 - primary blue */
 
-    /* Status Colors - Clear & Accessible */
-    --success: 142 76% 36%; /* #16a34a - clear green */
+    /* Status Colors - Clear & Accessible (Enhanced for 2025) */
+    --success: 142 76% 40%; /* #16a34a - more vibrant green */
     --success-foreground: 0 0% 98%; /* white */
-    --warning: 38 92% 50%; /* #f59e0b - clear orange */
+    --success-light: 142 76% 50%; /* lighter green for accents */
+    --warning: 38 92% 55%; /* #f59e0b - more vibrant orange */
     --warning-foreground: 0 0% 98%; /* white */
-    --info: 217 91% 60%; /* #3b82f6 - clear blue */
+    --warning-light: 38 92% 65%; /* lighter orange for accents */
+    --info: 217 91% 65%; /* #3b82f6 - more vibrant blue */
     --info-foreground: 0 0% 98%; /* white */
-    --destructive: 0 84% 60%; /* #ef4444 - clear red */
+    --info-light: 217 91% 75%; /* lighter blue for accents */
+    --destructive: 0 84% 65%; /* #ef4444 - more vibrant red */
     --destructive-foreground: 0 0% 98%; /* white */
+    --destructive-light: 0 84% 75%; /* lighter red for accents */
 
     /* Borders & Inputs - Defined & Clear */
     --border: 220 13% 91%; /* #e2e8f0 - clear border */
@@ -82,6 +86,15 @@
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
     --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+    --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+    --shadow-glow: 0 0 20px rgba(0, 61, 130, 0.15);
+    --shadow-glow-lg: 0 0 30px rgba(0, 61, 130, 0.2);
+
+    /* Enhanced Status Colors - More Vibrant */
+    --success-vibrant: 142 76% 40%;
+    --warning-vibrant: 38 92% 55%;
+    --error-vibrant: 0 84% 65%;
+    --info-vibrant: 217 91% 65%;
   }
 
   .dark {
@@ -381,13 +394,51 @@
   .gap-lg { @apply gap-8; }
   .gap-xl { @apply gap-12; }
 
-  /* Typography consistency */
-  .text-h1 { @apply text-4xl font-bold tracking-tight; }
-  .text-h2 { @apply text-3xl font-bold tracking-tight; }
-  .text-h3 { @apply text-2xl font-semibold tracking-tight; }
-  .text-h4 { @apply text-xl font-semibold; }
-  .text-body { @apply text-base leading-relaxed; }
-  .text-small { @apply text-sm leading-relaxed; }
+  /* Typography consistency - Enhanced 2025 */
+  .text-h1 { 
+    @apply text-4xl font-bold tracking-tight;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+  .text-h2 { 
+    @apply text-3xl font-bold tracking-tight;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+  .text-h3 { 
+    @apply text-2xl font-semibold tracking-tight;
+    line-height: 1.3;
+  }
+  .text-h4 { 
+    @apply text-xl font-semibold;
+    line-height: 1.4;
+  }
+  .text-body { 
+    @apply text-base;
+    line-height: 1.6;
+  }
+  .text-small { 
+    @apply text-sm;
+    line-height: 1.5;
+  }
+  
+  /* Enhanced Typography Scale */
+  .text-display-lg {
+    @apply text-5xl font-bold tracking-tight;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+  }
+  
+  .text-display-md {
+    @apply text-4xl font-bold tracking-tight;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+  
+  .text-lead {
+    @apply text-lg;
+    line-height: 1.7;
+  }
 
   /* Smooth transitions */
   .transition-smooth {
@@ -405,9 +456,19 @@
     }
   }
 
-  /* Table row zebra striping */
+  /* Table row zebra striping - Enhanced */
   .table-zebra tbody tr:nth-child(even) {
-    @apply bg-muted/20;
+    @apply bg-muted/10;
+  }
+  
+  .table-zebra tbody tr:nth-child(odd) {
+    @apply bg-card;
+  }
+  
+  @media (hover: hover) and (pointer: fine) {
+    .table-zebra tbody tr:hover {
+      @apply bg-accent/40;
+    }
   }
 
   /* Responsive typography */
@@ -441,5 +502,153 @@
   
   .safe-right {
     padding-right: env(safe-area-inset-right);
+  }
+
+  /* 2025 Modern UI Enhancements */
+  
+  /* Gradient Utility Classes */
+  .gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary-hover)) 100%);
+  }
+  
+  .gradient-success {
+    background: linear-gradient(135deg, hsl(var(--success)) 0%, hsl(142 76% 42%) 100%);
+  }
+  
+  .gradient-warning {
+    background: linear-gradient(135deg, hsl(var(--warning)) 0%, hsl(38 92% 55%) 100%);
+  }
+  
+  .gradient-info {
+    background: linear-gradient(135deg, hsl(var(--info)) 0%, hsl(217 91% 65%) 100%);
+  }
+  
+  .gradient-border-primary {
+    border-image: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-hover))) 1;
+  }
+  
+  .gradient-accent {
+    background: linear-gradient(135deg, hsl(var(--accent)) 0%, hsl(220 60% 99%) 100%);
+  }
+
+  /* Card Enhancements - 2025 Style */
+  .card-modern {
+    @apply relative overflow-hidden;
+    @apply bg-card;
+    @apply border border-border/50;
+    @apply shadow-sm;
+    @apply transition-all duration-300 ease-out;
+  }
+  
+  @media (hover: hover) and (pointer: fine) {
+    .card-modern:hover {
+      @apply shadow-xl -translate-y-1 border-primary/40;
+      transform: translateY(-4px);
+      @apply bg-accent/20;
+    }
+  }
+  
+  .card-modern:active {
+    transform: translateY(-2px);
+  }
+
+  /* Status Accent Bars */
+  .card-accent-success {
+    @apply border-l-4 border-l-success;
+  }
+  
+  .card-accent-warning {
+    @apply border-l-4 border-l-warning;
+  }
+  
+  .card-accent-error {
+    @apply border-l-4 border-l-destructive;
+  }
+  
+  .card-accent-info {
+    @apply border-l-4 border-l-info;
+  }
+  
+  .card-accent-primary {
+    @apply border-l-4 border-l-primary;
+  }
+
+  /* Glassmorphism Effect */
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-md;
+    @apply border border-border/50;
+    @apply shadow-lg;
+  }
+
+  /* Enhanced Status Colors - More Vibrant */
+  --success-vibrant: 142 76% 40%;
+  --warning-vibrant: 38 92% 55%;
+  --error-vibrant: 0 84% 65%;
+  --info-vibrant: 217 91% 65%;
+
+  /* Glow Effects */
+  .glow-primary {
+    box-shadow: 0 0 20px rgba(0, 61, 130, 0.2), 0 0 40px rgba(0, 61, 130, 0.1);
+  }
+  
+  .glow-success {
+    box-shadow: 0 0 20px rgba(22, 163, 74, 0.2), 0 0 40px rgba(22, 163, 74, 0.1);
+  }
+  
+  .glow-warning {
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.2), 0 0 40px rgba(245, 158, 11, 0.1);
+  }
+
+  /* Smooth Row Hover */
+  .table-row-modern {
+    @apply transition-colors duration-200 ease-out;
+  }
+  
+  @media (hover: hover) and (pointer: fine) {
+    .table-row-modern:hover {
+      @apply bg-muted/40;
+    }
+  }
+
+  /* Modern Badge Glow */
+  .badge-glow {
+    @apply shadow-sm;
+    transition: all 0.2s ease-out;
+  }
+  
+  @media (hover: hover) and (pointer: fine) {
+    .badge-glow:hover {
+      @apply shadow-md scale-105;
+    }
+  }
+
+  /* Input Focus Glow */
+  .input-focus-glow:focus {
+    @apply ring-2 ring-primary/50 ring-offset-2;
+    box-shadow: 0 0 0 3px rgba(0, 61, 130, 0.1);
+  }
+
+  /* Button Ripple Effect */
+  .btn-ripple {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .btn-ripple::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+  }
+  
+  .btn-ripple:active::after {
+    width: 300px;
+    height: 300px;
   }
 }

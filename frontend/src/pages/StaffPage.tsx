@@ -29,9 +29,10 @@ export default function StaffPage() {
   const fetchStaff = async () => {
     try {
       const { data } = await api.get("/staff");
-      setStaff(data || []);
+      setStaff(data?.staff || []);
     } catch (err) {
       console.error("Failed to fetch staff", err);
+      setStaff([]);
     } finally {
       setLoading(false);
     }

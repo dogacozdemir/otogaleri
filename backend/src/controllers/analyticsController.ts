@@ -166,7 +166,7 @@ export async function getTopProfitable(req: AuthRequest, res: Response) {
         v.id,
         v.maker,
         v.model,
-        v.year,
+        v.production_year as year,
         v.chassis_no,
         vs.sale_amount * vs.sale_fx_rate_to_base as sale_price,
         (v.purchase_amount * COALESCE(v.purchase_fx_rate_to_base, 1) + 
@@ -539,7 +539,7 @@ export async function getRecentActivities(req: AuthRequest, res: Response) {
         vs.customer_name,
         v.maker,
         v.model,
-        v.year,
+        v.production_year as year,
         'sale' as activity_type
       FROM vehicle_sales vs
       JOIN vehicles v ON vs.vehicle_id = v.id
@@ -555,7 +555,7 @@ export async function getRecentActivities(req: AuthRequest, res: Response) {
         id,
         maker,
         model,
-        year,
+        production_year as year,
         created_at,
         'vehicle' as activity_type
       FROM vehicles

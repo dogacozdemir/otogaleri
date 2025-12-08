@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { TenantProvider } from "./contexts/TenantContext";
+import { CurrencyRatesProvider } from "./contexts/CurrencyRatesContext";
 import { Toaster } from "./components/ui/toaster";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import AuthPage from "./pages/AuthPage";
@@ -22,7 +23,8 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider>
         <TenantProvider>
-          <Routes>
+          <CurrencyRatesProvider>
+            <Routes>
           <Route path="/login" element={<AuthPage />} />
           <Route path="/signup" element={<AuthPage />} />
           <Route
@@ -45,8 +47,9 @@ function App() {
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
-          </Routes>
-          <Toaster />
+            </Routes>
+            <Toaster />
+          </CurrencyRatesProvider>
         </TenantProvider>
       </ThemeProvider>
     </ErrorBoundary>

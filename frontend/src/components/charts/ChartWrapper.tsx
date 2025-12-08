@@ -39,11 +39,13 @@ export const ChartWrapper = ({
       </CardHeader>
       <CardContent>
         {hasData ? (
-          <div className="w-full">{children}</div>
+          <div className="w-full min-h-[350px]">{children}</div>
         ) : (
-          <div className="flex items-center justify-center h-64 text-muted-foreground">
-            <div className="text-center">
-              <p className="text-sm">{emptyMessage}</p>
+          <div className="flex items-center justify-center h-64 relative overflow-hidden rounded-lg">
+            {/* Gradient Background */}
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
+            <div className="text-center relative z-10">
+              <p className="text-sm text-muted-foreground font-medium">{emptyMessage}</p>
             </div>
           </div>
         )}

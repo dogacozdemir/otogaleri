@@ -1,12 +1,15 @@
 import { Router } from "express";
 import { authMiddleware } from "../middleware/auth";
 import { tenantGuard } from "../middleware/tenantGuard";
+import { paginationValidator } from "../middleware/paginationValidator";
+import { inputSanitizer } from "../middleware/inputSanitizer";
 import {
   listVehicles,
   createVehicle,
   getVehicleById,
   updateVehicle,
   deleteVehicle,
+  getNextVehicleNumber,
 } from "../controllers/vehicleController";
 import {
   listVehicleCosts,
@@ -30,6 +33,7 @@ const router = Router();
 
 router.use(authMiddleware);
 router.use(tenantGuard);
+router.use(inputSanitizer);
 
 // Analytics routes (must come before parameterized routes)
 router.get("/analytics/brand-profit", getBrandProfit);
@@ -39,7 +43,8 @@ router.get("/analytics/top-profitable", getTopProfitable);
 router.get("/analytics/monthly-comparison", getMonthlyComparison);
 router.get("/analytics/category-costs", getCategoryCosts);
 
-router.get("/", listVehicles);
+router.get("/", paginationValidator, listVehicles);
+router.get("/next-number", getNextVehicleNumber);
 router.post("/", createVehicle);
 
 // Vehicle sub-routes (must come before /:id route)

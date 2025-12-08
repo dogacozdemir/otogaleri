@@ -3,12 +3,33 @@ import { AuthRequest } from "../middleware/auth";
 import { dbPool } from "../config/database";
 
 export async function listBranches(req: AuthRequest, res: Response) {
+  const { page = 1, limit = 50 } = req.query;
+  
   try {
+    const pageNum = Math.max(1, Number(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, Number(limit) || 50));
+    const offset = (pageNum - 1) * limitNum;
+    
     const [rows] = await dbPool.query(
-      "SELECT * FROM branches WHERE tenant_id = ? ORDER BY name",
+      "SELECT * FROM branches WHERE tenant_id = ? ORDER BY name LIMIT ? OFFSET ?",
+      [req.tenantId, limitNum, offset]
+    );
+    
+    const [countRows] = await dbPool.query(
+      "SELECT COUNT(*) as total FROM branches WHERE tenant_id = ?",
       [req.tenantId]
     );
-    res.json(rows);
+    const total = (countRows as any[])[0]?.total || 0;
+    
+    res.json({
+      branches: rows,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
   } catch (err) {
     console.error("[branch] List error", err);
     res.status(500).json({ error: "Failed to list branches" });

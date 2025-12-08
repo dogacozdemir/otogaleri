@@ -48,7 +48,7 @@ cd otogaleri
 ### Backend Kurulumu
 ```bash
 cd backend
-npm install --production
+npm install
 
 # Environment dosyası oluştur
 cp .env.example .env
@@ -79,11 +79,35 @@ FREECURRENCY_API_KEY=your_api_key_here
 # Schema'yı yükle
 mysql -u otogaleri_user -p otogaleri < schema.sql
 
-# Migration'ları çalıştır (eğer varsa)
-# Her migration dosyasını sırayla çalıştır
+# Migration'ları sırayla çalıştır (ÖNEMLİ: Tüm migration'ları çalıştırın)
+cd /home/cloudpanel/htdocs/otogaleri/backend
 mysql -u otogaleri_user -p otogaleri < migrations/add_vehicle_images.sql
-# ... diğer migration'lar
+mysql -u otogaleri_user -p otogaleri < migrations/add_tenant_settings.sql
+mysql -u otogaleri_user -p otogaleri < migrations/add_installment_sales.sql
+mysql -u otogaleri_user -p otogaleri < migrations/add_inventory_tables.sql
+mysql -u otogaleri_user -p otogaleri < migrations/add_followup_and_documents.sql
+mysql -u otogaleri_user -p otogaleri < migrations/add_track_stock_to_inventory.sql
+mysql -u otogaleri_user -p otogaleri < migrations/remove_ps_tw_add_plate_number.sql
 ```
+
+### Seed Data (Test Verileri - Opsiyonel)
+Test amaçlı örnek veriler yüklemek için:
+```bash
+cd /home/cloudpanel/htdocs/otogaleri/backend
+mysql -u otogaleri_user -p otogaleri < migrations/seed_data.sql
+```
+
+**Not:** Seed data şunları içerir:
+- 2 şube (Merkez ve Ankara)
+- 5 personel
+- 15 müşteri
+- 25 araç (10 satılmış, 10 stokta, 5 rezerve)
+- Araç maliyetleri
+- 10 satış kaydı
+- 5 taksitli satış
+- 15 envanter ürünü
+- Gelir/gider kayıtları
+- Satış sonrası takip kayıtları
 
 ### Backend Build
 ```bash

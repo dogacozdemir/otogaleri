@@ -62,7 +62,7 @@ export default function DashboardPage() {
   const fetchStats = async () => {
     try {
       const [vehiclesRes, installmentRes, branchesRes, followupsRes, overdueInstallmentsRes, documentsRes, activeInstallmentsRes, monthlySalesRes, inventoryStatsRes, recentActivitiesRes, brandProfitRes, weeklySalesRes, weeklyInventoryRes] = await Promise.all([
-        api.get("/vehicles?limit=1000"),
+        api.get("/vehicles?limit=100"),
         api.get("/analytics/active-installment-count").catch(() => ({ data: { count: 0 } })),
         api.get("/branches").catch(() => ({ data: { branches: [] } })),
         api.get("/followups/today").catch(() => ({ data: [] })),
@@ -81,8 +81,9 @@ export default function DashboardPage() {
       const unsoldVehicles = vehicles.filter((v: any) => !v.is_sold).length;
       const totalSales = vehicles.filter((v: any) => v.is_sold).length;
       const activeInstallmentCount = installmentRes.data?.count || 0;
+      // Use pagination.total if available, otherwise count branches array
       const branches = branchesRes.data?.branches || [];
-      const totalBranches = Array.isArray(branches) ? branches.length : 0;
+      const totalBranches = branchesRes.data?.pagination?.total ?? (Array.isArray(branches) ? branches.length : 0);
 
       // Takip görevlerini ve gecikmiş taksitleri birleştir
       const followups = followupsRes.data || [];
@@ -155,22 +156,14 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-h1">{t("dashboard.title")}</h1>
-          <p className="text-small text-muted-foreground mt-2">
-            Oto galerinizin genel durumu ve istatistikleri
-          </p>
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 pt-4">
         <KPICard
           title="Toplam Araç"
           value={stats?.unsoldVehicles || 0}
           subtitle="Satılmamış araç sayısı"
           icon={Car}
           iconColor="text-primary"
+          className="bg-accent/20"
         />
 
         <KPICard
@@ -179,6 +172,7 @@ export default function DashboardPage() {
           subtitle="Satılan araç sayısı"
           icon={TrendingUp}
           iconColor="text-success"
+          className="bg-accent/20"
         />
 
         <KPICard
@@ -187,6 +181,7 @@ export default function DashboardPage() {
           subtitle="Kalan borcu olan araç sayısı"
           icon={Clock}
           iconColor="text-warning"
+          className="bg-accent/20"
         />
 
         <KPICard
@@ -195,6 +190,7 @@ export default function DashboardPage() {
           subtitle="Aktif şube sayısı"
           icon={Building2}
           iconColor="text-primary"
+          className="bg-accent/20"
         />
       </div>
 
@@ -246,7 +242,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {weeklySales.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
+              <ResponsiveContainer width="100%" height={200} minHeight={200}>
                 <BarChart data={weeklySales} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={true} vertical={false} />
                   <XAxis 
@@ -311,7 +307,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {weeklyInventory.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
+              <ResponsiveContainer width="100%" height={200} minHeight={200}>
                 <BarChart data={weeklyInventory} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={true} vertical={false} />
                   <XAxis 

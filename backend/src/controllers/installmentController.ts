@@ -337,7 +337,7 @@ export async function getOverdueInstallments(req: AuthRequest, res: Response) {
         vis.status,
         v.maker,
         v.model,
-        v.year,
+        v.production_year as year,
         v.chassis_no,
         vs.customer_name,
         vs.customer_phone,
@@ -386,6 +386,219 @@ export async function getOverdueInstallments(req: AuthRequest, res: Response) {
   }
 }
 
+// Taksit ödemesini güncelle
+export async function updatePayment(req: AuthRequest, res: Response) {
+  const { payment_id } = req.params;
+  const {
+    payment_type,
+    installment_number,
+    amount,
+    currency,
+    payment_date,
+    notes,
+  } = req.body;
+
+  if (!amount || !currency || !payment_date) {
+    return res.status(400).json({ error: "amount, currency, and payment_date are required" });
+  }
+
+  if (payment_type === "installment" && installment_number === undefined) {
+    return res.status(400).json({ error: "installment_number is required for installment payments" });
+  }
+
+  const conn = await dbPool.getConnection();
+  await conn.beginTransaction();
+
+  try {
+    // Ödemeyi kontrol et
+    const [paymentRows] = await conn.query(
+      `SELECT vip.*, vis.status as installment_status
+       FROM vehicle_installment_payments vip
+       JOIN vehicle_installment_sales vis ON vip.installment_sale_id = vis.id
+       WHERE vip.id = ? AND vip.tenant_id = ?`,
+      [payment_id, req.tenantId]
+    );
+    const paymentRowsArray = paymentRows as any[];
+    if (paymentRowsArray.length === 0) {
+      await conn.rollback();
+      conn.release();
+      return res.status(404).json({ error: "Payment not found" });
+    }
+
+    const payment = paymentRowsArray[0];
+    const installmentSaleId = payment.installment_sale_id;
+
+    if (payment.installment_status !== "active") {
+      await conn.rollback();
+      conn.release();
+      return res.status(400).json({ error: "Installment sale is not active" });
+    }
+
+    const [tenantRows] = await conn.query("SELECT default_currency FROM tenants WHERE id = ?", [req.tenantId]);
+    const baseCurrency = (tenantRows as any[])[0]?.default_currency || "TRY";
+
+    let fxRate = 1;
+    if (currency !== baseCurrency) {
+      fxRate = await getOrFetchRate(
+        currency as SupportedCurrency,
+        baseCurrency as SupportedCurrency,
+        payment_date
+      );
+    }
+
+    // Ödemeyi güncelle
+    await conn.query(
+      `UPDATE vehicle_installment_payments 
+       SET payment_type = ?, installment_number = ?, amount = ?, currency = ?, fx_rate_to_base = ?, payment_date = ?, notes = ?
+       WHERE id = ? AND tenant_id = ?`,
+      [
+        payment_type || payment.payment_type,
+        payment_type === "installment" ? installment_number : null,
+        amount,
+        currency,
+        fxRate,
+        payment_date,
+        notes || null,
+        payment_id,
+        req.tenantId,
+      ]
+    );
+
+    // Kalan borcu hesapla
+    const [totalPaidRows] = await conn.query(
+      `SELECT COALESCE(SUM(amount * fx_rate_to_base), 0) as total_paid
+       FROM vehicle_installment_payments
+       WHERE installment_sale_id = ?`,
+      [installmentSaleId]
+    );
+    const totalPaidRowsArray = totalPaidRows as any[];
+    const totalPaid = Number(totalPaidRowsArray[0]?.total_paid || 0);
+    
+    const [installmentRows] = await conn.query(
+      "SELECT total_amount, fx_rate_to_base FROM vehicle_installment_sales WHERE id = ?",
+      [installmentSaleId]
+    );
+    const installmentRowsArray = installmentRows as any[];
+    const installmentSale = installmentRowsArray[0];
+    const totalAmountBase = Number(installmentSale.total_amount) * Number(installmentSale.fx_rate_to_base);
+    const remainingBalance = totalAmountBase - totalPaid;
+
+    // Eğer kalan borç 0 veya negatifse, durumu 'completed' yap
+    if (remainingBalance <= 0) {
+      await conn.query(
+        "UPDATE vehicle_installment_sales SET status = 'completed' WHERE id = ?",
+        [installmentSaleId]
+      );
+    } else {
+      // Eğer daha önce completed ise ve şimdi borç varsa, active yap
+      await conn.query(
+        "UPDATE vehicle_installment_sales SET status = 'active' WHERE id = ? AND status = 'completed'",
+        [installmentSaleId]
+      );
+    }
+
+    // Güncellenmiş ödemeyi al
+    const [updatedRows] = await conn.query(
+      "SELECT * FROM vehicle_installment_payments WHERE id = ?",
+      [payment_id]
+    );
+    const updatedRowsArray = updatedRows as any[];
+
+    await conn.commit();
+    conn.release();
+
+    res.json(updatedRowsArray[0]);
+  } catch (err) {
+    await conn.rollback();
+    conn.release();
+    console.error("[installment] Update payment error", err);
+    res.status(500).json({ error: "Failed to update payment" });
+  }
+}
+
+// Taksit ödemesini sil
+export async function deletePayment(req: AuthRequest, res: Response) {
+  const { payment_id } = req.params;
+
+  const conn = await dbPool.getConnection();
+  await conn.beginTransaction();
+
+  try {
+    // Ödemeyi kontrol et
+    const [paymentRows] = await conn.query(
+      `SELECT vip.*, vis.status as installment_status
+       FROM vehicle_installment_payments vip
+       JOIN vehicle_installment_sales vis ON vip.installment_sale_id = vis.id
+       WHERE vip.id = ? AND vip.tenant_id = ?`,
+      [payment_id, req.tenantId]
+    );
+    const paymentRowsArray = paymentRows as any[];
+    if (paymentRowsArray.length === 0) {
+      await conn.rollback();
+      conn.release();
+      return res.status(404).json({ error: "Payment not found" });
+    }
+
+    const payment = paymentRowsArray[0];
+    const installmentSaleId = payment.installment_sale_id;
+
+    if (payment.installment_status !== "active") {
+      await conn.rollback();
+      conn.release();
+      return res.status(400).json({ error: "Can only delete payments from active installment sales" });
+    }
+
+    // Ödemeyi sil
+    await conn.query(
+      "DELETE FROM vehicle_installment_payments WHERE id = ? AND tenant_id = ?",
+      [payment_id, req.tenantId]
+    );
+
+    // Kalan borcu hesapla
+    const [totalPaidRows] = await conn.query(
+      `SELECT COALESCE(SUM(amount * fx_rate_to_base), 0) as total_paid
+       FROM vehicle_installment_payments
+       WHERE installment_sale_id = ?`,
+      [installmentSaleId]
+    );
+    const totalPaidRowsArray = totalPaidRows as any[];
+    const totalPaid = Number(totalPaidRowsArray[0]?.total_paid || 0);
+    
+    const [installmentRows] = await conn.query(
+      "SELECT total_amount, fx_rate_to_base FROM vehicle_installment_sales WHERE id = ?",
+      [installmentSaleId]
+    );
+    const installmentRowsArray = installmentRows as any[];
+    const installmentSale = installmentRowsArray[0];
+    const totalAmountBase = Number(installmentSale.total_amount) * Number(installmentSale.fx_rate_to_base);
+    const remainingBalance = totalAmountBase - totalPaid;
+
+    // Eğer kalan borç 0 veya negatifse, durumu 'completed' yap
+    if (remainingBalance <= 0) {
+      await conn.query(
+        "UPDATE vehicle_installment_sales SET status = 'completed' WHERE id = ?",
+        [installmentSaleId]
+      );
+    } else {
+      // Eğer daha önce completed ise ve şimdi borç varsa, active yap
+      await conn.query(
+        "UPDATE vehicle_installment_sales SET status = 'active' WHERE id = ? AND status = 'completed'",
+        [installmentSaleId]
+      );
+    }
+
+    await conn.commit();
+    conn.release();
+
+    res.json({ message: "Payment deleted successfully" });
+  } catch (err) {
+    await conn.rollback();
+    conn.release();
+    console.error("[installment] Delete payment error", err);
+    res.status(500).json({ error: "Failed to delete payment" });
+  }
+}
+
 // Aktif taksitleri getir (son ödeme tarihine göre sıralı - en uzun süre geçen en üstte)
 export async function getActiveInstallments(req: AuthRequest, res: Response) {
   try {
@@ -402,7 +615,7 @@ export async function getActiveInstallments(req: AuthRequest, res: Response) {
         vis.sale_date,
         v.maker,
         v.model,
-        v.year,
+        v.production_year as year,
         v.chassis_no,
         vs.customer_name,
         vs.customer_phone,

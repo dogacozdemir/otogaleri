@@ -94,16 +94,16 @@ CREATE TABLE IF NOT EXISTS fx_rates (
 CREATE TABLE IF NOT EXISTS vehicles (
   id INT AUTO_INCREMENT PRIMARY KEY,
   tenant_id INT NOT NULL,
+  vehicle_number INT NULL,
   branch_id INT NULL,
   maker VARCHAR(100) NULL,
   model VARCHAR(100) NULL,
-  year INT NULL,
+  production_year INT NULL,
+  arrival_date DATE NULL,
   transmission VARCHAR(50) NULL,
-  door_seat VARCHAR(50) NULL,
   chassis_no VARCHAR(100) NULL,
   plate_number VARCHAR(20) NULL,
   km INT NULL,
-  month INT NULL,
   fuel VARCHAR(50) NULL,
   grade VARCHAR(100) NULL,
   cc INT NULL,
@@ -130,7 +130,8 @@ CREATE TABLE IF NOT EXISTS vehicles (
   FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL,
   INDEX idx_tenant (tenant_id),
   INDEX idx_tenant_sold (tenant_id, is_sold),
-  INDEX idx_tenant_maker_model (tenant_id, maker, model)
+  INDEX idx_tenant_maker_model (tenant_id, maker, model),
+  UNIQUE KEY idx_tenant_vehicle_number (tenant_id, vehicle_number)
 );
 
 -- Vehicle costs (harcamalar, kendi para birimi ve kur bilgisiyle)

@@ -15,7 +15,7 @@ export async function listFollowups(req: AuthRequest, res: Response) {
         vs.sale_amount,
         v.maker,
         v.model,
-        v.year,
+        v.production_year as year,
         c.name as customer_name_full,
         s.name as created_by_name
       FROM post_sale_followups f
@@ -75,7 +75,7 @@ export async function getFollowupById(req: AuthRequest, res: Response) {
         vs.sale_amount,
         v.maker,
         v.model,
-        v.year,
+        v.production_year as year,
         c.name as customer_name_full,
         s.name as created_by_name
       FROM post_sale_followups f
@@ -260,7 +260,7 @@ export async function getTodayFollowups(req: AuthRequest, res: Response) {
         vs.sale_date,
         v.maker,
         v.model,
-        v.year,
+        v.production_year as year,
         c.name as customer_name_full,
         c.phone as customer_phone
       FROM post_sale_followups f

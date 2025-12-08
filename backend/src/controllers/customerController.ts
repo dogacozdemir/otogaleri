@@ -32,7 +32,7 @@ export async function listCustomers(req: AuthRequest, res: Response) {
         COALESCE(COUNT(DISTINCT vs.id), 0) as sale_count,
         MAX(vs.sale_date) as last_sale_date,
         MIN(vs.sale_date) as first_sale_date,
-        GROUP_CONCAT(DISTINCT CONCAT(COALESCE(v.maker, ''), ' ', COALESCE(v.model, ''), ' ', COALESCE(v.year, '')) SEPARATOR ', ') as vehicles_purchased
+        GROUP_CONCAT(DISTINCT CONCAT(COALESCE(v.maker, ''), ' ', COALESCE(v.model, ''), ' ', COALESCE(v.production_year, '')) SEPARATOR ', ') as vehicles_purchased
       FROM customers c
       LEFT JOIN vehicle_sales vs ON vs.tenant_id = ? AND (vs.customer_name = c.name OR (vs.customer_phone IS NOT NULL AND vs.customer_phone = c.phone))
       LEFT JOIN vehicles v ON vs.vehicle_id = v.id
@@ -86,12 +86,19 @@ export async function getCustomerById(req: AuthRequest, res: Response) {
         vs.*,
         v.maker,
         v.model,
-        v.year,
+        v.production_year as year,
         v.chassis_no,
-        (SELECT CONCAT('/uploads/vehicles/', image_filename) 
-         FROM vehicle_images 
-         WHERE vehicle_id = v.id AND is_primary = TRUE AND tenant_id = v.tenant_id 
-         LIMIT 1) as primary_image_url,
+        COALESCE(
+          (SELECT CONCAT('/uploads/vehicles/', image_filename) 
+           FROM vehicle_images 
+           WHERE vehicle_id = v.id AND is_primary = TRUE AND tenant_id = v.tenant_id 
+           LIMIT 1),
+          (SELECT CONCAT('/uploads/vehicles/', image_filename) 
+           FROM vehicle_images 
+           WHERE vehicle_id = v.id AND tenant_id = v.tenant_id 
+           ORDER BY display_order ASC, created_at ASC
+           LIMIT 1)
+        ) as primary_image_url,
         b.name as branch_name,
         s.name as staff_name
       FROM vehicle_sales vs
@@ -252,7 +259,7 @@ export async function getCustomerSegments(req: AuthRequest, res: Response) {
         COALESCE(COUNT(DISTINCT vs.id), 0) as sale_count,
         MAX(vs.sale_date) as last_sale_date,
         MIN(vs.sale_date) as first_sale_date,
-        GROUP_CONCAT(DISTINCT CONCAT(COALESCE(v.maker, ''), ' ', COALESCE(v.model, ''), ' ', COALESCE(v.year, '')) SEPARATOR ', ') as vehicles_purchased,
+        GROUP_CONCAT(DISTINCT CONCAT(COALESCE(v.maker, ''), ' ', COALESCE(v.model, ''), ' ', COALESCE(v.production_year, '')) SEPARATOR ', ') as vehicles_purchased,
         GROUP_CONCAT(DISTINCT v.chassis_no SEPARATOR ', ') as chassis_numbers
       FROM customers c
       LEFT JOIN vehicle_sales vs ON vs.tenant_id = ? AND (vs.customer_name = c.name OR (vs.customer_phone IS NOT NULL AND vs.customer_phone = c.phone))

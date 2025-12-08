@@ -286,7 +286,7 @@ const CustomerDetails: React.FC = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-        <Card className="bg-card border border-border shadow-sm hover:shadow-md transition-shadow">
+        <Card>
           <CardContent className="p-6">
             <div>
               <p className="text-sm text-muted-foreground font-medium mb-2">Toplam Harcama</p>
@@ -295,7 +295,7 @@ const CustomerDetails: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-card border border-border shadow-sm hover:shadow-md transition-shadow">
+        <Card>
           <CardContent className="p-6">
             <div>
               <p className="text-sm text-muted-foreground font-medium mb-2">Toplam Satış</p>
@@ -304,7 +304,7 @@ const CustomerDetails: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-card border border-border shadow-sm hover:shadow-md transition-shadow">
+        <Card>
           <CardContent className="p-6">
             <div>
               <p className="text-sm text-muted-foreground font-medium mb-2">Ortalama Satış</p>
@@ -313,7 +313,7 @@ const CustomerDetails: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-card border border-border shadow-sm hover:shadow-md transition-shadow">
+        <Card>
           <CardContent className="p-6">
             <div>
               <p className="text-sm text-muted-foreground font-medium mb-2">İlk Satış</p>
@@ -322,7 +322,7 @@ const CustomerDetails: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="bg-card border border-border shadow-sm hover:shadow-md transition-shadow">
+        <Card>
           <CardContent className="p-6">
             <div>
               <p className="text-sm text-muted-foreground font-medium mb-2">Son Satış</p>
@@ -336,7 +336,7 @@ const CustomerDetails: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Customer Info */}
         <div className="lg:col-span-1 space-y-6">
-          <Card className="border-0 shadow-lg bg-card text-card-foreground border shadow-sm">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
                 <User className="w-5 h-5 mr-2 text-primary" />
@@ -375,7 +375,7 @@ const CustomerDetails: React.FC = () => {
           </Card>
 
           {/* Communication */}
-          <Card className="border-0 shadow-lg bg-card text-card-foreground border shadow-sm">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
                 <MessageSquare className="w-5 h-5 mr-2 text-primary" />
@@ -409,7 +409,7 @@ const CustomerDetails: React.FC = () => {
 
         {/* Tabs - Sales, Followups, Documents */}
         <div className="lg:col-span-2 space-y-6">
-          <Card className="border-0 shadow-lg bg-card text-card-foreground border shadow-sm">
+          <Card>
             <Tabs defaultValue="sales" className="w-full">
               <CardHeader>
                 <div className="flex items-center justify-between">

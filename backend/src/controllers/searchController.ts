@@ -48,11 +48,11 @@ export async function globalSearch(req: AuthRequest, res: Response) {
       const vehicleQuery = `
         SELECT DISTINCT
           v.id,
-          CONCAT(COALESCE(v.maker, ''), ' ', COALESCE(v.model, ''), ' ', COALESCE(v.year, '')) as name,
+          CONCAT(COALESCE(v.maker, ''), ' ', COALESCE(v.model, ''), ' ', COALESCE(v.production_year, '')) as name,
           v.chassis_no,
           v.maker,
           v.model,
-          v.year,
+          v.production_year as year,
           v.color,
           v.fuel,
           v.transmission,
@@ -78,7 +78,7 @@ export async function globalSearch(req: AuthRequest, res: Response) {
           v.grade LIKE ? OR
           v.plate_number LIKE ? OR
           CAST(v.km AS CHAR) LIKE ? OR
-          CAST(v.year AS CHAR) LIKE ? OR
+          CAST(v.production_year AS CHAR) LIKE ? OR
           CAST(v.cc AS CHAR) LIKE ? OR
           CONCAT(COALESCE(v.maker, ''), ' ', COALESCE(v.model, '')) LIKE ? OR
           (v.features IS NOT NULL AND v.features LIKE ?) OR
@@ -100,7 +100,7 @@ export async function globalSearch(req: AuthRequest, res: Response) {
         searchTerm, // v.grade
         searchTerm, // v.plate_number
         searchTerm, // CAST(v.km AS CHAR)
-        searchTerm, // CAST(v.year AS CHAR)
+        searchTerm, // CAST(v.production_year AS CHAR)
         searchTerm, // CAST(v.cc AS CHAR)
         searchTerm, // CONCAT(...)
         searchTerm, // v.features

@@ -44,16 +44,19 @@ export const EmptyState = ({
   const ActionIcon = action?.icon;
 
   return (
-    <Card className={cn("border-dashed", className)}>
-      <CardContent className={cn("text-center", sizeClasses[size])}>
+    <Card className={cn("border-dashed relative overflow-hidden", className)}>
+      {/* Gradient Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 pointer-events-none" />
+      
+      <CardContent className={cn("text-center relative z-10", sizeClasses[size])}>
         {Icon && (
           <div className="mb-4 flex justify-center">
             <div className={cn(
-              "rounded-full bg-muted/50 p-4 transition-all duration-300",
+              "rounded-full bg-gradient-to-br from-primary/10 to-accent/10 p-4 transition-all duration-300 group",
               iconSizes[size]
             )}>
               <Icon className={cn(
-                "text-muted-foreground transition-colors duration-300",
+                "text-primary transition-all duration-300 group-hover:scale-110",
                 iconSizes[size]
               )} />
             </div>
@@ -61,7 +64,7 @@ export const EmptyState = ({
         )}
         <h3 className="text-lg font-semibold text-foreground mb-2">{title}</h3>
         {description && (
-          <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">{description}</p>
+          <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto leading-relaxed">{description}</p>
         )}
         {action && (
           <Button 

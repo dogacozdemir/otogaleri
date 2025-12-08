@@ -312,16 +312,9 @@ const AccountingPage = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Kasa Yönetimi</h1>
-          <p className="text-muted-foreground mt-1">Gelir, gider ve finansal takip sistemi</p>
-        </div>
-      </div>
-
       {/* Tarih Filtreleme */}
-      <Card>
+      <div className="pt-4">
+        <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
             <Filter className="w-5 h-5 mr-2 text-primary" />
@@ -367,6 +360,7 @@ const AccountingPage = () => {
           )}
         </CardContent>
       </Card>
+      </div>
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -431,10 +425,25 @@ const AccountingPage = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview">Genel Bakış</TabsTrigger>
-          <TabsTrigger value="income">Gelirler</TabsTrigger>
-          <TabsTrigger value="expenses">Giderler</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 bg-card border border-border rounded-xl p-1.5 shadow-sm h-auto mb-6">
+          <TabsTrigger 
+            value="overview"
+            className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-colors duration-200 ease-in-out min-h-[3.5rem] data-[state=active]:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 hover:bg-muted/70"
+          >
+            Genel Bakış
+          </TabsTrigger>
+          <TabsTrigger 
+            value="income"
+            className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-colors duration-200 ease-in-out min-h-[3.5rem] data-[state=active]:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 hover:bg-muted/70"
+          >
+            Gelirler
+          </TabsTrigger>
+          <TabsTrigger 
+            value="expenses"
+            className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-colors duration-200 ease-in-out min-h-[3.5rem] data-[state=active]:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 hover:bg-muted/70"
+          >
+            Giderler
+          </TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -449,7 +458,7 @@ const AccountingPage = () => {
             <CardContent>
               <div className="h-80">
                 {dateRangeData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={400} minHeight={400}>
                     <LineChart data={dateRangeData}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis
@@ -485,7 +494,7 @@ const AccountingPage = () => {
             <CardContent>
               <div className="h-80">
                 {yearlyData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height={400} minHeight={400}>
                     <BarChart data={yearlyData}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="month" tickFormatter={(value) => new Date(value + "-01").toLocaleDateString("tr-TR", { month: "short" })} />

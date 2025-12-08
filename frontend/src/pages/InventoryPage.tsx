@@ -164,15 +164,17 @@ const InventoryPage = () => {
       setCustomers(data?.customers || []);
     } catch (e: any) {
       console.error("Müşteriler alınamadı:", e);
+      setCustomers([]);
     }
   };
 
   const fetchStaff = async () => {
     try {
       const { data } = await api.get("/staff");
-      setStaff(data || []);
+      setStaff(data?.staff || []);
     } catch (e: any) {
       console.error("Personel listesi alınamadı:", e);
+      setStaff([]);
     }
   };
 
@@ -438,24 +440,8 @@ const InventoryPage = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-display text-primary">Stok Takibi</h1>
-          <p className="text-body text-muted-foreground mt-2">Ürün yönetimi ve stok analizi</p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <div className="status-success px-4 py-2 rounded-xl">
-            <div className="flex items-center space-x-2">
-              <Activity className="w-4 h-4" />
-              <span className="font-semibold text-sm">Canlı</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 pt-4">
         <div className="card-professional p-6 animate-slide-up">
           <div className="flex items-center justify-between">
             <div>
@@ -523,27 +509,27 @@ const InventoryPage = () => {
 
       {/* Tabs Section */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-professional-lg">
-        <TabsList className="grid w-full grid-cols-3 bg-card border border-border rounded-xl p-1 shadow-professional-sm h-auto">
+        <TabsList className="grid w-full grid-cols-3 bg-card border border-border rounded-xl p-1.5 shadow-sm h-auto mb-6">
           <TabsTrigger
             value="products"
-            className="flex flex-col items-center space-y-1 px-3 py-3 text-muted-foreground data-[state=active]:bg-gradient-trustworthy data-[state=active]:text-white data-[state=active]:shadow-professional-sm rounded-lg font-semibold min-h-[3rem]"
+            className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-colors duration-200 ease-in-out min-h-[3.5rem] data-[state=active]:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 hover:bg-muted/70"
           >
-            <Package className="w-4 h-4" />
-            <span className="text-xs">Ürünler</span>
+            <Package className="w-4 h-4 mr-2" />
+            Ürünler
           </TabsTrigger>
           <TabsTrigger
             value="sales"
-            className="flex flex-col items-center space-y-1 px-3 py-3 text-muted-foreground data-[state=active]:bg-gradient-trustworthy data-[state=active]:text-white data-[state=active]:shadow-professional-sm rounded-lg font-semibold min-h-[3rem]"
+            className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-colors duration-200 ease-in-out min-h-[3.5rem] data-[state=active]:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 hover:bg-muted/70"
           >
-            <ShoppingCart className="w-4 h-4" />
-            <span className="text-xs">Satış</span>
+            <ShoppingCart className="w-4 h-4 mr-2" />
+            Satış
           </TabsTrigger>
           <TabsTrigger
             value="service"
-            className="flex flex-col items-center space-y-1 px-3 py-3 text-muted-foreground data-[state=active]:bg-gradient-trustworthy data-[state=active]:text-white data-[state=active]:shadow-professional-sm rounded-lg font-semibold min-h-[3rem]"
+            className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-colors duration-200 ease-in-out min-h-[3.5rem] data-[state=active]:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 hover:bg-muted/70"
           >
-            <Wrench className="w-4 h-4" />
-            <span className="text-xs">Servis</span>
+            <Wrench className="w-4 h-4 mr-2" />
+            Servis
           </TabsTrigger>
         </TabsList>
 

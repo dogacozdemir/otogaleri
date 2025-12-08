@@ -40,7 +40,7 @@ export async function updateTenant(req: AuthRequest, res: Response) {
         phone || null,
         address || null,
         city || null,
-        default_currency || "TRY",
+        default_currency ?? "TRY",
         language || "tr",
         req.tenantId,
       ]

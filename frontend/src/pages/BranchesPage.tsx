@@ -28,9 +28,10 @@ export default function BranchesPage() {
   const fetchBranches = async () => {
     try {
       const { data } = await api.get("/branches");
-      setBranches(data || []);
+      setBranches(data?.branches || []);
     } catch (err) {
       console.error("Failed to fetch branches", err);
+      setBranches([]);
     } finally {
       setLoading(false);
     }

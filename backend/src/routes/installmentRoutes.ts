@@ -4,6 +4,8 @@ import { tenantGuard } from "../middleware/tenantGuard";
 import {
   createInstallmentSale,
   recordPayment,
+  updatePayment,
+  deletePayment,
   getInstallmentDetails,
   getInstallmentByVehicleId,
   getRemainingBalance,
@@ -18,6 +20,8 @@ router.use(tenantGuard);
 
 router.post("/", createInstallmentSale);
 router.post("/payments", recordPayment);
+router.put("/payments/:payment_id", updatePayment);
+router.delete("/payments/:payment_id", deletePayment);
 router.get("/overdue", getOverdueInstallments);
 router.get("/active", getActiveInstallments);
 router.get("/:id", getInstallmentDetails);

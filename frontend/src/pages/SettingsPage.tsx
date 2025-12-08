@@ -85,18 +85,9 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <Settings className="w-8 h-8 text-primary" />
-            Ayarlar
-          </h1>
-          <p className="text-muted-foreground mt-2">Galeri bilgileri ve genel ayarlar</p>
-        </div>
-      </div>
-
       <form onSubmit={handleSubmit}>
-        <Card>
+        <div className="pt-4">
+          <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Building2 className="w-5 h-5" />
@@ -244,6 +235,7 @@ export default function SettingsPage() {
             <Save className="w-4 h-4" />
             {saving ? "Kaydediliyor..." : "Değişiklikleri Kaydet"}
           </Button>
+        </div>
         </div>
       </form>
     </div>

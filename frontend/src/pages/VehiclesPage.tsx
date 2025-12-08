@@ -20,7 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Plus, Search, Edit, Trash2, 
-  Calculator, CheckCircle, XCircle, Image as ImageIcon, FileDown, BarChart3, List, Grid3x3, Eye,
+  Calculator, CheckCircle, XCircle, Image as ImageIcon, FileDown, List, Grid3x3, Eye,
   FileText, Upload, AlertCircle
 } from "lucide-react";
 import {
@@ -38,19 +38,23 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { formatCurrency } from "@/lib/formatters";
 import VehicleImageUpload from "@/components/VehicleImageUpload";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import { useCurrencyRates } from "@/contexts/CurrencyRatesContext";
+import { useTenant } from "@/contexts/TenantContext";
 
 type Vehicle = {
   id: number;
+  vehicle_number: number | null;
   maker: string | null;
   model: string | null;
-  year: number | null;
+  production_year: number | null;
+  arrival_date: string | null;
   transmission: string | null;
-  door_seat: string | null;
   chassis_no: string | null;
   plate_number: string | null;
   km: number | null;
-  month: number | null;
   fuel: string | null;
   grade: string | null;
   cc: number | null;
@@ -121,8 +125,8 @@ type CostCalculation = {
     model: string | null;
     sale_price: number | null;
   };
-  costItems: Array<{ name: string; amount: number }>;
-  customItems: Array<{ name: string; amount: number }>;
+  costItems: Array<{ name: string; amount: number; currency?: string; amount_base?: number }>;
+  customItems: Array<{ name: string; amount: number; currency?: string }>;
   generalTotal: number;
   salePrice: number;
   profit: number;
@@ -263,6 +267,9 @@ const getInstallmentStatus = (vehicle: Vehicle): {
 
 const VehiclesPage = () => {
   const { formatCurrency: currency } = useCurrency();
+  const { getCustomRate } = useCurrencyRates();
+  const { tenant } = useTenant();
+  const baseCurrency = tenant?.default_currency || "TRY";
   const location = useLocation();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(false);
@@ -278,6 +285,9 @@ const VehiclesPage = () => {
 
   // Modal states
   const [openAdd, setOpenAdd] = useState(false);
+  const [addModalStep, setAddModalStep] = useState(1);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
   const [openDetail, setOpenDetail] = useState(false);
   const [openCost, setOpenCost] = useState(false);
@@ -285,6 +295,7 @@ const VehiclesPage = () => {
   // const [openCalculate, setOpenCalculate] = useState(false); // Unused - keeping for potential future use
   const [openSell, setOpenSell] = useState(false);
   const [openPayment, setOpenPayment] = useState(false);
+  const [editingPaymentId, setEditingPaymentId] = useState<number | null>(null);
   const [paymentForm, setPaymentForm] = useState({
     installment_sale_id: "",
     payment_type: "installment",
@@ -309,25 +320,18 @@ const VehiclesPage = () => {
   const [selectedDocumentFile, setSelectedDocumentFile] = useState<File | null>(null);
 
   // Rapor state'leri
-  const [brandProfit, setBrandProfit] = useState<any[]>([]);
-  const [modelProfit, setModelProfit] = useState<any[]>([]);
-  const [topProfitable, setTopProfitable] = useState<any[]>([]);
-  const [salesDuration, setSalesDuration] = useState<any>(null);
-  const [monthlyComparison, setMonthlyComparison] = useState<any[]>([]);
-  const [categoryCosts, setCategoryCosts] = useState<any[]>([]);
-  const [reportsLoading, setReportsLoading] = useState(false);
 
   // Form states
   const [vehicleForm, setVehicleForm] = useState({
+    vehicle_number: "",
     maker: "",
     model: "",
-    year: "",
+    production_year: "",
+    arrival_date: "",
     transmission: "",
-    door_seat: "",
     chassis_no: "",
     plate_number: "",
     km: "",
-    month: "",
     fuel: "",
     grade: "",
     cc: "",
@@ -349,10 +353,11 @@ const VehiclesPage = () => {
   const [costForm, setCostForm] = useState({
     cost_name: "",
     amount: "",
+    currency: "TRY",
     date: new Date().toISOString().split('T')[0],
-    category: "other"
+    category: "other",
+    customRate: null as number | null
   });
-  const [costCategoryFilter, setCostCategoryFilter] = useState<string>("");
   const [editingCost, setEditingCost] = useState<VehicleCost | null>(null);
 
   const [sellForm, setSellForm] = useState({
@@ -362,6 +367,7 @@ const VehiclesPage = () => {
     plate_number: "",
     key_count: "",
     sale_price: "",
+    sale_currency: "TRY",
     sale_date: new Date().toISOString().split('T')[0],
     payment_type: "cash",
     down_payment: "",
@@ -386,6 +392,14 @@ const VehiclesPage = () => {
     'Antrepo',
     'Ortalama masraf',
     'Hızlı kayıt'
+  ];
+
+  // Para birimleri
+  const currencies = [
+    { value: "TRY", label: "Türk Lirası (TRY)" },
+    { value: "USD", label: "Amerikan Doları (USD)" },
+    { value: "EUR", label: "Euro (EUR)" },
+    { value: "GBP", label: "İngiliz Sterlini (GBP)" },
   ];
 
   // Harcama kategorileri
@@ -459,7 +473,7 @@ const VehiclesPage = () => {
     }
   };
 
-  const fetchVehicleDetail = async (id: number, category?: string) => {
+  const fetchVehicleDetail = async (id: number) => {
     try {
       const response = await api.get(`/vehicles/${id}`);
       const vehicleData = response.data;
@@ -469,11 +483,9 @@ const VehiclesPage = () => {
         sale_info: vehicleData.sale_info || null,
         installment: vehicleData.installment || null
       });
-      
-      // Harcamaları getir (kategori filtresi ile)
-      const filterCategory = category !== undefined ? category : costCategoryFilter;
-      const costsParams = filterCategory ? `?category=${filterCategory}` : '';
-      const costsResponse = await api.get(`/vehicles/${id}/costs${costsParams}`);
+
+      // Harcamaları getir (tüm kategoriler)
+      const costsResponse = await api.get(`/vehicles/${id}/costs`);
       setVehicleCosts(costsResponse.data || []);
     } catch (e: any) {
       toast({ 
@@ -502,7 +514,9 @@ const VehiclesPage = () => {
       const costsArray = Array.isArray(data.costs) ? data.costs : [];
       const costItems = costsArray.map((cost: any) => ({
         name: cost.cost_name || cost.name || 'Harcama',
-        amount: cost.amount_base || cost.amount || 0
+        amount: cost.amount || 0, // Orijinal tutar (kendi para biriminde)
+        currency: cost.currency || "TRY", // Para birimi
+        amount_base: cost.amount_base || (cost.amount * (cost.fx_rate_to_base || 1)) // Base currency'deki tutar
       }));
       
       const transformedData: CostCalculation = {
@@ -534,17 +548,28 @@ const VehiclesPage = () => {
     }
   };
 
-  const resetVehicleForm = () => {
+  const fetchNextVehicleNumber = async () => {
+    try {
+      const response = await api.get("/vehicles/next-number");
+      return response.data.next_vehicle_number || "";
+    } catch (error) {
+      console.error("Failed to fetch next vehicle number", error);
+      return "";
+    }
+  };
+
+  const resetVehicleForm = async () => {
+    const nextNumber = await fetchNextVehicleNumber();
     setVehicleForm({
+      vehicle_number: nextNumber.toString(),
       maker: "",
       model: "",
-      year: "",
+      production_year: "",
+      arrival_date: "",
       transmission: "",
-      door_seat: "",
       chassis_no: "",
       plate_number: "",
       km: "",
-      month: "",
       fuel: "",
       grade: "",
       cc: "",
@@ -562,9 +587,45 @@ const VehiclesPage = () => {
       features: {},
       contract_pdf: null
     });
+    setFormErrors({});
+  };
+
+  const validateStep1 = (): boolean => {
+    const errors: Record<string, string> = {};
+    
+    if (!vehicleForm.maker?.trim()) {
+      errors.maker = "Marka zorunludur";
+    }
+    if (!vehicleForm.model?.trim()) {
+      errors.model = "Model zorunludur";
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const validateStep2 = (): boolean => {
+    const errors: Record<string, string> = {};
+    
+    // Step 2 için zorunlu alan yok, hepsi opsiyonel
+    setFormErrors(errors);
+    return true;
+  };
+
+  const handleNextStep = () => {
+    if (addModalStep === 1) {
+      if (validateStep1()) {
+        setAddModalStep(2);
+      }
+    }
   };
 
   const handleAddVehicle = async () => {
+    if (!validateStep2()) {
+      return;
+    }
+    
+    setIsSubmitting(true);
     try {
       const payload: any = {};
       const contractPdf = vehicleForm.contract_pdf;
@@ -597,7 +658,7 @@ const VehiclesPage = () => {
             payload[key] = featuresObj;
           }
         } else if (value) {
-          if (['year', 'km', 'month', 'cc', 'sale_price', 'target_profit'].includes(key)) {
+          if (['km', 'cc', 'sale_price', 'target_profit'].includes(key)) {
             payload[key] = Number(value);
           } else {
             payload[key] = value;
@@ -629,8 +690,13 @@ const VehiclesPage = () => {
         }
       }
 
-      toast({ title: "Başarılı", description: "Araç eklendi." });
+      toast({ 
+        title: "Başarılı", 
+        description: "Araç başarıyla eklendi.",
+        variant: "default"
+      });
       setOpenAdd(false);
+      setAddModalStep(1);
       resetVehicleForm();
       fetchVehicles();
     } catch (e: any) {
@@ -639,6 +705,8 @@ const VehiclesPage = () => {
         description: e?.response?.data?.message || "Araç eklenemedi.", 
         variant: "destructive" 
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -670,7 +738,7 @@ const VehiclesPage = () => {
             payload[key] = featuresObj;
           }
         } else if (value) {
-          if (['year', 'km', 'month', 'cc', 'sale_price', 'target_profit'].includes(key)) {
+          if (['km', 'cc', 'sale_price', 'target_profit', 'vehicle_number', 'production_year'].includes(key)) {
             payload[key] = Number(value);
           } else {
             payload[key] = value;
@@ -748,15 +816,15 @@ const VehiclesPage = () => {
     }
 
     setVehicleForm({
+      vehicle_number: vehicle.vehicle_number?.toString() || "",
       maker: vehicle.maker || "",
       model: vehicle.model || "",
-      year: vehicle.year?.toString() || "",
+      production_year: vehicle.production_year?.toString() || "",
+      arrival_date: vehicle.arrival_date ? vehicle.arrival_date.split('T')[0] : "",
       transmission: vehicle.transmission || "",
-      door_seat: vehicle.door_seat || "",
       chassis_no: vehicle.chassis_no || "",
       plate_number: vehicle.plate_number || "",
       km: vehicle.km?.toString() || "",
-      month: vehicle.month?.toString() || "",
       fuel: vehicle.fuel || "",
       grade: vehicle.grade || "",
       cc: vehicle.cc?.toString() || "",
@@ -782,8 +850,10 @@ const VehiclesPage = () => {
     setCostForm({
       cost_name: "",
       amount: "",
+      currency: "TRY",
       date: new Date().toISOString().split('T')[0],
-      category: "other"
+      category: "other",
+      customRate: null
     });
     setOpenCost(true);
   };
@@ -798,6 +868,7 @@ const VehiclesPage = () => {
       plate_number: "",
       key_count: "",
       sale_price: vehicle.sale_price?.toString() || "",
+      sale_currency: "TRY",
       sale_date: new Date().toISOString().split('T')[0],
       payment_type: "cash",
       down_payment: "",
@@ -816,12 +887,19 @@ const VehiclesPage = () => {
       return;
     }
     try {
+      const costCurrency = costForm.currency || "TRY";
+      // Use form-specific customRate if set, otherwise use global context
+      const customRate = costForm.customRate !== null 
+        ? costForm.customRate 
+        : (costCurrency !== baseCurrency ? getCustomRate(costCurrency, baseCurrency) : null);
+
       const payload = {
         cost_name: costForm.cost_name,
         amount: Number(costForm.amount),
+        currency: costCurrency,
         cost_date: costForm.date,
         category: costForm.category || "other",
-        currency: "TRY" // Default currency, can be made configurable later
+        ...(customRate !== null && { custom_rate: customRate })
       };
       await api.post(`/vehicles/${selectedVehicle.id}/costs`, payload);
       toast({ title: "Başarılı", description: "Harcama eklendi." });
@@ -829,8 +907,10 @@ const VehiclesPage = () => {
       setCostForm({
         cost_name: "",
         amount: "",
+        currency: "TRY",
         date: new Date().toISOString().split('T')[0],
-        category: "other"
+        category: "other",
+        customRate: null
       });
       if (openDetail) {
         await fetchVehicleDetail(selectedVehicle.id);
@@ -867,8 +947,10 @@ const VehiclesPage = () => {
     setCostForm({
       cost_name: cost.cost_name,
       amount: cost.amount.toString(),
+      currency: (cost as any).currency || "TRY",
       date: cost.cost_date || cost.date,
-      category: cost.category || "other"
+      category: cost.category || "other",
+      customRate: null // Reset on edit, user can set new rate if needed
     });
     setOpenEditCost(true);
   };
@@ -882,12 +964,19 @@ const VehiclesPage = () => {
       return;
     }
     try {
+      const costCurrency = costForm.currency || "TRY";
+      // Use form-specific customRate if set, otherwise use global context
+      const customRate = costForm.customRate !== null 
+        ? costForm.customRate 
+        : (costCurrency !== baseCurrency ? getCustomRate(costCurrency, baseCurrency) : null);
+
       const payload = {
         cost_name: costForm.cost_name,
         amount: Number(costForm.amount),
+        currency: costCurrency,
         cost_date: costForm.date,
         category: costForm.category || "other",
-        currency: editingCost.currency || "TRY" // Use existing currency or default to TRY
+        ...(customRate !== null && { custom_rate: customRate })
       };
       await api.put(`/vehicles/${selectedVehicle.id}/costs/${editingCost.id}`, payload);
       toast({ title: "Başarılı", description: "Harcama güncellendi." });
@@ -896,8 +985,10 @@ const VehiclesPage = () => {
       setCostForm({
         cost_name: "",
         amount: "",
+        currency: "TRY",
         date: new Date().toISOString().split('T')[0],
-        category: "other"
+        category: "other",
+        customRate: null
       });
       await fetchVehicleDetail(selectedVehicle.id);
       fetchVehicles();
@@ -935,11 +1026,18 @@ const VehiclesPage = () => {
       }
     }
     try {
+      const saleCurrency = sellForm.sale_currency || "TRY";
+      const customRate = saleCurrency !== baseCurrency 
+        ? getCustomRate(saleCurrency, baseCurrency) 
+        : null;
+
       const payload: any = {
         customer_name: sellForm.customer_name,
         sale_date: sellForm.sale_date,
         sale_amount: Number(sellForm.sale_price),
-        payment_type: sellForm.payment_type
+        sale_currency: saleCurrency,
+        payment_type: sellForm.payment_type,
+        ...(customRate !== null && { custom_rate: customRate })
       };
       if (sellForm.customer_phone) payload.customer_phone = sellForm.customer_phone;
       if (sellForm.customer_address) payload.customer_address = sellForm.customer_address;
@@ -1002,9 +1100,15 @@ const VehiclesPage = () => {
         payload.notes = paymentForm.notes;
       }
 
-      await api.post(`/installments/payments`, payload);
-      toast({ title: "Başarılı", description: "Ödeme kaydedildi." });
+      if (editingPaymentId) {
+        await api.put(`/installments/payments/${editingPaymentId}`, payload);
+        toast({ title: "Başarılı", description: "Ödeme güncellendi." });
+      } else {
+        await api.post(`/installments/payments`, payload);
+        toast({ title: "Başarılı", description: "Ödeme kaydedildi." });
+      }
       setOpenPayment(false);
+      setEditingPaymentId(null);
       setPaymentForm({
         installment_sale_id: "",
         payment_type: "installment",
@@ -1024,6 +1128,42 @@ const VehiclesPage = () => {
         description: e?.response?.data?.error || e?.response?.data?.message || "Ödeme kaydedilemedi.", 
         variant: "destructive" 
       });
+    }
+  };
+
+  const handleDeletePayment = async (paymentId: number) => {
+    if (!confirm("Bu ödemeyi silmek istediğinize emin misiniz?")) {
+      return;
+    }
+    try {
+      await api.delete(`/installments/payments/${paymentId}`);
+      toast({ title: "Başarılı", description: "Ödeme silindi." });
+      if (selectedVehicle) {
+        await fetchVehicleDetail(selectedVehicle.id);
+      }
+      fetchVehicles();
+    } catch (e: any) {
+      toast({ 
+        title: "Hata", 
+        description: e?.response?.data?.error || e?.response?.data?.message || "Ödeme silinemedi.", 
+        variant: "destructive" 
+      });
+    }
+  };
+
+  const handleEditPayment = (payment: any) => {
+    if (selectedVehicle?.installment) {
+      setEditingPaymentId(payment.id);
+      setPaymentForm({
+        installment_sale_id: selectedVehicle.installment.id.toString(),
+        payment_type: payment.payment_type,
+        installment_number: payment.installment_number?.toString() || "",
+        amount: payment.amount.toString(),
+        currency: payment.currency,
+        payment_date: payment.payment_date.split('T')[0],
+        notes: payment.notes || ""
+      });
+      setOpenPayment(true);
     }
   };
 
@@ -1061,387 +1201,89 @@ const VehiclesPage = () => {
   }, [soldVehicles, soldVehiclesFilter, query]);
 
   // Rapor verilerini yükle
-  const fetchReports = async () => {
-    setReportsLoading(true);
-    try {
-      const [brandRes, modelRes, topRes, durationRes, monthlyRes, categoryRes] = await Promise.all([
-        api.get('/vehicles/analytics/brand-profit?limit=10'),
-        api.get('/vehicles/analytics/model-profit?limit=10'),
-        api.get('/vehicles/analytics/top-profitable?limit=10'),
-        api.get('/vehicles/analytics/sales-duration'),
-        api.get('/vehicles/analytics/monthly-comparison?months=12'),
-        api.get('/vehicles/analytics/category-costs')
-      ]);
-      setBrandProfit(brandRes.data || []);
-      setModelProfit(modelRes.data || []);
-      setTopProfitable(topRes.data || []);
-      setSalesDuration(durationRes.data || null);
-      setMonthlyComparison(monthlyRes.data || []);
-      setCategoryCosts(categoryRes.data || []);
-    } catch (e: any) {
-      console.error('Rapor yükleme hatası:', e);
-      toast({
-        title: "Hata",
-        description: "Raporlar yüklenemedi.",
-        variant: "destructive"
-      });
-    } finally {
-      setReportsLoading(false);
-    }
-  };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Oto Galeri</h1>
-          <p className="text-muted-foreground mt-2">Araç yönetimi ve satış takibi</p>
-        </div>
-        {activeTab === "vehicles" && (
-          <Dialog open={openAdd} onOpenChange={setOpenAdd}>
-            <DialogTrigger asChild>
-              <Button onClick={resetVehicleForm}>
-                <Plus className="h-4 w-4 mr-2" />
-                Yeni Araç Ekle
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Yeni Araç Ekle</DialogTitle>
-                <DialogDescription>
-                  Tüm alanlar opsiyoneldir, istediğiniz bilgileri girebilirsiniz.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid grid-cols-2 gap-4 mt-4">
-                <div>
-                  <label className="text-sm font-medium">Marka</label>
-                  <Input
-                    value={vehicleForm.maker}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, maker: e.target.value })}
-                    placeholder="Örn: Toyota"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Model</label>
-                  <Input
-                    value={vehicleForm.model}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, model: e.target.value })}
-                    placeholder="Örn: Corolla"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Yıl</label>
-                  <Input
-                    type="number"
-                    value={vehicleForm.year}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, year: e.target.value })}
-                    placeholder="Örn: 2023"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Vites</label>
-                  <Input
-                    value={vehicleForm.transmission}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, transmission: e.target.value })}
-                    placeholder="Örn: Otomatik"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Kapı/Koltuk</label>
-                  <Input
-                    value={vehicleForm.door_seat}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, door_seat: e.target.value })}
-                    placeholder="Örn: 5/5"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Şasi No</label>
-                  <Input
-                    value={vehicleForm.chassis_no}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, chassis_no: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Plaka</label>
-                  <Input
-                    value={vehicleForm.plate_number}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, plate_number: e.target.value })}
-                    placeholder="Örn: 34ABC123"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Km</label>
-                  <Input
-                    type="number"
-                    value={vehicleForm.km}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, km: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Ay</label>
-                  <Input
-                    type="number"
-                    value={vehicleForm.month}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, month: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Yakıt</label>
-                  <Input
-                    value={vehicleForm.fuel}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, fuel: e.target.value })}
-                    placeholder="Örn: Benzin"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Sınıf</label>
-                  <Input
-                    value={vehicleForm.grade}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, grade: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">CC</label>
-                  <Input
-                    type="number"
-                    value={vehicleForm.cc}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, cc: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Renk</label>
-                  <Input
-                    value={vehicleForm.color}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, color: e.target.value })}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="text-sm font-medium">Diğer</label>
-                  <Input
-                    value={vehicleForm.other}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, other: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Önerilen Satış Fiyatı</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={vehicleForm.sale_price}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, sale_price: e.target.value })}
-                    placeholder="Önerilen satış fiyatı (opsiyonel)"
-                  />
-                </div>
-                <div className="col-span-2 grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-sm font-medium">Ödenen</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={vehicleForm.paid}
-                      onChange={(e) => setVehicleForm({ ...vehicleForm, paid: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Döviz</label>
-                    <Select
-                      value={vehicleForm.purchase_currency}
-                      onValueChange={(value) => setVehicleForm({ ...vehicleForm, purchase_currency: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Döviz seçin" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="TRY">TRY</SelectItem>
-                        <SelectItem value="USD">USD</SelectItem>
-                        <SelectItem value="EUR">EUR</SelectItem>
-                        <SelectItem value="GBP">GBP</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Teslimat Tarihi</label>
-                  <Input
-                    type="date"
-                    value={vehicleForm.delivery_date}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, delivery_date: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Teslimat Saati</label>
-                  <Input
-                    type="time"
-                    value={vehicleForm.delivery_time}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, delivery_time: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Araç Durumu</label>
-                  <Select
-                    value={vehicleForm.status || "used"}
-                    onValueChange={(value) => setVehicleForm({ ...vehicleForm, status: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Araç durumu seçin" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="new">Sıfır</SelectItem>
-                      <SelectItem value="used">İkinci El</SelectItem>
-                      <SelectItem value="damaged">Hasarlı</SelectItem>
-                      <SelectItem value="repaired">Onarılmış</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Stok Durumu</label>
-                  <Select
-                    value={vehicleForm.stock_status || "in_stock"}
-                    onValueChange={(value) => setVehicleForm({ ...vehicleForm, stock_status: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Stok durumu seçin" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="in_stock">Stokta</SelectItem>
-                      <SelectItem value="on_sale">Satışta</SelectItem>
-                      <SelectItem value="reserved">Rezerve</SelectItem>
-                      <SelectItem value="sold">Satıldı</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Lokasyon</label>
-                  <Input
-                    value={vehicleForm.location}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, location: e.target.value })}
-                    placeholder="Örn: Şube A, Park Yeri 5"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Hedef Kar (Opsiyonel)</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={vehicleForm.target_profit}
-                    onChange={(e) => setVehicleForm({ ...vehicleForm, target_profit: e.target.value })}
-                    placeholder="Hedef kar tutarı"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="text-sm font-medium">Sözleşme PDF (Opsiyonel)</label>
-                  <Input
-                    type="file"
-                    accept=".pdf"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        // Önce araç oluştur, sonra PDF yükle
-                        // Bu işlem handleAddVehicle içinde yapılacak
-                        setVehicleForm({ ...vehicleForm, contract_pdf: file });
-                      }
-                    }}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Araç eklenirken sözleşme PDF'i yüklenecektir</p>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setOpenAdd(false)}>İptal</Button>
-                <Button onClick={handleAddVehicle}>Ekle</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
-      </div>
-
-      {/* Search and Filters - Shared for both tabs */}
-      <div className="flex gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            className="pl-8"
-            placeholder="Araç ara (marka, model, şasi no)..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
-        {activeTab === "vehicles" && (
-          <>
-            <Select value={isSoldFilter || "all"} onValueChange={(value) => setIsSoldFilter(value === "all" ? "" : value)}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Satış Durumu" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tümü</SelectItem>
-                <SelectItem value="false">Satılmamış</SelectItem>
-                <SelectItem value="true">Satılmış</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter || "all"} onValueChange={(value) => setStatusFilter(value === "all" ? "" : value)}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Araç Durumu" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tümü</SelectItem>
-                <SelectItem value="new">Sıfır</SelectItem>
-                <SelectItem value="used">İkinci El</SelectItem>
-                <SelectItem value="damaged">Hasarlı</SelectItem>
-                <SelectItem value="repaired">Onarılmış</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={stockStatusFilter || "all"} onValueChange={(value) => setStockStatusFilter(value === "all" ? "" : value)}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Stok Durumu" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tümü</SelectItem>
-                <SelectItem value="in_stock">Stokta</SelectItem>
-                <SelectItem value="on_sale">Satışta</SelectItem>
-                <SelectItem value="reserved">Rezerve</SelectItem>
-                <SelectItem value="sold">Satıldı</SelectItem>
-              </SelectContent>
-            </Select>
-          </>
-        )}
-        {activeTab === "sold" && (
-          <Select value={soldVehiclesFilter} onValueChange={setSoldVehiclesFilter}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Filtrele" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tümü</SelectItem>
-              <SelectItem value="cash">Peşin Satılanlar</SelectItem>
-              <SelectItem value="installment_pending">Taksitli - Kalan Borç Var</SelectItem>
-              <SelectItem value="installment_completed">Taksitli - Tamamlandı</SelectItem>
-            </SelectContent>
-          </Select>
-        )}
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-card border border-border rounded-xl p-1.5 shadow-sm h-auto mb-6">
+      <div className="pt-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 bg-card border border-border rounded-xl p-1.5 shadow-sm h-auto mb-6">
           <TabsTrigger 
             value="vehicles"
-            className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-md rounded-lg transition-all min-h-[3.5rem] data-[state=active]:bg-[#001f3f] hover:bg-muted/50"
+            className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-colors duration-200 ease-in-out min-h-[3.5rem] data-[state=active]:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 hover:bg-muted/70"
           >
             Araçlar
           </TabsTrigger>
           <TabsTrigger 
             value="sold"
-            className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-md rounded-lg transition-all min-h-[3.5rem] data-[state=active]:bg-[#001f3f] hover:bg-muted/50"
+            className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-colors duration-200 ease-in-out min-h-[3.5rem] data-[state=active]:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 hover:bg-muted/70"
           >
             Satılan Araçlar
           </TabsTrigger>
-          <TabsTrigger 
-            value="reports" 
-            onClick={fetchReports}
-            className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-md rounded-lg transition-all min-h-[3.5rem] data-[state=active]:bg-[#001f3f] hover:bg-muted/50"
-          >
-            <BarChart3 className="h-5 w-5 mr-2" />
-            Raporlar
-          </TabsTrigger>
         </TabsList>
+
+        {/* Search and Filters - Shared for both tabs */}
+        <div className="flex gap-4 mb-6">
+          <div className="relative flex-1">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              className="pl-8"
+              placeholder="Araç ara (marka, model, şasi no)..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+          {activeTab === "vehicles" && (
+            <>
+              <Select value={isSoldFilter || "all"} onValueChange={(value) => setIsSoldFilter(value === "all" ? "" : value)}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Satış Durumu" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tümü</SelectItem>
+                  <SelectItem value="false">Satılmamış</SelectItem>
+                  <SelectItem value="true">Satılmış</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter || "all"} onValueChange={(value) => setStatusFilter(value === "all" ? "" : value)}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Araç Durumu" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tümü</SelectItem>
+                  <SelectItem value="new">Sıfır</SelectItem>
+                  <SelectItem value="used">İkinci El</SelectItem>
+                  <SelectItem value="damaged">Hasarlı</SelectItem>
+                  <SelectItem value="repaired">Onarılmış</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={stockStatusFilter || "all"} onValueChange={(value) => setStockStatusFilter(value === "all" ? "" : value)}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Stok Durumu" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tümü</SelectItem>
+                  <SelectItem value="in_stock">Stokta</SelectItem>
+                  <SelectItem value="on_sale">Satışta</SelectItem>
+                  <SelectItem value="reserved">Rezerve</SelectItem>
+                  <SelectItem value="sold">Satıldı</SelectItem>
+                </SelectContent>
+              </Select>
+            </>
+          )}
+          {activeTab === "sold" && (
+            <Select value={soldVehiclesFilter} onValueChange={setSoldVehiclesFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Filtrele" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tümü</SelectItem>
+                <SelectItem value="cash">Peşin Satılanlar</SelectItem>
+                <SelectItem value="installment_pending">Taksitli - Kalan Borç Var</SelectItem>
+                <SelectItem value="installment_completed">Taksitli - Tamamlandı</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        </div>
 
         <TabsContent value="vehicles" className="space-y-6">
       {/* Vehicles Table/List */}
@@ -1450,6 +1292,351 @@ const VehiclesPage = () => {
           <div className="flex justify-between items-center">
             <CardTitle>Araç Listesi</CardTitle>
             <div className="flex items-center gap-3">
+              <Dialog open={openAdd} onOpenChange={(open) => {
+                setOpenAdd(open);
+                if (!open) {
+                  setAddModalStep(1);
+                  setFormErrors({});
+                } else {
+                  setFormErrors({});
+                }
+              }}>
+                <DialogTrigger asChild>
+                  <Button onClick={() => {
+                    resetVehicleForm();
+                    setAddModalStep(1);
+                    setFormErrors({});
+                  }}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Yeni Araç Ekle
+                  </Button>
+                </DialogTrigger>
+                <DialogContent 
+                  className="max-w-4xl max-h-[90vh] overflow-y-auto"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !isSubmitting) {
+                      e.preventDefault();
+                      if (addModalStep === 1) {
+                        handleNextStep();
+                      } else {
+                        handleAddVehicle();
+                      }
+                    }
+                  }}
+                >
+                  {/* Step Indicator */}
+                  <div className="mt-4 mb-6 px-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center flex-1">
+                        <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300 shadow-sm ${
+                          addModalStep >= 1 
+                            ? 'bg-primary text-primary-foreground border-primary shadow-md scale-105' 
+                            : 'bg-muted border-muted-foreground/20 text-muted-foreground'
+                        }`}>
+                          {addModalStep > 1 ? (
+                            <CheckCircle className="h-5 w-5" />
+                          ) : (
+                            <span className="text-sm font-bold">1</span>
+                          )}
+                        </div>
+                        <div className={`flex-1 h-1.5 mx-3 rounded-full transition-all duration-500 ${
+                          addModalStep > 1 ? 'bg-primary shadow-sm' : 'bg-muted'
+                        }`} />
+                        <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300 shadow-sm ${
+                          addModalStep >= 2 
+                            ? 'bg-primary text-primary-foreground border-primary shadow-md scale-105' 
+                            : 'bg-muted border-muted-foreground/20 text-muted-foreground'
+                        }`}>
+                          <span className="text-sm font-bold">2</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex justify-between mt-3 px-1">
+                      <span className={`text-xs font-semibold transition-colors ${
+                        addModalStep === 1 ? 'text-foreground' : 'text-muted-foreground'
+                      }`}>
+                        Araç Bilgileri
+                      </span>
+                      <span className={`text-xs font-semibold transition-colors ${
+                        addModalStep === 2 ? 'text-foreground' : 'text-muted-foreground'
+                      }`}>
+                        Satış ve Durum
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="transition-all duration-300 ease-in-out">
+                  {addModalStep === 1 ? (
+                    // Adım 1: Araç Bilgileri
+                    <div className="mt-4 animate-in fade-in slide-in-from-right-4">
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Araç No</label>
+                          <Input
+                            type="number"
+                            value={vehicleForm.vehicle_number}
+                            onChange={(e) => setVehicleForm({ ...vehicleForm, vehicle_number: e.target.value })}
+                            placeholder="Otomatik"
+                            className="h-8"
+                            autoFocus
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">
+                            Marka <span className="text-destructive">*</span>
+                          </label>
+                          <Input
+                            value={vehicleForm.maker}
+                            onChange={(e) => {
+                              setVehicleForm({ ...vehicleForm, maker: e.target.value });
+                              if (formErrors.maker) {
+                                setFormErrors({ ...formErrors, maker: "" });
+                              }
+                            }}
+                            placeholder="Örn: Toyota"
+                            className={`h-8 ${formErrors.maker ? 'border-destructive' : ''}`}
+                          />
+                          {formErrors.maker && (
+                            <p className="text-xs text-destructive mt-1">{formErrors.maker}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">
+                            Model <span className="text-destructive">*</span>
+                          </label>
+                          <Input
+                            value={vehicleForm.model}
+                            onChange={(e) => {
+                              setVehicleForm({ ...vehicleForm, model: e.target.value });
+                              if (formErrors.model) {
+                                setFormErrors({ ...formErrors, model: "" });
+                              }
+                            }}
+                            placeholder="Örn: Corolla"
+                            className={`h-8 ${formErrors.model ? 'border-destructive' : ''}`}
+                          />
+                          {formErrors.model && (
+                            <p className="text-xs text-destructive mt-1">{formErrors.model}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Üretim Yılı</label>
+                          <Input
+                            type="number"
+                            value={vehicleForm.production_year}
+                            onChange={(e) => setVehicleForm({ ...vehicleForm, production_year: e.target.value })}
+                            placeholder="Örn: 2023"
+                            min="1900"
+                            max={new Date().getFullYear() + 1}
+                            className="h-8"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Bayiye Geliş Tarihi</label>
+                          <Input
+                            type="date"
+                            value={vehicleForm.arrival_date}
+                            onChange={(e) => setVehicleForm({ ...vehicleForm, arrival_date: e.target.value })}
+                            className="h-8"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Vites</label>
+                          <Input
+                            value={vehicleForm.transmission}
+                            onChange={(e) => setVehicleForm({ ...vehicleForm, transmission: e.target.value })}
+                            placeholder="Örn: Otomatik"
+                            className="h-8"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Şasi No</label>
+                          <Input
+                            value={vehicleForm.chassis_no}
+                            onChange={(e) => setVehicleForm({ ...vehicleForm, chassis_no: e.target.value })}
+                            className="h-8"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Plaka</label>
+                          <Input
+                            value={vehicleForm.plate_number}
+                            onChange={(e) => setVehicleForm({ ...vehicleForm, plate_number: e.target.value })}
+                            placeholder="Örn: 34ABC123"
+                            className="h-8"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Km</label>
+                          <Input
+                            type="number"
+                            value={vehicleForm.km}
+                            onChange={(e) => setVehicleForm({ ...vehicleForm, km: e.target.value })}
+                            className="h-8"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Yakıt</label>
+                          <Input
+                            value={vehicleForm.fuel}
+                            onChange={(e) => setVehicleForm({ ...vehicleForm, fuel: e.target.value })}
+                            placeholder="Örn: Benzin"
+                            className="h-8"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Sınıf</label>
+                          <Input
+                            value={vehicleForm.grade}
+                            onChange={(e) => setVehicleForm({ ...vehicleForm, grade: e.target.value })}
+                            className="h-8"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">CC</label>
+                          <Input
+                            type="number"
+                            value={vehicleForm.cc}
+                            onChange={(e) => setVehicleForm({ ...vehicleForm, cc: e.target.value })}
+                            className="h-8"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Renk</label>
+                          <Input
+                            value={vehicleForm.color}
+                            onChange={(e) => setVehicleForm({ ...vehicleForm, color: e.target.value })}
+                            className="h-8"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Diğer</label>
+                          <Input
+                            value={vehicleForm.other}
+                            onChange={(e) => setVehicleForm({ ...vehicleForm, other: e.target.value })}
+                            className="h-8"
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter className="mt-4">
+                        <Button onClick={handleNextStep}>İleri</Button>
+                      </DialogFooter>
+                    </div>
+                  ) : (
+                    // Adım 2: Satış ve Durum Bilgileri
+                    <div className="mt-4 animate-in fade-in slide-in-from-left-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Önerilen Satış Fiyatı</label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={vehicleForm.sale_price}
+                            onChange={(e) => setVehicleForm({ ...vehicleForm, sale_price: e.target.value })}
+                            placeholder="Önerilen satış fiyatı (opsiyonel)"
+                            className="h-8"
+                            autoFocus
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Alış Fiyatı</label>
+                          <CurrencyInput
+                            value={vehicleForm.paid}
+                            currency={vehicleForm.purchase_currency}
+                            onValueChange={(value) => setVehicleForm({ ...vehicleForm, paid: value })}
+                            onCurrencyChange={(value) => setVehicleForm({ ...vehicleForm, purchase_currency: value })}
+                            className="h-8"
+                            currencies={currencies.map(c => ({ value: c.value, label: c.label }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Araç Durumu</label>
+                          <Select
+                            value={vehicleForm.status || "used"}
+                            onValueChange={(value) => setVehicleForm({ ...vehicleForm, status: value })}
+                          >
+                            <SelectTrigger className="h-8">
+                              <SelectValue placeholder="Araç durumu seçin" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="new">Sıfır</SelectItem>
+                              <SelectItem value="used">İkinci El</SelectItem>
+                              <SelectItem value="damaged">Hasarlı</SelectItem>
+                              <SelectItem value="repaired">Onarılmış</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Stok Durumu</label>
+                          <Select
+                            value={vehicleForm.stock_status || "in_stock"}
+                            onValueChange={(value) => setVehicleForm({ ...vehicleForm, stock_status: value })}
+                          >
+                            <SelectTrigger className="h-8">
+                              <SelectValue placeholder="Stok durumu seçin" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="in_stock">Stokta</SelectItem>
+                              <SelectItem value="on_sale">Satışta</SelectItem>
+                              <SelectItem value="reserved">Rezerve</SelectItem>
+                              <SelectItem value="sold">Satıldı</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Lokasyon</label>
+                          <Input
+                            value={vehicleForm.location}
+                            onChange={(e) => setVehicleForm({ ...vehicleForm, location: e.target.value })}
+                            placeholder="Örn: Şube A, Park Yeri 5"
+                            className="h-8"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium mb-1 block">Sözleşme PDF</label>
+                          <Input
+                            type="file"
+                            accept=".pdf"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setVehicleForm({ ...vehicleForm, contract_pdf: file });
+                              }
+                            }}
+                            className="h-8"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">Araç eklenirken sözleşme PDF'i yüklenecektir</p>
+                        </div>
+                      </div>
+                      <DialogFooter className="mt-4">
+                        <Button 
+                          variant="outline" 
+                          onClick={() => {
+                            setAddModalStep(1);
+                            setFormErrors({});
+                          }}
+                          disabled={isSubmitting}
+                        >
+                          Geri
+                        </Button>
+                        <Button 
+                          onClick={handleAddVehicle}
+                          disabled={isSubmitting}
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <span className="mr-2">Yükleniyor...</span>
+                            </>
+                          ) : (
+                            "Ekle"
+                          )}
+                        </Button>
+                      </DialogFooter>
+                    </div>
+                  )}
+                  </div>
+                </DialogContent>
+              </Dialog>
               <div className="flex items-center gap-2">
                 <Grid3x3 className={`h-4 w-4 ${viewMode === 'list' ? 'text-primary' : 'text-muted-foreground'}`} />
                 <Switch
@@ -1466,6 +1653,7 @@ const VehiclesPage = () => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Araç No</TableHead>
                 <TableHead>Marka/Model</TableHead>
                 <TableHead>Yıl</TableHead>
                 <TableHead>Şasi No</TableHead>
@@ -1478,15 +1666,16 @@ const VehiclesPage = () => {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center">Yükleniyor...</TableCell>
+                  <TableCell colSpan={8} className="text-center">Yükleniyor...</TableCell>
                 </TableRow>
               ) : filteredVehicles.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center">Araç bulunamadı.</TableCell>
+                  <TableCell colSpan={8} className="text-center">Araç bulunamadı.</TableCell>
                 </TableRow>
               ) : (
                 filteredVehicles.map((vehicle) => (
                   <TableRow key={vehicle.id}>
+                    <TableCell>{vehicle.vehicle_number || "-"}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         {vehicle.primary_image_url ? (
@@ -1534,7 +1723,7 @@ const VehiclesPage = () => {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>{vehicle.year || "-"}</TableCell>
+                    <TableCell>{vehicle.production_year || "-"}</TableCell>
                     <TableCell>{vehicle.chassis_no || "-"}</TableCell>
                     <TableCell>{currency(vehicle.sale_price)}</TableCell>
                     <TableCell>{currency(vehicle.total_costs)}</TableCell>
@@ -1650,7 +1839,7 @@ const VehiclesPage = () => {
                 <div className="col-span-full text-center py-12">Araç bulunamadı.</div>
               ) : (
                 filteredVehicles.map((vehicle) => (
-                  <Card key={vehicle.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                  <Card key={vehicle.id} className="overflow-hidden">
                     <div className="relative">
                       {vehicle.primary_image_url ? (
                         <img
@@ -1733,8 +1922,8 @@ const VehiclesPage = () => {
                               return null;
                             })()}
                           </h3>
-                          {vehicle.year && (
-                            <p className="text-sm text-muted-foreground">{vehicle.year}</p>
+                          {vehicle.production_year && (
+                            <p className="text-sm text-muted-foreground">{vehicle.production_year}</p>
                           )}
                         </div>
                         {vehicle.chassis_no && (
@@ -1845,14 +2034,9 @@ const VehiclesPage = () => {
       {/* Detail Modal - Bu modal araç detaylarını, harcamaları ve maliyet hesaplamayı gösterir */}
       <Dialog 
         open={openDetail} 
-        onOpenChange={(open) => {
-          console.log("Dialog onOpenChange called with:", open, "current openDetail:", openDetail);
-          setOpenDetail(open);
-        }}
+        onOpenChange={setOpenDetail}
       >
-        <DialogContent className="max-w-4xl h-[70vh] p-0 flex flex-col" onOpenAutoFocus={() => {
-          console.log("DialogContent onOpenAutoFocus called");
-        }}>
+        <DialogContent className="max-w-4xl h-[70vh] p-0 flex flex-col">
           <DialogHeader className="px-6 pt-6 pb-0">
             <DialogTitle>
               {selectedVehicle ? `${selectedVehicle.maker || ""} ${selectedVehicle.model || ""}`.trim() || "Araç Detayları" : "Araç Detayları"}
@@ -1877,15 +2061,14 @@ const VehiclesPage = () => {
               
               <TabsContent value="info" className="space-y-4 mt-4">
                 <div className="grid grid-cols-2 gap-4">
+                  <div><strong>Araç No:</strong> {selectedVehicle.vehicle_number || "-"}</div>
                   <div><strong>Marka:</strong> {selectedVehicle.maker || "-"}</div>
                   <div><strong>Model:</strong> {selectedVehicle.model || "-"}</div>
-                  <div><strong>Yıl:</strong> {selectedVehicle.year || "-"}</div>
+                  <div><strong>Üretim Yılı:</strong> {selectedVehicle.production_year || "-"}</div>
                   <div><strong>Vites:</strong> {selectedVehicle.transmission || "-"}</div>
-                  <div><strong>Kapı/Koltuk:</strong> {selectedVehicle.door_seat || "-"}</div>
                   <div><strong>Şasi No:</strong> {selectedVehicle.chassis_no || "-"}</div>
                   <div><strong>Plaka:</strong> {selectedVehicle.plate_number || "-"}</div>
                   <div><strong>Km:</strong> {selectedVehicle.km || "-"}</div>
-                  <div><strong>Ay:</strong> {selectedVehicle.month || "-"}</div>
                   <div><strong>Yakıt:</strong> {selectedVehicle.fuel || "-"}</div>
                   <div><strong>Sınıf:</strong> {selectedVehicle.grade || "-"}</div>
                   <div><strong>CC:</strong> {selectedVehicle.cc || "-"}</div>
@@ -2036,6 +2219,9 @@ const VehiclesPage = () => {
                             <TableHead>Taksit No</TableHead>
                             <TableHead>Tutar</TableHead>
                             <TableHead>Notlar</TableHead>
+                            {selectedVehicle.installment && selectedVehicle.installment.status === 'active' && (
+                              <TableHead>İşlemler</TableHead>
+                            )}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -2053,13 +2239,33 @@ const VehiclesPage = () => {
                                     ? payment.installment_number 
                                     : '-'}
                                 </TableCell>
-                                <TableCell>{currency(payment.amount)}</TableCell>
+                                <TableCell>{formatCurrency(payment.amount, payment.currency)}</TableCell>
                                 <TableCell>{payment.notes || '-'}</TableCell>
+                                {selectedVehicle.installment && selectedVehicle.installment.status === 'active' && (
+                                  <TableCell>
+                                    <div className="flex gap-2">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleEditPayment(payment)}
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleDeletePayment(payment.id)}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                )}
                               </TableRow>
                             ))
                           ) : (
                             <TableRow>
-                              <TableCell colSpan={5} className="text-center">Ödeme kaydı bulunamadı.</TableCell>
+                              <TableCell colSpan={selectedVehicle.installment && selectedVehicle.installment.status === 'active' ? 6 : 5} className="text-center">Ödeme kaydı bulunamadı.</TableCell>
                             </TableRow>
                           )}
                         </TableBody>
@@ -2070,6 +2276,7 @@ const VehiclesPage = () => {
                         <Button
                           onClick={() => {
                             if (selectedVehicle.installment) {
+                              setEditingPaymentId(null);
                               setPaymentForm({
                                 installment_sale_id: selectedVehicle.installment.id.toString(),
                                 payment_type: "installment",
@@ -2188,29 +2395,10 @@ const VehiclesPage = () => {
               <TabsContent value="costs" className="space-y-4 mt-4">
                 <div className="flex justify-between items-center">
                   <h3 className="font-semibold">Harcamalar</h3>
-                  <div className="flex gap-2">
-                    <Select value={costCategoryFilter || "all"} onValueChange={(value) => {
-                      const filterValue = value === "all" ? "" : value;
-                      setCostCategoryFilter(filterValue);
-                      if (selectedVehicle) {
-                        fetchVehicleDetail(selectedVehicle.id, filterValue);
-                      }
-                    }}>
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Kategori Filtrele" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Tümü</SelectItem>
-                        {costCategories.map((cat) => (
-                          <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button onClick={() => openCostModal(selectedVehicle)}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Harcama Ekle
-                    </Button>
-                  </div>
+                  <Button onClick={() => openCostModal(selectedVehicle)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Harcama Ekle
+                  </Button>
                 </div>
                 <Table>
                   <TableHeader>
@@ -2237,7 +2425,12 @@ const VehiclesPage = () => {
                           <TableCell>
                             <Badge variant="outline">{categoryLabel}</Badge>
                           </TableCell>
-                          <TableCell>{currency(cost.amount)}</TableCell>
+                          <TableCell>
+                            {formatCurrency(
+                              cost.amount,
+                              (cost as any).currency || "TRY"
+                            )}
+                          </TableCell>
                           <TableCell>{formatDate(cost.date)}</TableCell>
                           <TableCell>
                             <div className="flex gap-2">
@@ -2288,7 +2481,9 @@ const VehiclesPage = () => {
                               costCalculation.costItems.map((item, idx) => (
                                 <div key={idx} className="flex justify-between">
                                   <span>{item.name}:</span>
-                                  <span className="font-semibold">{currency(item.amount)}</span>
+                                  <span className="font-semibold">
+                                    {formatCurrency(item.amount, item.currency || "TRY")}
+                                  </span>
                                 </div>
                               ))
                             ) : (
@@ -2307,7 +2502,9 @@ const VehiclesPage = () => {
                               {costCalculation.customItems.map((item, idx) => (
                                 <div key={idx} className="flex justify-between">
                                   <span>{item.name}:</span>
-                                  <span className="font-semibold">{currency(item.amount)}</span>
+                                  <span className="font-semibold">
+                                    {formatCurrency(item.amount, item.currency || "TRY")}
+                                  </span>
                                 </div>
                               ))}
                             </div>
@@ -2396,6 +2593,15 @@ const VehiclesPage = () => {
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 mt-4">
             <div>
+              <label className="text-sm font-medium">Araç No</label>
+              <Input
+                type="number"
+                value={vehicleForm.vehicle_number}
+                onChange={(e) => setVehicleForm({ ...vehicleForm, vehicle_number: e.target.value })}
+                placeholder="Araç No"
+              />
+            </div>
+            <div>
               <label className="text-sm font-medium">Marka</label>
               <Input
                 value={vehicleForm.maker}
@@ -2412,12 +2618,22 @@ const VehiclesPage = () => {
               />
             </div>
             <div>
-              <label className="text-sm font-medium">Yıl</label>
+              <label className="text-sm font-medium">Üretim Yılı</label>
               <Input
                 type="number"
-                value={vehicleForm.year}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, year: e.target.value })}
+                value={vehicleForm.production_year}
+                onChange={(e) => setVehicleForm({ ...vehicleForm, production_year: e.target.value })}
                 placeholder="Örn: 2023"
+                min="1900"
+                max={new Date().getFullYear() + 1}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Bayiye Geliş Tarihi</label>
+              <Input
+                type="date"
+                value={vehicleForm.arrival_date}
+                onChange={(e) => setVehicleForm({ ...vehicleForm, arrival_date: e.target.value })}
               />
             </div>
             <div>
@@ -2426,14 +2642,6 @@ const VehiclesPage = () => {
                 value={vehicleForm.transmission}
                 onChange={(e) => setVehicleForm({ ...vehicleForm, transmission: e.target.value })}
                 placeholder="Örn: Otomatik"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Kapı/Koltuk</label>
-              <Input
-                value={vehicleForm.door_seat}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, door_seat: e.target.value })}
-                placeholder="Örn: 5/5"
               />
             </div>
             <div>
@@ -2457,14 +2665,6 @@ const VehiclesPage = () => {
                 type="number"
                 value={vehicleForm.km}
                 onChange={(e) => setVehicleForm({ ...vehicleForm, km: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Ay</label>
-              <Input
-                type="number"
-                value={vehicleForm.month}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, month: e.target.value })}
               />
             </div>
             <div>
@@ -2514,33 +2714,15 @@ const VehiclesPage = () => {
                 placeholder="Önerilen satış fiyatı (opsiyonel)"
               />
             </div>
-            <div className="col-span-2 grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-sm font-medium">Ödenen</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={vehicleForm.paid}
-                  onChange={(e) => setVehicleForm({ ...vehicleForm, paid: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Döviz</label>
-                <Select
-                  value={vehicleForm.purchase_currency}
-                  onValueChange={(value) => setVehicleForm({ ...vehicleForm, purchase_currency: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Döviz seçin" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="TRY">TRY</SelectItem>
-                    <SelectItem value="USD">USD</SelectItem>
-                    <SelectItem value="EUR">EUR</SelectItem>
-                    <SelectItem value="GBP">GBP</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="col-span-2">
+              <label className="text-sm font-medium">Alış Fiyatı</label>
+              <CurrencyInput
+                value={vehicleForm.paid}
+                currency={vehicleForm.purchase_currency}
+                onValueChange={(value) => setVehicleForm({ ...vehicleForm, paid: value })}
+                onCurrencyChange={(value) => setVehicleForm({ ...vehicleForm, purchase_currency: value })}
+                currencies={currencies.map(c => ({ value: c.value, label: c.label }))}
+              />
             </div>
             <div>
               <label className="text-sm font-medium">Teslimat Tarihi</label>
@@ -2652,11 +2834,14 @@ const VehiclesPage = () => {
             </div>
             <div>
               <label className="text-sm font-medium">Tutar *</label>
-              <Input
-                type="number"
-                step="0.01"
+              <CurrencyInput
                 value={costForm.amount}
-                onChange={(e) => setCostForm({ ...costForm, amount: e.target.value })}
+                currency={costForm.currency || "TRY"}
+                onValueChange={(value) => setCostForm({ ...costForm, amount: value })}
+                onCurrencyChange={(value) => setCostForm({ ...costForm, currency: value, customRate: null })}
+                currencies={currencies.map(c => ({ value: c.value, label: c.label }))}
+                customRate={costForm.customRate}
+                onCustomRateChange={(rate) => setCostForm({ ...costForm, customRate: rate })}
               />
             </div>
             <div>
@@ -2725,11 +2910,14 @@ const VehiclesPage = () => {
             </div>
             <div>
               <label className="text-sm font-medium">Tutar *</label>
-              <Input
-                type="number"
-                step="0.01"
+              <CurrencyInput
                 value={costForm.amount}
-                onChange={(e) => setCostForm({ ...costForm, amount: e.target.value })}
+                currency={costForm.currency || "TRY"}
+                onValueChange={(value) => setCostForm({ ...costForm, amount: value })}
+                onCurrencyChange={(value) => setCostForm({ ...costForm, currency: value, customRate: null })}
+                currencies={currencies.map(c => ({ value: c.value, label: c.label }))}
+                customRate={costForm.customRate}
+                onCustomRateChange={(rate) => setCostForm({ ...costForm, customRate: rate })}
               />
             </div>
             <div>
@@ -2764,8 +2952,10 @@ const VehiclesPage = () => {
               setCostForm({
                 cost_name: "",
                 amount: "",
+                currency: "TRY",
                 date: new Date().toISOString().split('T')[0],
-                category: "other"
+                category: "other",
+                customRate: null
               });
             }}>İptal</Button>
             <Button onClick={handleUpdateCost}>Güncelle</Button>
@@ -2775,7 +2965,7 @@ const VehiclesPage = () => {
 
       {/* Sell Modal */}
       <Dialog open={openSell} onOpenChange={setOpenSell}>
-        <DialogContent>
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Araç Satışı</DialogTitle>
             <DialogDescription>
@@ -2783,19 +2973,21 @@ const VehiclesPage = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-4">
-            <div>
-              <label className="text-sm font-medium">Müşteri Adı Soyadı *</label>
-              <Input
-                value={sellForm.customer_name}
-                onChange={(e) => setSellForm({ ...sellForm, customer_name: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Müşteri Telefon</label>
-              <Input
-                value={sellForm.customer_phone}
-                onChange={(e) => setSellForm({ ...sellForm, customer_phone: e.target.value })}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Müşteri Adı Soyadı *</label>
+                <Input
+                  value={sellForm.customer_name}
+                  onChange={(e) => setSellForm({ ...sellForm, customer_name: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Müşteri Telefon</label>
+                <Input
+                  value={sellForm.customer_phone}
+                  onChange={(e) => setSellForm({ ...sellForm, customer_phone: e.target.value })}
+                />
+              </div>
             </div>
             <div>
               <label className="text-sm font-medium">Müşteri Adres</label>
@@ -2804,29 +2996,29 @@ const VehiclesPage = () => {
                 onChange={(e) => setSellForm({ ...sellForm, customer_address: e.target.value })}
               />
             </div>
-            <div>
-              <label className="text-sm font-medium">Araç Plaka</label>
-              <Input
-                value={sellForm.plate_number}
-                onChange={(e) => setSellForm({ ...sellForm, plate_number: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Anahtar Sayısı</label>
-              <Input
-                type="number"
-                value={sellForm.key_count}
-                onChange={(e) => setSellForm({ ...sellForm, key_count: e.target.value })}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Araç Plaka</label>
+                <Input
+                  value={sellForm.plate_number}
+                  onChange={(e) => setSellForm({ ...sellForm, plate_number: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Anahtar Sayısı</label>
+                <Input
+                  type="number"
+                  value={sellForm.key_count}
+                  onChange={(e) => setSellForm({ ...sellForm, key_count: e.target.value })}
+                />
+              </div>
             </div>
             <div>
               <label className="text-sm font-medium">Satış Fiyatı *</label>
-              <Input
-                type="number"
-                step="0.01"
+              <CurrencyInput
                 value={sellForm.sale_price}
-                onChange={(e) => {
-                  const salePrice = e.target.value;
+                currency={sellForm.sale_currency || "TRY"}
+                onValueChange={(salePrice) => {
                   setSellForm({ ...sellForm, sale_price: salePrice });
                   // Taksit tutarını otomatik hesapla
                   if (sellForm.payment_type === "installment" && sellForm.down_payment && sellForm.installment_count) {
@@ -2835,26 +3027,38 @@ const VehiclesPage = () => {
                     setSellForm(prev => ({ ...prev, sale_price: salePrice, installment_amount: installmentAmount.toFixed(2) }));
                   }
                 }}
+                onCurrencyChange={(value) => setSellForm({ ...sellForm, sale_currency: value })}
                 placeholder="Satış fiyatını girin"
+                currencies={currencies.map(c => ({ value: c.value, label: c.label }))}
               />
             </div>
-            <div>
-              <label className="text-sm font-medium">Ödeme Tipi *</label>
-              <Select
-                value={sellForm.payment_type}
-                onValueChange={(value) => setSellForm({ ...sellForm, payment_type: value, down_payment: "", installment_count: "", installment_amount: "" })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Ödeme tipi seçin" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Peşin</SelectItem>
-                  <SelectItem value="installment">Taksitli</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Ödeme Tipi *</label>
+                <Select
+                  value={sellForm.payment_type}
+                  onValueChange={(value) => setSellForm({ ...sellForm, payment_type: value, down_payment: "", installment_count: "", installment_amount: "" })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Ödeme tipi seçin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Peşin</SelectItem>
+                    <SelectItem value="installment">Taksitli</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Satış Tarihi *</label>
+                <Input
+                  type="date"
+                  value={sellForm.sale_date}
+                  onChange={(e) => setSellForm({ ...sellForm, sale_date: e.target.value })}
+                />
+              </div>
             </div>
             {sellForm.payment_type === "installment" && (
-              <>
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="text-sm font-medium">Peşinat *</label>
                   <Input
@@ -2903,16 +3107,8 @@ const VehiclesPage = () => {
                     className="bg-muted"
                   />
                 </div>
-              </>
+              </div>
             )}
-            <div>
-              <label className="text-sm font-medium">Satış Tarihi *</label>
-              <Input
-                type="date"
-                value={sellForm.sale_date}
-                onChange={(e) => setSellForm({ ...sellForm, sale_date: e.target.value })}
-              />
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpenSell(false)}>İptal</Button>
@@ -2922,12 +3118,26 @@ const VehiclesPage = () => {
       </Dialog>
 
       {/* Payment Modal */}
-      <Dialog open={openPayment} onOpenChange={setOpenPayment}>
+      <Dialog open={openPayment} onOpenChange={(open) => {
+        setOpenPayment(open);
+        if (!open) {
+          setEditingPaymentId(null);
+          setPaymentForm({
+            installment_sale_id: "",
+            payment_type: "installment",
+            installment_number: "",
+            amount: "",
+            currency: "TRY",
+            payment_date: new Date().toISOString().split('T')[0],
+            notes: ""
+          });
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Taksit Ödemesi Ekle</DialogTitle>
+            <DialogTitle>{editingPaymentId ? "Taksit Ödemesi Düzenle" : "Taksit Ödemesi Ekle"}</DialogTitle>
             <DialogDescription>
-              Taksit ödemesi bilgilerini girin.
+              {editingPaymentId ? "Taksit ödemesi bilgilerini düzenleyin." : "Taksit ödemesi bilgilerini girin."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-4">
@@ -2959,29 +3169,14 @@ const VehiclesPage = () => {
             )}
             <div>
               <label className="text-sm font-medium">Tutar *</label>
-              <Input
-                type="number"
-                step="0.01"
+              <CurrencyInput
                 value={paymentForm.amount}
-                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                currency={paymentForm.currency}
+                onValueChange={(value) => setPaymentForm({ ...paymentForm, amount: value })}
+                onCurrencyChange={(value) => setPaymentForm({ ...paymentForm, currency: value })}
                 placeholder="Ödeme tutarını girin"
+                currencies={currencies.map(c => ({ value: c.value, label: c.label }))}
               />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Para Birimi</label>
-              <Select
-                value={paymentForm.currency}
-                onValueChange={(value) => setPaymentForm({ ...paymentForm, currency: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Para birimi seçin" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="TRY">TRY</SelectItem>
-                  <SelectItem value="USD">USD</SelectItem>
-                  <SelectItem value="EUR">EUR</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
             <div>
               <label className="text-sm font-medium">Ödeme Tarihi *</label>
@@ -3003,6 +3198,7 @@ const VehiclesPage = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => {
               setOpenPayment(false);
+              setEditingPaymentId(null);
               setPaymentForm({
                 installment_sale_id: "",
                 payment_type: "installment",
@@ -3013,7 +3209,7 @@ const VehiclesPage = () => {
                 notes: ""
               });
             }}>İptal</Button>
-            <Button onClick={handleAddPayment}>Ödeme Ekle</Button>
+            <Button onClick={handleAddPayment}>{editingPaymentId ? "Güncelle" : "Kaydet"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -3228,7 +3424,7 @@ const VehiclesPage = () => {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell>{vehicle.year || "-"}</TableCell>
+                        <TableCell>{vehicle.production_year || "-"}</TableCell>
                         <TableCell>{vehicle.chassis_no || "-"}</TableCell>
                         <TableCell>{currency(vehicle.sale_price)}</TableCell>
                         <TableCell>
@@ -3313,7 +3509,7 @@ const VehiclesPage = () => {
                     <div className="col-span-full text-center py-12">Satılan araç bulunamadı.</div>
                   ) : (
                     filteredSoldVehicles.map((vehicle) => (
-                      <Card key={vehicle.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                      <Card key={vehicle.id} className="overflow-hidden">
                         <div className="relative">
                           {vehicle.primary_image_url ? (
                             <img
@@ -3387,8 +3583,8 @@ const VehiclesPage = () => {
                                   return null;
                                 })()}
                               </h3>
-                              {vehicle.year && (
-                                <p className="text-sm text-muted-foreground">{vehicle.year}</p>
+                              {vehicle.production_year && (
+                                <p className="text-sm text-muted-foreground">{vehicle.production_year}</p>
                               )}
                             </div>
                             {vehicle.chassis_no && (
@@ -3464,272 +3660,8 @@ const VehiclesPage = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="reports" className="space-y-6">
-          {reportsLoading ? (
-            <div className="text-center py-12">Raporlar yükleniyor...</div>
-          ) : (
-            <>
-              {/* Ortalama Satış Süresi */}
-              {salesDuration && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Ortalama Satış Süresi</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                        <div className="text-2xl font-bold">{salesDuration.avg_days ? Math.round(salesDuration.avg_days) : 0}</div>
-                        <div className="text-sm text-muted-foreground">Ortalama Gün</div>
-                      </div>
-                      <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                        <div className="text-2xl font-bold">{salesDuration.min_days || 0}</div>
-                        <div className="text-sm text-muted-foreground">En Kısa Süre</div>
-                      </div>
-                      <div className="text-center p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-                        <div className="text-2xl font-bold">{salesDuration.max_days || 0}</div>
-                        <div className="text-sm text-muted-foreground">En Uzun Süre</div>
-                      </div>
-                    </div>
-                    <div className="mt-4 text-center text-sm text-muted-foreground">
-                      Toplam Satış: {salesDuration.total_sales || 0}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Marka Bazlı Kar Analizi */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Marka Bazlı Kar Analizi</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {brandProfit.length > 0 ? (
-                    <div className="space-y-4">
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={brandProfit}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="brand" />
-                          <YAxis />
-                          <Tooltip formatter={(value: any) => `${parseFloat(value).toFixed(2)} TL`} />
-                          <Legend />
-                          <Bar dataKey="total_profit" fill="#8884d8" name="Toplam Kar" />
-                          <Bar dataKey="total_revenue" fill="#82ca9d" name="Toplam Gelir" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Marka</TableHead>
-                            <TableHead>Araç Sayısı</TableHead>
-                            <TableHead>Satılan</TableHead>
-                            <TableHead>Toplam Gelir</TableHead>
-                            <TableHead>Toplam Maliyet</TableHead>
-                            <TableHead>Toplam Kar</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {brandProfit.map((brand, idx) => (
-                            <TableRow key={idx}>
-                              <TableCell>{brand.brand || '-'}</TableCell>
-                              <TableCell>{brand.vehicle_count}</TableCell>
-                              <TableCell>{brand.sold_count}</TableCell>
-                              <TableCell>{currency(brand.total_revenue)}</TableCell>
-                              <TableCell>{currency(brand.total_costs)}</TableCell>
-                              <TableCell className="font-semibold">{currency(brand.total_profit)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">Marka bazlı veri bulunamadı.</div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Model Bazlı Kar Analizi */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Model Bazlı Kar Analizi</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {modelProfit.length > 0 ? (
-                    <div className="space-y-4">
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={modelProfit}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="model" />
-                          <YAxis />
-                          <Tooltip formatter={(value: any) => `${parseFloat(value).toFixed(2)} TL`} />
-                          <Legend />
-                          <Bar dataKey="total_profit" fill="#8884d8" name="Toplam Kar" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Marka</TableHead>
-                            <TableHead>Model</TableHead>
-                            <TableHead>Araç Sayısı</TableHead>
-                            <TableHead>Satılan</TableHead>
-                            <TableHead>Toplam Kar</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {modelProfit.map((model, idx) => (
-                            <TableRow key={idx}>
-                              <TableCell>{model.brand || '-'}</TableCell>
-                              <TableCell>{model.model || '-'}</TableCell>
-                              <TableCell>{model.vehicle_count}</TableCell>
-                              <TableCell>{model.sold_count}</TableCell>
-                              <TableCell className="font-semibold">{currency(model.total_profit)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">Model bazlı veri bulunamadı.</div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* En Karlı Araçlar */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>En Karlı Araçlar</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {topProfitable.length > 0 ? (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Marka/Model</TableHead>
-                          <TableHead>Yıl</TableHead>
-                          <TableHead>Şasi No</TableHead>
-                          <TableHead>Satış Fiyatı</TableHead>
-                          <TableHead>Toplam Maliyet</TableHead>
-                          <TableHead>Kar</TableHead>
-                          <TableHead>Satış Tarihi</TableHead>
-                          <TableHead>Müşteri</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {topProfitable.map((vehicle) => (
-                          <TableRow key={vehicle.id}>
-                            <TableCell>{vehicle.maker || '-'} {vehicle.model || ''}</TableCell>
-                            <TableCell>{vehicle.year || '-'}</TableCell>
-                            <TableCell>{vehicle.chassis_no || '-'}</TableCell>
-                            <TableCell>{currency(vehicle.sale_price)}</TableCell>
-                            <TableCell>{currency(vehicle.total_costs)}</TableCell>
-                            <TableCell className="font-semibold text-green-600">{currency(vehicle.profit)}</TableCell>
-                            <TableCell>{formatDateTime(vehicle.sale_date)}</TableCell>
-                            <TableCell>{vehicle.customer_name || '-'}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">En karlı araç verisi bulunamadı.</div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Aylık Karşılaştırma */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Aylık Karşılaştırma</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {monthlyComparison.length > 0 ? (
-                    <div className="space-y-4">
-                      <ResponsiveContainer width="100%" height={400}>
-                        <LineChart data={monthlyComparison}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="month" />
-                          <YAxis />
-                          <Tooltip formatter={(value: any) => `${parseFloat(value).toFixed(2)} TL`} />
-                          <Legend />
-                          <Line type="monotone" dataKey="total_revenue" stroke="#8884d8" name="Toplam Gelir" />
-                          <Line type="monotone" dataKey="total_costs" stroke="#ff7300" name="Toplam Maliyet" />
-                          <Line type="monotone" dataKey="total_profit" stroke="#82ca9d" name="Toplam Kar" />
-                        </LineChart>
-                      </ResponsiveContainer>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Ay</TableHead>
-                            <TableHead>Satış Sayısı</TableHead>
-                            <TableHead>Toplam Gelir</TableHead>
-                            <TableHead>Toplam Maliyet</TableHead>
-                            <TableHead>Toplam Kar</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {monthlyComparison.map((month, idx) => (
-                            <TableRow key={idx}>
-                              <TableCell>{month.month}</TableCell>
-                              <TableCell>{month.sales_count}</TableCell>
-                              <TableCell>{currency(month.total_revenue)}</TableCell>
-                              <TableCell>{currency(month.total_costs)}</TableCell>
-                              <TableCell className="font-semibold">{currency(month.total_profit)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">Aylık karşılaştırma verisi bulunamadı.</div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Kategori Bazlı Harcama Analizi */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Kategori Bazlı Harcama Analizi</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {categoryCosts.length > 0 ? (
-                    <div className="space-y-4">
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={categoryCosts}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="category_name" />
-                          <YAxis />
-                          <Tooltip formatter={(value: any) => `${parseFloat(value).toFixed(2)} TL`} />
-                          <Legend />
-                          <Bar dataKey="total_amount" fill="#8884d8" name="Toplam Tutar" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Kategori</TableHead>
-                            <TableHead>Harcama Sayısı</TableHead>
-                            <TableHead>Toplam Tutar</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {categoryCosts.map((cat, idx) => (
-                            <TableRow key={idx}>
-                              <TableCell>{cat.category_name || cat.category || '-'}</TableCell>
-                              <TableCell>{cat.cost_count || 0}</TableCell>
-                              <TableCell className="font-semibold">{currency(cat.total_amount)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">Kategori bazlı veri bulunamadı.</div>
-                  )}
-                </CardContent>
-              </Card>
-            </>
-          )}
-        </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 };

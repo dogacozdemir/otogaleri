@@ -56,7 +56,7 @@ export const SalesDurationChart = ({ data, onViewDetails }: SalesDurationChartPr
         )
       }
     >
-      <ResponsiveContainer width="100%" height={350}>
+      <ResponsiveContainer width="100%" height={350} minHeight={350}>
         <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
           <XAxis
