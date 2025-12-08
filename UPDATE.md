@@ -1,218 +1,185 @@
-# Production Güncelleme Rehberi
+# Update Guide - Otogaleri Production Server
 
-Bu dokümantasyon, production ortamındaki Otogaleri projesini güncellemek için gereken adımları içerir.
+Bu dosya production Ubuntu server'ınızı güncellemek için adım adım talimatlar içerir.
 
 ## Ön Hazırlık
 
-### 1. Yedekleme (ÖNEMLİ!)
+1. **Backup Alın:**
+   ```bash
+   # Database backup
+   mysqldump -u root -p otogaleri > backup_$(date +%Y%m%d_%H%M%S).sql
+   
+   # Frontend ve backend dosyalarını yedekleyin
+   cp -r /home/cloudpanel/htdocs/otogaleri /home/cloudpanel/htdocs/otogaleri_backup_$(date +%Y%m%d)
+   ```
 
-Güncelleme öncesi mutlaka yedek alın:
+2. **Git Durumunu Kontrol Edin:**
+   ```bash
+   cd /home/cloudpanel/htdocs/otogaleri
+   git status
+   git fetch origin
+   git log HEAD..origin/main  # Yeni commit'leri göster
+   ```
 
-```bash
-# Veritabanı yedeği
-cd /home/cloudpanel/htdocs/otogaleri/backend
-mysqldump -u otogaleri_user -p otogaleri > backup_$(date +%Y%m%d_%H%M%S).sql
+## Update Adımları
 
-# Proje dosyalarının yedeği (opsiyonel ama önerilir)
-cd /home/cloudpanel/htdocs/otogaleri
-tar -czf backup_$(date +%Y%m%d_%H%M%S).tar.gz .
-```
-
-### 2. Mevcut Durumu Kontrol Et
-
-```bash
-cd /home/cloudpanel/htdocs/otogaleri
-
-# Git durumunu kontrol et
-git status
-
-# Mevcut branch'i kontrol et
-git branch
-
-# Son commit'i kontrol et
-git log -1
-```
-
-## Güncelleme Adımları
-
-### 1. Değişiklikleri Çek
+### 1. Git'ten Son Değişiklikleri Çekin
 
 ```bash
 cd /home/cloudpanel/htdocs/otogaleri
-
-# Değişiklikleri çek (main branch için)
 git pull origin main
-
-# Eğer farklı bir branch kullanıyorsanız:
-# git pull origin <branch-name>
 ```
 
-**Not:** Eğer local değişiklikler varsa, önce bunları commit edin veya stash edin:
+### 2. Backend Dependencies Güncelleyin
+
 ```bash
-# Değişiklikleri geçici olarak sakla
-git stash
-
-# Güncellemeleri çek
-git pull origin main
-
-# Saklanan değişiklikleri geri getir (eğer gerekirse)
-git stash pop
+cd backend
+npm install
 ```
 
-### 2. Backend Güncellemeleri
+### 3. Database Migrations Çalıştırın
+
+**ÖNEMLİ:** Migration'ları çalıştırmadan önce database backup'ı aldığınızdan emin olun!
+
+```bash
+# Migration'ları çalıştır
+npm run migrate
+
+# Migration durumunu kontrol et
+mysql -u root -p otogaleri -e "SELECT migration_name, executed_at, success FROM schema_migrations ORDER BY executed_at DESC LIMIT 10;"
+```
+
+**Not:** Migration sistemi otomatik olarak:
+- Hangi migration'ların çalıştırıldığını takip eder
+- Sadece çalışmamış migration'ları çalıştırır
+- Başarısız migration'ları kaydeder
+
+### 4. Backend Build
 
 ```bash
 cd /home/cloudpanel/htdocs/otogaleri/backend
+npm run build
+```
 
-# Yeni bağımlılıkları yükle
-npm install --production
-
-# TypeScript build
+**Eğer "Killed" hatası alırsanız:**
+```bash
+# Node.js memory limit'ini artır
+export NODE_OPTIONS="--max-old-space-size=4096"
 npm run build
 
-# PM2 ile restart (eğer PM2 kullanıyorsanız)
+# Veya swap space ekleyin
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+```
+
+### 5. Frontend Dependencies ve Build
+
+```bash
+cd /home/cloudpanel/htdocs/otogaleri/frontend
+npm install
+npm run build
+```
+
+**Eğer "Killed" hatası alırsanız:**
+```bash
+export NODE_OPTIONS="--max-old-space-size=4096"
+npm run build
+```
+
+### 6. Backend'i Restart Edin
+
+```bash
+# PM2 process'lerini kontrol et
+pm2 list
+
+# Backend'i restart et
 pm2 restart otogaleri-backend
 
-# Veya CloudPanel Node.js App'i restart edin
-```
-
-### 3. Veritabanı Migration'ları (Eğer Varsa)
-
-Yeni migration dosyaları varsa, bunları sırayla çalıştırın:
-
-```bash
-cd /home/cloudpanel/htdocs/otogaleri/backend
-
-# Migration dosyalarını kontrol et
-ls -la migrations/
-
-# Yeni migration'ları çalıştır (sadece daha önce çalıştırılmamış olanları)
-# Örnek: Eğer yeni migration'lar varsa
-mysql -u otogaleri_user -p otogaleri < migrations/add_arrival_date.sql
-mysql -u otogaleri_user -p otogaleri < migrations/add_vehicle_number.sql
-mysql -u otogaleri_user -p otogaleri < migrations/add_vehicle_number_index.sql
-mysql -u otogaleri_user -p otogaleri < migrations/merge_month_year_to_production_date.sql
-mysql -u otogaleri_user -p otogaleri < migrations/remove_door_seat.sql
-```
-
-**ÖNEMLİ:** Migration'ları çalıştırmadan önce:
-1. Veritabanı yedeğinizi aldığınızdan emin olun
-2. Migration dosyalarını inceleyin
-3. Test ortamında önce deneyin (mümkünse)
-
-### 4. Frontend Güncellemeleri
-
-```bash
-cd /home/cloudpanel/htdocs/otogaleri/frontend
-
-# Yeni bağımlılıkları yükle
-npm install
-
-# Production build
-npm run build
-
-# Build başarılı olduğunda, Nginx otomatik olarak yeni build'i serve edecek
-```
-
-### 5. Environment Variables Kontrolü
-
-Yeni environment variable'lar eklenmişse, bunları kontrol edin:
-
-```bash
-# Backend .env kontrolü
-cd /home/cloudpanel/htdocs/otogaleri/backend
-cat .env
-
-# Frontend .env kontrolü
-cd /home/cloudpanel/htdocs/otogaleri/frontend
-cat .env
-```
-
-**Yeni eklenen environment variable'lar:**
-- Backend: Herhangi bir yeni değişken var mı kontrol edin
-- Frontend: `VITE_API_BASE` doğru mu kontrol edin
-
-### 6. Dosya İzinleri (Eğer Gerekirse)
-
-```bash
-# Uploads klasörü izinleri
-chmod -R 755 /home/cloudpanel/htdocs/otogaleri/backend/uploads
-chown -R cloudpanel:cloudpanel /home/cloudpanel/htdocs/otogaleri/backend/uploads
-```
-
-## Test ve Doğrulama
-
-### 1. Backend Health Check
-
-```bash
-# Backend'in çalıştığını kontrol et
-curl http://localhost:5005/api/health
-
-# Veya browser'dan
-# https://yourdomain.com/api/health
-```
-
-### 2. Frontend Kontrolü
-
-1. Browser'dan siteyi açın: `https://yourdomain.com`
-2. Login sayfasının yüklendiğini kontrol edin
-3. Giriş yapıp dashboard'u kontrol edin
-
-### 3. Önemli Özellikleri Test Et
-
-- ✅ Şube sayısı dashboard'da doğru görünüyor mu?
-- ✅ CurrencyInput component'i çalışıyor mu?
-- ✅ Manuel kur girişi çalışıyor mu?
-- ✅ Maliyet ekleme/düzenleme çalışıyor mu?
-- ✅ Satış işlemleri çalışıyor mu?
-
-### 4. Log Kontrolü
-
-```bash
-# PM2 logları (eğer PM2 kullanıyorsanız)
+# Logları kontrol et
 pm2 logs otogaleri-backend --lines 50
-
-# Veya CloudPanel'de Node.js App loglarını kontrol edin
 ```
 
-## Hızlı Güncelleme Komutu (Tek Satır)
+**Eğer port 5005 zaten kullanımda hatası alırsanız:**
+```bash
+# PM2'deki tüm process'leri temizle
+pm2 delete all
+pm2 kill
 
-Tüm adımları tek seferde yapmak için:
+# Port'u kullanan process'i bul ve kapat
+sudo lsof -i :5005
+sudo kill -9 <PID>
+
+# Backend'i yeniden başlat
+cd /home/cloudpanel/htdocs/otogaleri/backend
+pm2 start dist/server.js --name otogaleri-backend
+
+# PM2'yi sistem başlangıcında başlat
+pm2 startup
+pm2 save
+```
+
+### 7. Nginx'i Restart Edin (Gerekirse)
 
 ```bash
-cd /home/cloudpanel/htdocs/otogaleri && \
-git pull origin main && \
-cd backend && npm install --production && npm run build && pm2 restart otogaleri-backend && \
-cd ../frontend && npm install && npm run build && \
-echo "Güncelleme tamamlandı!"
+sudo nginx -t  # Config'i test et
+sudo systemctl restart nginx
 ```
+
+### 8. Test Edin
+
+```bash
+# Backend health check
+curl http://localhost:5005/health
+
+# Frontend erişilebilirliğini kontrol et
+curl -I https://galeri.calenius.io
+```
+
+## Migration Yönetimi
+
+### Yeni Migration Eklendiğinde
+
+1. Git'ten migration dosyasını çekin
+2. `npm run migrate` çalıştırın
+3. Sistem otomatik olarak sadece yeni migration'ı çalıştırır
+
+### Migration Durumunu Kontrol Etme
+
+```bash
+mysql -u root -p otogaleri -e "
+SELECT 
+  migration_name,
+  executed_at,
+  execution_time_ms,
+  success,
+  LEFT(error_message, 100) as error_preview
+FROM schema_migrations
+ORDER BY executed_at DESC
+LIMIT 20;"
+```
+
+### Migration Başarısız Olursa
+
+1. Hata mesajını kontrol edin:
+   ```bash
+   mysql -u root -p otogaleri -e "SELECT * FROM schema_migrations WHERE success = FALSE ORDER BY executed_at DESC LIMIT 1;"
+   ```
+
+2. Hatayı düzeltin ve migration dosyasını güncelleyin
+
+3. Migration kaydını silin (tekrar çalıştırmak için):
+   ```bash
+   mysql -u root -p otogaleri -e "DELETE FROM schema_migrations WHERE migration_name = 'migration_name_here';"
+   ```
+
+4. Tekrar çalıştırın:
+   ```bash
+   npm run migrate
+   ```
 
 ## Sorun Giderme
-
-### Git Pull Hatası
-
-Eğer `git pull` sırasında conflict hatası alırsanız:
-
-```bash
-# Değişiklikleri stash et
-git stash
-
-# Tekrar pull yap
-git pull origin main
-
-# Conflict'leri çöz (eğer varsa)
-# Dosyaları düzenleyip commit edin
-```
-
-### Build Hatası
-
-```bash
-# Node modules'ı temizle ve yeniden yükle
-cd backend  # veya frontend
-rm -rf node_modules package-lock.json
-npm install
-npm run build
-```
 
 ### Backend Başlamıyor
 
@@ -225,102 +192,132 @@ netstat -tulpn | grep 5005
 
 # .env dosyasını kontrol et
 cat backend/.env
+
+# Backend'i manuel restart et
+cd /home/cloudpanel/htdocs/otogaleri/backend
+pm2 restart otogaleri-backend
 ```
 
-### Frontend Build Hatası
+### Port 5005 Zaten Kullanımda (EADDRINUSE)
+
+Eğer "address already in use :::5005" hatası alırsanız:
 
 ```bash
-# Cache'i temizle
-cd frontend
-rm -rf node_modules dist .vite
-npm install
+# 1. Port 5005'i kullanan process'i bul
+sudo lsof -i :5005
+# veya
+sudo netstat -tulpn | grep 5005
+
+# 2. PM2'deki tüm process'leri temizle
+pm2 delete all
+pm2 kill
+
+# 3. Port'u kullanan process'i zorla kapat (eğer PM2 dışındaysa)
+# Önce process ID'yi bul (yukarıdaki komutlardan)
+sudo kill -9 <PID>
+
+# 4. Backend'i yeniden başlat
+cd /home/cloudpanel/htdocs/otogaleri/backend
+pm2 start dist/server.js --name otogaleri-backend
+
+# 5. PM2'yi sistem başlangıcında başlat (eğer yapmadıysanız)
+pm2 startup
+pm2 save
+
+# 6. Durumu kontrol et
+pm2 status
+pm2 logs otogaleri-backend --lines 20
+```
+
+### Build Process "Killed" Hatası
+
+Bu genellikle memory yetersizliğinden kaynaklanır:
+
+```bash
+# Çözüm 1: Node.js memory limit'ini artır
+export NODE_OPTIONS="--max-old-space-size=4096"
+npm run build
+
+# Çözüm 2: Swap space ekle
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+
+# Swap'i kalıcı yapmak için /etc/fstab'a ekle
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
+# Sonra tekrar build dene
 npm run build
 ```
 
-### Veritabanı Migration Hatası
-
-Eğer migration sırasında hata alırsanız:
-
-1. Migration'ı durdurun
-2. Veritabanı yedeğinizden geri yükleyin
-3. Migration dosyasını kontrol edin
-4. Sorunu çözüp tekrar deneyin
+### Migration Hataları
 
 ```bash
-# Veritabanını geri yükle
-mysql -u otogaleri_user -p otogaleri < backup_YYYYMMDD_HHMMSS.sql
+# Son migration'ı kontrol et
+mysql -u root -p otogaleri -e "SELECT * FROM schema_migrations ORDER BY executed_at DESC LIMIT 1;"
+
+# Migration'ı tekrar çalıştırmak için kaydı sil
+mysql -u root -p otogaleri -e "DELETE FROM schema_migrations WHERE migration_name = 'migration_name';"
+
+# Tekrar çalıştır
+npm run migrate
 ```
 
-## Rollback (Geri Alma)
-
-Eğer güncelleme sonrası sorun yaşarsanız:
+## Hızlı Update Komutu (Tüm Adımlar)
 
 ```bash
+#!/bin/bash
+# update.sh - Tüm update adımlarını otomatik çalıştırır
+
+set -e  # Hata durumunda dur
+
+echo "=== Otogaleri Update Başlatılıyor ==="
+
+# 1. Git pull
 cd /home/cloudpanel/htdocs/otogaleri
+echo "Git pull yapılıyor..."
+git pull origin main
 
-# Önceki commit'e geri dön
-git log  # Commit hash'ini bulun
-git checkout <previous-commit-hash>
-
-# Backend'i rebuild ve restart
+# 2. Backend dependencies
 cd backend
-npm install --production
+echo "Backend dependencies güncelleniyor..."
+npm install
+
+# 3. Migrations
+echo "Database migrations çalıştırılıyor..."
+npm run migrate
+
+# 4. Backend build
+echo "Backend build ediliyor..."
+export NODE_OPTIONS="--max-old-space-size=4096"
 npm run build
+
+# 5. Frontend dependencies ve build
+cd ../frontend
+echo "Frontend dependencies güncelleniyor..."
+npm install
+echo "Frontend build ediliyor..."
+npm run build
+
+# 6. Backend restart
+cd ../backend
+echo "Backend restart ediliyor..."
 pm2 restart otogaleri-backend
 
-# Frontend'i rebuild
-cd ../frontend
-npm install
-npm run build
+echo "=== Update Tamamlandı ==="
+pm2 logs otogaleri-backend --lines 10
+```
 
-# Veritabanını geri yükle (eğer migration yaptıysanız)
-mysql -u otogaleri_user -p otogaleri < backup_YYYYMMDD_HHMMSS.sql
+Bu script'i `update.sh` olarak kaydedip çalıştırabilirsiniz:
+```bash
+chmod +x update.sh
+./update.sh
 ```
 
 ## Önemli Notlar
 
-1. **Yedekleme:** Her güncelleme öncesi mutlaka yedek alın
-2. **Test:** Mümkünse önce test ortamında deneyin
-3. **Maintenance Mode:** Yüksek trafikli sitelerde maintenance mode açmayı düşünün
-4. **Downtime:** Güncelleme sırasında kısa bir downtime olabilir (1-2 dakika)
-5. **Monitoring:** Güncelleme sonrası logları ve performansı izleyin
-
-## Son Güncelleme Notları (2025-01-XX)
-
-Bu güncellemede yapılan değişiklikler:
-
-### Yeni Özellikler
-- ✅ CurrencyInput component'i eklendi (miktar ve döviz birleşik input)
-- ✅ Manuel kur girişi özelliği eklendi
-- ✅ Her maliyet için ayrı kur desteği
-- ✅ CurrencyRatesContext eklendi (localStorage ile kur saklama)
-
-### Düzeltmeler
-- ✅ Dashboard'da şube sayısı düzeltildi (pagination.total kullanımı)
-- ✅ Tarih formatı hatası düzeltildi (MySQL DATE formatı)
-- ✅ Controlled/uncontrolled input uyarısı düzeltildi
-- ✅ JSX syntax hatası düzeltildi
-
-### Backend Değişiklikleri
-- ✅ `addVehicleCost` - custom_rate parametresi eklendi
-- ✅ `updateVehicleCost` - custom_rate parametresi eklendi
-- ✅ `markVehicleAsSold` - custom_rate parametresi eklendi
-- ✅ Tarih formatı düzeltmeleri
-
-### Frontend Değişiklikleri
-- ✅ CurrencyInput component'i oluşturuldu
-- ✅ CurrencyRateEditor component'i oluşturuldu
-- ✅ CurrencyRatesContext eklendi
-- ✅ VehiclesPage modalları güncellendi
-- ✅ DashboardPage şube sayısı düzeltildi
-
-### Migration'lar
-Bu güncellemede yeni migration yok. Mevcut migration'ları zaten çalıştırmış olmalısınız.
-
-## İletişim ve Destek
-
-Sorun yaşarsanız:
-1. Logları kontrol edin
-2. Yedekten geri yükleyin
-3. Git issue açın veya geliştirici ile iletişime geçin
-
+1. **Her zaman backup alın** migration çalıştırmadan önce
+2. **Migration'ları test ortamında test edin** production'a almadan önce
+3. **PM2 loglarını kontrol edin** restart sonrası
+4. **Migration durumunu kontrol edin** her update sonrası

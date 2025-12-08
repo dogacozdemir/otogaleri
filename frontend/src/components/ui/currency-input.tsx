@@ -31,6 +31,7 @@ interface CurrencyInputProps extends Omit<React.InputHTMLAttributes<HTMLInputEle
   currencies?: Array<{ value: string; label: string; icon?: string }>
   customRate?: number | null
   onCustomRateChange?: (rate: number | null) => void
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
 }
 
 const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(

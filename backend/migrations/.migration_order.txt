@@ -1,0 +1,21 @@
+# Migration Execution Order
+# Bu dosya migration'ların çalıştırılma sırasını belirler
+# Dosya isimlerini bu sıraya göre numaralandırın
+
+000_create_migration_tracking.sql
+001_add_vehicle_number.sql
+002_add_vehicle_number_index.sql
+003_add_vehicle_images.sql
+004_add_arrival_date.sql
+005_merge_month_year_to_production_date.sql
+006_remove_door_seat.sql
+007_remove_ps_tw_add_plate_number.sql
+008_add_installment_sales.sql
+009_add_followup_and_documents.sql
+010_add_tenant_settings.sql
+011_add_inventory_tables.sql
+012_add_track_stock_to_inventory.sql
+013_seed_data.sql
+
+# Not: Eğer migration sırası farklıysa, dosya isimlerini buna göre düzenleyin
+

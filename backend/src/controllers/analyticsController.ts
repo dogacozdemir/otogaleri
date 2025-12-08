@@ -21,16 +21,21 @@ export async function getBrandProfit(req: AuthRequest, res: Response) {
         COUNT(DISTINCT CASE WHEN v.is_sold = TRUE THEN v.id END) as sold_count,
         COALESCE(SUM(CASE WHEN vs.id IS NOT NULL THEN vs.sale_amount * vs.sale_fx_rate_to_base ELSE 0 END), 0) as total_revenue,
         COALESCE(SUM(CASE WHEN vs.id IS NOT NULL THEN 
-          (v.purchase_amount * COALESCE(v.purchase_fx_rate_to_base, 1) + 
-           COALESCE((SELECT SUM(amount * fx_rate_to_base) FROM vehicle_costs WHERE vehicle_id = v.id), 0))
+          (v.purchase_amount * COALESCE(v.purchase_fx_rate_to_base, 1) + COALESCE(cost_summary.total_costs, 0))
         ELSE 0 END), 0) as total_costs,
         COALESCE(SUM(CASE WHEN vs.id IS NOT NULL THEN 
           (vs.sale_amount * vs.sale_fx_rate_to_base) - 
-          (v.purchase_amount * COALESCE(v.purchase_fx_rate_to_base, 1) + 
-           COALESCE((SELECT SUM(amount * fx_rate_to_base) FROM vehicle_costs WHERE vehicle_id = v.id), 0))
+          (v.purchase_amount * COALESCE(v.purchase_fx_rate_to_base, 1) + COALESCE(cost_summary.total_costs, 0))
         ELSE 0 END), 0) as total_profit
       FROM vehicles v
       LEFT JOIN vehicle_sales vs ON v.id = vs.vehicle_id AND vs.tenant_id = ?
+      LEFT JOIN (
+        SELECT 
+          vehicle_id,
+          SUM(amount * fx_rate_to_base) as total_costs
+        FROM vehicle_costs
+        GROUP BY vehicle_id
+      ) cost_summary ON cost_summary.vehicle_id = v.id
       WHERE v.tenant_id = ? ${dateFilter}
       GROUP BY v.maker
       HAVING vehicle_count > 0
@@ -81,16 +86,21 @@ export async function getModelProfit(req: AuthRequest, res: Response) {
         COUNT(DISTINCT CASE WHEN v.is_sold = TRUE THEN v.id END) as sold_count,
         COALESCE(SUM(CASE WHEN vs.id IS NOT NULL THEN vs.sale_amount * vs.sale_fx_rate_to_base ELSE 0 END), 0) as total_revenue,
         COALESCE(SUM(CASE WHEN vs.id IS NOT NULL THEN 
-          (v.purchase_amount * COALESCE(v.purchase_fx_rate_to_base, 1) + 
-           COALESCE((SELECT SUM(amount * fx_rate_to_base) FROM vehicle_costs WHERE vehicle_id = v.id), 0))
+          (v.purchase_amount * COALESCE(v.purchase_fx_rate_to_base, 1) + COALESCE(cost_summary.total_costs, 0))
         ELSE 0 END), 0) as total_costs,
         COALESCE(SUM(CASE WHEN vs.id IS NOT NULL THEN 
           (vs.sale_amount * vs.sale_fx_rate_to_base) - 
-          (v.purchase_amount * COALESCE(v.purchase_fx_rate_to_base, 1) + 
-           COALESCE((SELECT SUM(amount * fx_rate_to_base) FROM vehicle_costs WHERE vehicle_id = v.id), 0))
+          (v.purchase_amount * COALESCE(v.purchase_fx_rate_to_base, 1) + COALESCE(cost_summary.total_costs, 0))
         ELSE 0 END), 0) as total_profit
       FROM vehicles v
       LEFT JOIN vehicle_sales vs ON v.id = vs.vehicle_id AND vs.tenant_id = ?
+      LEFT JOIN (
+        SELECT 
+          vehicle_id,
+          SUM(amount * fx_rate_to_base) as total_costs
+        FROM vehicle_costs
+        GROUP BY vehicle_id
+      ) cost_summary ON cost_summary.vehicle_id = v.id
       WHERE v.tenant_id = ? ${brandFilter} ${dateFilter}
       GROUP BY v.maker, v.model
       HAVING vehicle_count > 0

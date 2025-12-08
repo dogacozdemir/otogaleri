@@ -4,6 +4,45 @@ import { dbPool } from "../config/database";
 
 const JWT_SECRET = process.env.JWT_SECRET || "otogaleri-secret-change-in-production";
 
+// Simple in-memory cache for user active status
+// Key: `${userId}:${tenantId}`, Value: { isActive: boolean, expiresAt: number }
+const userCache = new Map<string, { isActive: boolean; expiresAt: number }>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function getCachedUserStatus(userId: number, tenantId: number): boolean | null {
+  const key = `${userId}:${tenantId}`;
+  const cached = userCache.get(key);
+  
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.isActive;
+  }
+  
+  // Remove expired entry
+  if (cached) {
+    userCache.delete(key);
+  }
+  
+  return null;
+}
+
+function setCachedUserStatus(userId: number, tenantId: number, isActive: boolean): void {
+  const key = `${userId}:${tenantId}`;
+  userCache.set(key, {
+    isActive,
+    expiresAt: Date.now() + CACHE_TTL_MS,
+  });
+  
+  // Clean up old entries periodically (keep cache size reasonable)
+  if (userCache.size > 1000) {
+    const now = Date.now();
+    for (const [k, v] of userCache.entries()) {
+      if (v.expiresAt <= now) {
+        userCache.delete(k);
+      }
+    }
+  }
+}
+
 export interface AuthRequest extends Request {
   tenantId?: number;
   userId?: number;
@@ -24,19 +63,32 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
       role: string;
     };
     
-    // Check if user is active
-    const [userRows] = await dbPool.query(
-      "SELECT is_active FROM users WHERE id = ? AND tenant_id = ?",
-      [decoded.userId, decoded.tenantId]
-    );
-    const user = (userRows as any[])[0];
+    // Check cache first
+    const cachedStatus = getCachedUserStatus(decoded.userId, decoded.tenantId);
     
-    if (!user) {
-      return res.status(401).json({ error: "User not found" });
-    }
-    
-    if (!user.is_active) {
-      return res.status(401).json({ error: "User account is inactive" });
+    if (cachedStatus !== null) {
+      // Use cached value
+      if (!cachedStatus) {
+        return res.status(401).json({ error: "User account is inactive" });
+      }
+    } else {
+      // Check database and cache the result
+      const [userRows] = await dbPool.query(
+        "SELECT is_active FROM users WHERE id = ? AND tenant_id = ?",
+        [decoded.userId, decoded.tenantId]
+      );
+      const user = (userRows as any[])[0];
+      
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      
+      // Cache the result
+      setCachedUserStatus(decoded.userId, decoded.tenantId, user.is_active);
+      
+      if (!user.is_active) {
+        return res.status(401).json({ error: "User account is inactive" });
+      }
     }
     
     req.tenantId = decoded.tenantId;

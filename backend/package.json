@@ -6,6 +6,8 @@
     "dev": "nodemon src/server.ts",
     "start": "node dist/server.js",
     "build": "tsc -p .",
+    "migrate": "ts-node src/scripts/runMigrations.ts",
+    "migrate:status": "ts-node src/scripts/runMigrations.ts --status",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",

@@ -18,7 +18,11 @@ export const dbPool = mysql.createPool({
   user: OTG_DB_USER || "root",
   password: OTG_DB_PASSWORD || "",
   database: OTG_DB_NAME || "otogaleri",
-  connectionLimit: 10,
+  connectionLimit: 20,
+  queueLimit: 0, // Unlimited queue
+  waitForConnections: true,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0,
 });
 
 export async function testConnection() {

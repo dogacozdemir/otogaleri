@@ -88,65 +88,120 @@ export async function getCustomerById(req: AuthRequest, res: Response) {
         v.model,
         v.production_year as year,
         v.chassis_no,
-        COALESCE(
-          (SELECT CONCAT('/uploads/vehicles/', image_filename) 
-           FROM vehicle_images 
-           WHERE vehicle_id = v.id AND is_primary = TRUE AND tenant_id = v.tenant_id 
-           LIMIT 1),
-          (SELECT CONCAT('/uploads/vehicles/', image_filename) 
-           FROM vehicle_images 
-           WHERE vehicle_id = v.id AND tenant_id = v.tenant_id 
-           ORDER BY display_order ASC, created_at ASC
-           LIMIT 1)
-        ) as primary_image_url,
+        primary_img.image_filename as primary_image_filename,
         b.name as branch_name,
         s.name as staff_name
       FROM vehicle_sales vs
       LEFT JOIN vehicles v ON vs.vehicle_id = v.id
       LEFT JOIN branches b ON vs.branch_id = b.id
       LEFT JOIN staff s ON vs.staff_id = s.id
+      LEFT JOIN (
+        SELECT 
+          vi.vehicle_id,
+          vi.image_filename,
+          ROW_NUMBER() OVER (
+            PARTITION BY vi.vehicle_id 
+            ORDER BY vi.is_primary DESC, vi.display_order ASC, vi.created_at ASC
+          ) as rn
+        FROM vehicle_images vi
+        WHERE vi.tenant_id = ?
+      ) primary_img ON primary_img.vehicle_id = v.id AND primary_img.rn = 1
       WHERE vs.tenant_id = ? AND (vs.customer_name = ? OR (vs.customer_phone IS NOT NULL AND vs.customer_phone = ?))
       ORDER BY vs.sale_date DESC`,
-      [req.tenantId, customer.name, customer.phone]
+      [req.tenantId, req.tenantId, customer.name, customer.phone]
     );
 
-    // Her satış için taksit bilgilerini ekle
     const salesArray = sales as any[];
-    for (const sale of salesArray) {
-      if (sale.vehicle_id) {
-        const [installmentRows] = await dbPool.query(
-          `SELECT vis.*, 
-            (SELECT COALESCE(SUM(amount * fx_rate_to_base), 0)
-             FROM vehicle_installment_payments
-             WHERE installment_sale_id = vis.id) as total_paid,
-            (vis.total_amount * vis.fx_rate_to_base) - 
-            (SELECT COALESCE(SUM(amount * fx_rate_to_base), 0)
-             FROM vehicle_installment_payments
-             WHERE installment_sale_id = vis.id) as remaining_balance
-           FROM vehicle_installment_sales vis
-           WHERE vis.vehicle_id = ? AND vis.tenant_id = ?
-           ORDER BY vis.created_at DESC
-           LIMIT 1`,
-          [sale.vehicle_id, req.tenantId]
+    
+    // Tüm vehicle_id'leri topla ve batch olarak installment bilgilerini getir
+    const vehicleIds = salesArray
+      .filter(sale => sale.vehicle_id)
+      .map(sale => sale.vehicle_id);
+    
+    let installmentsMap: Record<number, any> = {};
+    let paymentsMap: Record<number, any[]> = {};
+    
+    if (vehicleIds.length > 0) {
+      // Installment bilgilerini batch olarak getir (her vehicle için en son installment)
+      const [installmentRows] = await dbPool.query(
+        `SELECT 
+          vis_latest.*,
+          COALESCE(payment_summary.total_paid, 0) as total_paid,
+          (vis_latest.total_amount * vis_latest.fx_rate_to_base) - COALESCE(payment_summary.total_paid, 0) as remaining_balance
+        FROM (
+          SELECT 
+            vis.*,
+            ROW_NUMBER() OVER (
+              PARTITION BY vis.vehicle_id 
+              ORDER BY vis.created_at DESC
+            ) as rn
+          FROM vehicle_installment_sales vis
+          WHERE vis.vehicle_id IN (${vehicleIds.map(() => '?').join(',')}) AND vis.tenant_id = ?
+        ) vis_latest
+        LEFT JOIN (
+          SELECT 
+            installment_sale_id,
+            SUM(amount * fx_rate_to_base) as total_paid
+          FROM vehicle_installment_payments
+          GROUP BY installment_sale_id
+        ) payment_summary ON payment_summary.installment_sale_id = vis_latest.id
+        WHERE vis_latest.rn = 1`,
+        [...vehicleIds, req.tenantId]
+      );
+      
+      const installmentsArray = installmentRows as any[];
+      const installmentSaleIds = installmentsArray.map(inst => inst.id);
+      
+      // Payment'ları batch olarak getir
+      if (installmentSaleIds.length > 0) {
+        const [paymentRows] = await dbPool.query(
+          `SELECT * FROM vehicle_installment_payments
+           WHERE installment_sale_id IN (${installmentSaleIds.map(() => '?').join(',')})
+           ORDER BY installment_sale_id, payment_date ASC, installment_number ASC`,
+          installmentSaleIds
         );
-        const installmentRowsArray = installmentRows as any[];
-        if (installmentRowsArray.length > 0) {
-          const installmentSale = installmentRowsArray[0];
-          const [paymentRows] = await dbPool.query(
-            `SELECT * FROM vehicle_installment_payments
-             WHERE installment_sale_id = ?
-             ORDER BY payment_date ASC, installment_number ASC`,
-            [installmentSale.id]
-          );
-          sale.installment = {
-            ...installmentSale,
-            payments: paymentRows,
-          };
-          sale.installment_sale_id = installmentSale.id;
-          sale.installment_remaining_balance = Number(installmentSale.remaining_balance);
-        }
+        const paymentsArray = paymentRows as any[];
+        paymentsMap = paymentsArray.reduce((acc, payment) => {
+          if (!acc[payment.installment_sale_id]) {
+            acc[payment.installment_sale_id] = [];
+          }
+          acc[payment.installment_sale_id].push(payment);
+          return acc;
+        }, {} as Record<number, any[]>);
       }
+      
+      // Installment'ları vehicle_id'ye göre map'le
+      installmentsMap = installmentsArray.reduce((acc, inst) => {
+        if (!acc[inst.vehicle_id]) {
+          acc[inst.vehicle_id] = inst;
+        }
+        return acc;
+      }, {} as Record<number, any>);
     }
+    
+    // Satışlara installment bilgilerini ekle
+    const formattedSales = salesArray.map(sale => {
+      const formatted: any = {
+        ...sale,
+        primary_image_url: sale.primary_image_filename 
+          ? `/uploads/vehicles/${sale.primary_image_filename}` 
+          : null,
+      };
+      
+      delete formatted.primary_image_filename;
+      
+      if (sale.vehicle_id && installmentsMap[sale.vehicle_id]) {
+        const installment = installmentsMap[sale.vehicle_id];
+        formatted.installment = {
+          ...installment,
+          payments: paymentsMap[installment.id] || [],
+        };
+        formatted.installment_sale_id = installment.id;
+        formatted.installment_remaining_balance = Number(installment.remaining_balance || 0);
+      }
+      
+      return formatted;
+    });
 
     // Müşterinin gelir kayıtlarını getir
     const [income] = await dbPool.query(
@@ -157,10 +212,10 @@ export async function getCustomerById(req: AuthRequest, res: Response) {
     );
 
     // İstatistikler
-    const totalSales = salesArray.length;
-    const totalSpent = salesArray.reduce((sum, s) => sum + (Number(s.sale_amount) * Number(s.sale_fx_rate_to_base) || 0), 0);
-    const lastSaleDate = salesArray.length > 0 ? salesArray[0].sale_date : null;
-    const firstSaleDate = salesArray.length > 0 ? salesArray[salesArray.length - 1].sale_date : null;
+    const totalSales = formattedSales.length;
+    const totalSpent = formattedSales.reduce((sum, s) => sum + (Number(s.sale_amount) * Number(s.sale_fx_rate_to_base) || 0), 0);
+    const lastSaleDate = formattedSales.length > 0 ? formattedSales[0].sale_date : null;
+    const firstSaleDate = formattedSales.length > 0 ? formattedSales[formattedSales.length - 1].sale_date : null;
 
     res.json({
       customer: {
@@ -170,7 +225,7 @@ export async function getCustomerById(req: AuthRequest, res: Response) {
         last_sale_date: lastSaleDate,
         first_sale_date: firstSaleDate,
       },
-      sales: salesArray,
+      sales: formattedSales,
       income: income,
     });
   } catch (err) {

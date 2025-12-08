@@ -343,38 +343,26 @@ export async function getOverdueInstallments(req: AuthRequest, res: Response) {
         vs.customer_phone,
         c.id as customer_id,
         c.name as customer_name_full,
-        (SELECT COALESCE(SUM(amount * fx_rate_to_base), 0)
-         FROM vehicle_installment_payments
-         WHERE installment_sale_id = vis.id) as total_paid,
-        (vis.total_amount * vis.fx_rate_to_base) - 
-        (SELECT COALESCE(SUM(amount * fx_rate_to_base), 0)
-         FROM vehicle_installment_payments
-         WHERE installment_sale_id = vis.id) as remaining_balance,
-        (SELECT MAX(payment_date) 
-         FROM vehicle_installment_payments 
-         WHERE installment_sale_id = vis.id) as last_payment_date,
-        DATEDIFF(CURDATE(), 
-          (SELECT MAX(payment_date) 
-           FROM vehicle_installment_payments 
-           WHERE installment_sale_id = vis.id)
-        ) as days_overdue
+        COALESCE(payment_summary.total_paid, 0) as total_paid,
+        (vis.total_amount * vis.fx_rate_to_base) - COALESCE(payment_summary.total_paid, 0) as remaining_balance,
+        payment_summary.last_payment_date,
+        DATEDIFF(CURDATE(), COALESCE(payment_summary.last_payment_date, vis.sale_date)) as days_overdue
       FROM vehicle_installment_sales vis
       LEFT JOIN vehicles v ON vis.vehicle_id = v.id
       LEFT JOIN vehicle_sales vs ON v.id = vs.vehicle_id AND vs.tenant_id = vis.tenant_id
       LEFT JOIN customers c ON (vs.customer_name = c.name OR (vs.customer_phone IS NOT NULL AND vs.customer_phone = c.phone))
+      LEFT JOIN (
+        SELECT 
+          installment_sale_id,
+          COALESCE(SUM(amount * fx_rate_to_base), 0) as total_paid,
+          MAX(payment_date) as last_payment_date
+        FROM vehicle_installment_payments
+        GROUP BY installment_sale_id
+      ) payment_summary ON payment_summary.installment_sale_id = vis.id
       WHERE vis.tenant_id = ?
         AND vis.status = 'active'
-        AND (
-          (vis.total_amount * vis.fx_rate_to_base) - 
-          (SELECT COALESCE(SUM(amount * fx_rate_to_base), 0)
-           FROM vehicle_installment_payments
-           WHERE installment_sale_id = vis.id)
-        ) > 0
-        AND DATEDIFF(CURDATE(), 
-          (SELECT MAX(payment_date) 
-           FROM vehicle_installment_payments 
-           WHERE installment_sale_id = vis.id)
-        ) >= 30
+        AND (vis.total_amount * vis.fx_rate_to_base) - COALESCE(payment_summary.total_paid, 0) > 0
+        AND DATEDIFF(CURDATE(), COALESCE(payment_summary.last_payment_date, vis.sale_date)) >= 30
       ORDER BY days_overdue DESC`,
       [req.tenantId]
     );
@@ -621,33 +609,25 @@ export async function getActiveInstallments(req: AuthRequest, res: Response) {
         vs.customer_phone,
         c.id as customer_id,
         c.name as customer_name_full,
-        (SELECT COALESCE(SUM(amount * fx_rate_to_base), 0)
-         FROM vehicle_installment_payments
-         WHERE installment_sale_id = vis.id) as total_paid,
-        (vis.total_amount * vis.fx_rate_to_base) - 
-        (SELECT COALESCE(SUM(amount * fx_rate_to_base), 0)
-         FROM vehicle_installment_payments
-         WHERE installment_sale_id = vis.id) as remaining_balance,
-        (SELECT MAX(payment_date) 
-         FROM vehicle_installment_payments 
-         WHERE installment_sale_id = vis.id) as last_payment_date,
-        CASE 
-          WHEN (SELECT MAX(payment_date) FROM vehicle_installment_payments WHERE installment_sale_id = vis.id) IS NOT NULL 
-          THEN DATEDIFF(CURDATE(), (SELECT MAX(payment_date) FROM vehicle_installment_payments WHERE installment_sale_id = vis.id))
-          ELSE DATEDIFF(CURDATE(), vis.sale_date)
-        END as days_since_last_payment
+        COALESCE(payment_summary.total_paid, 0) as total_paid,
+        (vis.total_amount * vis.fx_rate_to_base) - COALESCE(payment_summary.total_paid, 0) as remaining_balance,
+        payment_summary.last_payment_date,
+        DATEDIFF(CURDATE(), COALESCE(payment_summary.last_payment_date, vis.sale_date)) as days_since_last_payment
       FROM vehicle_installment_sales vis
       LEFT JOIN vehicles v ON vis.vehicle_id = v.id
       LEFT JOIN vehicle_sales vs ON v.id = vs.vehicle_id AND vs.tenant_id = vis.tenant_id
       LEFT JOIN customers c ON (vs.customer_name = c.name OR (vs.customer_phone IS NOT NULL AND vs.customer_phone = c.phone))
+      LEFT JOIN (
+        SELECT 
+          installment_sale_id,
+          COALESCE(SUM(amount * fx_rate_to_base), 0) as total_paid,
+          MAX(payment_date) as last_payment_date
+        FROM vehicle_installment_payments
+        GROUP BY installment_sale_id
+      ) payment_summary ON payment_summary.installment_sale_id = vis.id
       WHERE vis.tenant_id = ?
         AND vis.status = 'active'
-        AND (
-          (vis.total_amount * vis.fx_rate_to_base) - 
-          (SELECT COALESCE(SUM(amount * fx_rate_to_base), 0)
-           FROM vehicle_installment_payments
-           WHERE installment_sale_id = vis.id)
-        ) > 0
+        AND (vis.total_amount * vis.fx_rate_to_base) - COALESCE(payment_summary.total_paid, 0) > 0
       ORDER BY days_since_last_payment DESC, vis.sale_date ASC
       LIMIT 50`,
       [req.tenantId]

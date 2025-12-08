@@ -13,36 +13,71 @@ export async function listVehicles(req: AuthRequest, res: Response) {
   const offset = (pageNum - 1) * limitNum;
 
   let query = `
-    SELECT v.*, b.name as branch_name,
-      COALESCE((SELECT SUM(amount * fx_rate_to_base) FROM vehicle_costs WHERE vehicle_id = v.id), 0) as total_costs,
-      COALESCE((SELECT COUNT(*) FROM vehicle_costs WHERE vehicle_id = v.id), 0) as cost_count,
-      COALESCE(
-        (SELECT CONCAT('/uploads/vehicles/', image_filename) 
-         FROM vehicle_images 
-         WHERE vehicle_id = v.id AND is_primary = TRUE AND tenant_id = v.tenant_id 
-         LIMIT 1),
-        (SELECT CONCAT('/uploads/vehicles/', image_filename) 
-         FROM vehicle_images 
-         WHERE vehicle_id = v.id AND tenant_id = v.tenant_id 
-         ORDER BY display_order ASC, created_at ASC
-         LIMIT 1)
-      ) as primary_image_url,
-      (SELECT id FROM vehicle_installment_sales 
-       WHERE vehicle_id = v.id AND tenant_id = v.tenant_id
-       ORDER BY created_at DESC LIMIT 1) as installment_sale_id,
-      (SELECT (vis.total_amount * vis.fx_rate_to_base) - 
-              COALESCE(SUM(vip.amount * vip.fx_rate_to_base), 0)
-       FROM vehicle_installment_sales vis
-       LEFT JOIN vehicle_installment_payments vip ON vis.id = vip.installment_sale_id
-       WHERE vis.vehicle_id = v.id AND vis.tenant_id = v.tenant_id
-       GROUP BY vis.id
-       ORDER BY vis.created_at DESC
-       LIMIT 1) as installment_remaining_balance
+    SELECT 
+      v.*, 
+      b.name as branch_name,
+      COALESCE(cost_summary.total_costs, 0) as total_costs,
+      COALESCE(cost_summary.cost_count, 0) as cost_count,
+      primary_img.image_filename as primary_image_filename,
+      vis_latest.id as installment_sale_id,
+      vis_latest.total_amount as installment_total_amount,
+      vis_latest.down_payment as installment_down_payment,
+      vis_latest.installment_count as installment_installment_count,
+      vis_latest.installment_amount as installment_installment_amount,
+      vis_latest.currency as installment_currency,
+      vis_latest.status as installment_status,
+      vis_latest.fx_rate_to_base as installment_fx_rate_to_base,
+      vis_latest.sale_date as installment_sale_date,
+      COALESCE(vis_latest.total_paid, 0) as installment_total_paid,
+      COALESCE(vis_latest.remaining_balance, 0) as installment_remaining_balance
     FROM vehicles v
     LEFT JOIN branches b ON v.branch_id = b.id
+    LEFT JOIN (
+      SELECT 
+        vehicle_id,
+        SUM(amount * fx_rate_to_base) as total_costs,
+        COUNT(*) as cost_count
+      FROM vehicle_costs
+      GROUP BY vehicle_id
+    ) cost_summary ON cost_summary.vehicle_id = v.id
+    LEFT JOIN (
+      SELECT 
+        vi.vehicle_id,
+        vi.image_filename,
+        ROW_NUMBER() OVER (
+          PARTITION BY vi.vehicle_id 
+          ORDER BY vi.is_primary DESC, vi.display_order ASC, vi.created_at ASC
+        ) as rn
+      FROM vehicle_images vi
+      WHERE vi.tenant_id = ?
+    ) primary_img ON primary_img.vehicle_id = v.id AND primary_img.rn = 1
+    LEFT JOIN (
+      SELECT 
+        vis.id,
+        vis.vehicle_id,
+        vis.total_amount,
+        vis.down_payment,
+        vis.installment_count,
+        vis.installment_amount,
+        vis.currency,
+        vis.status,
+        vis.fx_rate_to_base,
+        vis.sale_date,
+        COALESCE(SUM(vip.amount * vip.fx_rate_to_base), 0) as total_paid,
+        (vis.total_amount * vis.fx_rate_to_base) - COALESCE(SUM(vip.amount * vip.fx_rate_to_base), 0) as remaining_balance,
+        ROW_NUMBER() OVER (
+          PARTITION BY vis.vehicle_id 
+          ORDER BY vis.created_at DESC
+        ) as rn
+      FROM vehicle_installment_sales vis
+      LEFT JOIN vehicle_installment_payments vip ON vis.id = vip.installment_sale_id
+      WHERE vis.tenant_id = ?
+      GROUP BY vis.id, vis.vehicle_id, vis.total_amount, vis.down_payment, vis.installment_count, 
+               vis.installment_amount, vis.currency, vis.status, vis.fx_rate_to_base, vis.sale_date, vis.created_at
+    ) vis_latest ON vis_latest.vehicle_id = v.id AND vis_latest.rn = 1
     WHERE v.tenant_id = ?
   `;
-  const params: any[] = [req.tenantId];
+  const params: any[] = [req.tenantId, req.tenantId, req.tenantId];
 
   if (is_sold === "true") {
     query += " AND v.is_sold = TRUE";
@@ -78,48 +113,69 @@ export async function listVehicles(req: AuthRequest, res: Response) {
     const [rows] = await dbPool.query(query, params);
     const vehiclesArray = rows as any[];
     
-    // Her araç için taksit bilgilerini ekle
-    for (const vehicle of vehiclesArray) {
-      if (vehicle.installment_sale_id) {
-        const [installmentRows] = await dbPool.query(
-          `SELECT vis.*, 
-            (SELECT COALESCE(SUM(amount * fx_rate_to_base), 0)
-             FROM vehicle_installment_payments
-             WHERE installment_sale_id = vis.id) as total_paid,
-            (vis.total_amount * vis.fx_rate_to_base) - 
-            (SELECT COALESCE(SUM(amount * fx_rate_to_base), 0)
-             FROM vehicle_installment_payments
-             WHERE installment_sale_id = vis.id) as remaining_balance
-           FROM vehicle_installment_sales vis
-           WHERE vis.id = ? AND vis.tenant_id = ?
-           ORDER BY vis.created_at DESC
-           LIMIT 1`,
-          [vehicle.installment_sale_id, req.tenantId]
-        );
-        const installmentRowsArray = installmentRows as any[];
-        if (installmentRowsArray.length > 0) {
-          const installmentSale = installmentRowsArray[0];
-          const [paymentRows] = await dbPool.query(
-            `SELECT * FROM vehicle_installment_payments
-             WHERE installment_sale_id = ?
-             ORDER BY payment_date ASC, installment_number ASC`,
-            [installmentSale.id]
-          );
-          vehicle.installment = {
-            id: installmentSale.id,
-            total_amount: Number(installmentSale.total_amount),
-            down_payment: Number(installmentSale.down_payment),
-            installment_count: Number(installmentSale.installment_count),
-            installment_amount: Number(installmentSale.installment_amount),
-            currency: installmentSale.currency,
-            status: installmentSale.status,
-            total_paid: Number(installmentSale.total_paid || 0),
-            remaining_balance: Number(installmentSale.remaining_balance || 0),
-            payments: paymentRows || [],
-          };
+    // Installment bilgilerini formatla ve payment'ları batch olarak getir
+    const installmentSaleIds = vehiclesArray
+      .filter(v => v.installment_sale_id)
+      .map(v => v.installment_sale_id);
+    
+    let paymentsMap: Record<number, any[]> = {};
+    if (installmentSaleIds.length > 0) {
+      const [paymentRows] = await dbPool.query(
+        `SELECT * FROM vehicle_installment_payments
+         WHERE installment_sale_id IN (${installmentSaleIds.map(() => '?').join(',')})
+         ORDER BY installment_sale_id, payment_date ASC, installment_number ASC`,
+        installmentSaleIds
+      );
+      const paymentsArray = paymentRows as any[];
+      paymentsMap = paymentsArray.reduce((acc, payment) => {
+        if (!acc[payment.installment_sale_id]) {
+          acc[payment.installment_sale_id] = [];
         }
-      }
+        acc[payment.installment_sale_id].push(payment);
+        return acc;
+      }, {} as Record<number, any[]>);
     }
+    
+    // Araçları formatla
+    const formattedVehicles = vehiclesArray.map(vehicle => {
+      const formatted: any = {
+        ...vehicle,
+        primary_image_url: vehicle.primary_image_filename 
+          ? `/uploads/vehicles/${vehicle.primary_image_filename}` 
+          : null,
+      };
+      
+      // Installment bilgilerini ekle
+      if (vehicle.installment_sale_id) {
+        formatted.installment = {
+          id: vehicle.installment_sale_id,
+          total_amount: Number(vehicle.installment_total_amount || 0),
+          down_payment: Number(vehicle.installment_down_payment || 0),
+          installment_count: Number(vehicle.installment_installment_count || 0),
+          installment_amount: Number(vehicle.installment_installment_amount || 0),
+          currency: vehicle.installment_currency,
+          status: vehicle.installment_status,
+          total_paid: Number(vehicle.installment_total_paid || 0),
+          remaining_balance: Number(vehicle.installment_remaining_balance || 0),
+          payments: paymentsMap[vehicle.installment_sale_id] || [],
+        };
+      }
+      
+      // Installment ile ilgili geçici alanları temizle
+      delete formatted.primary_image_filename;
+      delete formatted.installment_total_amount;
+      delete formatted.installment_down_payment;
+      delete formatted.installment_installment_count;
+      delete formatted.installment_installment_amount;
+      delete formatted.installment_currency;
+      delete formatted.installment_status;
+      delete formatted.installment_fx_rate_to_base;
+      delete formatted.installment_sale_date;
+      delete formatted.installment_total_paid;
+      delete formatted.installment_remaining_balance;
+      
+      return formatted;
+    });
     
     const [countRows] = await dbPool.query(
       "SELECT COUNT(*) as total FROM vehicles WHERE tenant_id = ?",
@@ -128,7 +184,7 @@ export async function listVehicles(req: AuthRequest, res: Response) {
     const total = (countRows as any[])[0]?.total || 0;
 
     res.json({
-      vehicles: vehiclesArray,
+      vehicles: formattedVehicles,
       pagination: {
         total,
         page: pageNum,
