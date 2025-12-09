@@ -23,6 +23,19 @@ Bu dosya production Ubuntu server'ınızı güncellemek için adım adım talima
 
 ## Update Adımları
 
+### 0. Git Güvenlik Ayarları (İlk Kez Çalıştırıyorsanız)
+
+Eğer "dubious ownership" hatası alırsanız:
+
+```bash
+# Git'e bu dizinin güvenli olduğunu söyle
+git config --global --add safe.directory /home/cloudpanel/htdocs/otogaleri
+
+# Veya sadece bu repository için
+cd /home/cloudpanel/htdocs/otogaleri
+git config --add safe.directory /home/cloudpanel/htdocs/otogaleri
+```
+
 ### 1. Git'ten Son Değişiklikleri Çekin
 
 ```bash
