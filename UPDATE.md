@@ -329,6 +329,10 @@ pm2 restart otogaleri-backend
 
 # 4. Health check yap
 curl http://localhost:5005/health
+
+# 5. Yeni endpoint'leri test et (opsiyonel)
+# curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:5005/api/quotes
+# curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:5005/api/documents/vehicles/expiring?days=30
 ```
 
 ### Vehicle Number Oluşmuyor
