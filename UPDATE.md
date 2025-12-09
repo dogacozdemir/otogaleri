@@ -54,6 +54,18 @@ mysql -u root -p otogaleri -e "SELECT migration_name, executed_at, success FROM 
 - Sadece çalışmamış migration'ları çalıştırır
 - Başarısız migration'ları kaydeder
 
+**Bu güncellemede çalışacak migration'lar:**
+- `add_vehicle_quotes.sql` - Teklif yönetimi için vehicle_quotes tablosu
+- `add_acl_permissions.sql` - Yetki yönetimi için acl_permissions tablosu
+- `add_installment_reminder_tracking.sql` - Taksit hatırlatma takibi için kolonlar
+
+**Eğer migration'lar daha önce manuel olarak çalıştırıldıysa:**
+Migration sistemi otomatik olarak atlayacaktır. Ancak emin olmak için:
+```bash
+# Hangi migration'ların çalıştığını kontrol et
+mysql -u root -p otogaleri -e "SELECT migration_name FROM schema_migrations WHERE migration_name IN ('add_vehicle_quotes', 'add_acl_permissions', 'add_installment_reminder_tracking');"
+```
+
 ### 4. Backend Build
 
 ```bash
@@ -387,9 +399,57 @@ chmod +x update.sh
 ./update.sh
 ```
 
+## Bu Güncellemedeki Yeni Özellikler
+
+### 1. Teklif Yönetimi Modülü
+- Araçlar sayfasında işlemler sütununa teklif ikonu eklendi
+- Teklif oluşturma, düzenleme ve satışa dönüştürme özellikleri
+- `/quotes` sayfasında teklif listesi ve yönetimi
+- Müşteri detay sayfasında teklifler sekmesi
+
+### 2. Gelişmiş Yetki Yönetimi (ACL)
+- Settings sayfasında yetki yönetimi sekmesi
+- Rol bazlı izin yönetimi (Sales, Accounting, Manager)
+- Kaynak ve aksiyon bazlı izin kontrolü
+
+### 3. Toplu İçe Aktarma
+- Araçlar ve masraflar için Excel/CSV toplu içe aktarma
+- Veri doğrulama ve hata raporlama
+
+### 4. PDF Belge Üretimi
+- Satış sözleşmesi PDF'i
+- Fatura PDF'i
+- Müşteri detay sayfasından indirme
+
+### 5. Taksit Hatırlatma Sistemi
+- Dashboard'da gecikmiş taksitler widget'ı
+- Manuel hatırlatma gönderme
+- Email hatırlatma servisi
+
+### 6. UI/UX İyileştirmeleri
+- Araç düzenleme modalı iki aşamalı hale getirildi
+- Accounting sayfasında tarih filtreleme tabların altına taşındı
+- Expiring documents endpoint'i eklendi
+- Vehicle cost kur yönetimi düzeltmeleri (orijinal tarihin kuru kullanılıyor)
+
+### 7. Bug Fixes
+- StaffPage'de branches API hatası düzeltildi
+- Vehicle cost düzenlemede kur yönetimi düzeltildi
+
 ## Önemli Notlar
 
 1. **Her zaman backup alın** migration çalıştırmadan önce
 2. **Migration'ları test ortamında test edin** production'a almadan önce
 3. **PM2 loglarını kontrol edin** restart sonrası
 4. **Migration durumunu kontrol edin** her update sonrası
+5. **Yeni endpoint'ler:**
+   - `/api/quotes` - Teklif yönetimi
+   - `/api/acl` - Yetki yönetimi
+   - `/api/documents/vehicles/expiring` - Süresi dolacak belgeler
+   - `/api/vehicles/bulk-import` - Toplu araç içe aktarma
+   - `/api/vehicles/bulk-costs` - Toplu masraf içe aktarma
+6. **Yeni bağımlılıklar:**
+   - `xlsx` - Excel dosya okuma
+   - `csv-parse` - CSV dosya okuma
+   - `pdfkit` - PDF üretimi
+   - `nodemailer` - Email gönderimi
