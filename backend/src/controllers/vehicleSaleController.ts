@@ -67,11 +67,11 @@ export async function markVehicleAsSold(req: AuthRequest, res: Response) {
       if (custom_rate !== undefined && custom_rate !== null) {
         saleFxRate = Number(custom_rate);
       } else {
-        saleFxRate = await getOrFetchRate(
-          finalSaleCurrency as SupportedCurrency,
-          baseCurrency as SupportedCurrency,
-          sale_date
-        );
+      saleFxRate = await getOrFetchRate(
+        finalSaleCurrency as SupportedCurrency,
+        baseCurrency as SupportedCurrency,
+        sale_date
+      );
       }
     }
 

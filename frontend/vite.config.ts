@@ -12,4 +12,19 @@ export default defineConfig({
   server: {
     port: 5175,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Vendor chunks
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          // Chart libraries
+          'charts': ['recharts'],
+          // UI libraries
+          'ui-vendor': ['lucide-react', 'date-fns'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000, // Increase limit to 1MB (default is 500KB)
+  },
 });

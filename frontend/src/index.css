@@ -91,10 +91,10 @@
     --shadow-glow-lg: 0 0 30px rgba(0, 61, 130, 0.2);
 
     /* Enhanced Status Colors - More Vibrant */
-    --success-vibrant: 142 76% 40%;
-    --warning-vibrant: 38 92% 55%;
-    --error-vibrant: 0 84% 65%;
-    --info-vibrant: 217 91% 65%;
+    --success-vibrant: hsl(142, 76%, 40%);
+    --warning-vibrant: hsl(38, 92%, 55%);
+    --error-vibrant: hsl(0, 84%, 65%);
+    --info-vibrant: hsl(217, 91%, 65%);
   }
 
   .dark {
@@ -579,12 +579,6 @@
     @apply border border-border/50;
     @apply shadow-lg;
   }
-
-  /* Enhanced Status Colors - More Vibrant */
-  --success-vibrant: 142 76% 40%;
-  --warning-vibrant: 38 92% 55%;
-  --error-vibrant: 0 84% 65%;
-  --info-vibrant: 217 91% 65%;
 
   /* Glow Effects */
   .glow-primary {

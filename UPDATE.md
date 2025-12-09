@@ -264,6 +264,78 @@ mysql -u root -p otogaleri -e "DELETE FROM schema_migrations WHERE migration_nam
 npm run migrate
 ```
 
+### Backend 500 Hataları ve SQL Syntax Hataları
+
+Eğer endpoint'ler 500 hatası veriyorsa:
+
+```bash
+# 1. Backend loglarını kontrol et
+pm2 logs otogaleri-backend --lines 100
+
+# 2. MySQL versiyonunu kontrol et (ROW_NUMBER() MySQL 8.0+ gerektirir)
+mysql --version
+# veya
+mysql -u root -p -e "SELECT VERSION();"
+
+# 3. Eğer MySQL 8.0'dan eskiyse, ROW_NUMBER() kullanan sorguları düzeltmek gerekir
+# Geçici çözüm: Eski MySQL için alternatif sorgular kullanılabilir
+```
+
+**MySQL 8.0'dan eski versiyon kullanıyorsanız:**
+
+Optimizasyonlarda kullanılan `ROW_NUMBER()` window function MySQL 8.0+ gerektirir. Eğer eski versiyon kullanıyorsanız:
+
+1. MySQL versiyonunu yükseltin (önerilen)
+2. Veya alternatif sorgular kullanın (subquery ile)
+
+**Backend'i restart etmeyi unutmayın:**
+
+```bash
+# Build sonrası mutlaka restart edin
+cd /home/cloudpanel/htdocs/otogaleri/backend
+npm run build
+pm2 restart otogaleri-backend
+
+# Logları kontrol edin
+pm2 logs otogaleri-backend --lines 50
+```
+
+### 404 Hataları (Endpoint Bulunamadı)
+
+Eğer `/api/vehicles/next-number` gibi endpoint'ler 404 veriyorsa:
+
+```bash
+# 1. Backend'in çalıştığını kontrol et
+pm2 status
+pm2 logs otogaleri-backend --lines 20
+
+# 2. Route'ların doğru mount edildiğini kontrol et
+# backend/src/server.ts dosyasında route'ların doğru import edildiğinden emin olun
+
+# 3. Backend'i restart et
+pm2 restart otogaleri-backend
+
+# 4. Health check yap
+curl http://localhost:5005/health
+```
+
+### Vehicle Number Oluşmuyor
+
+Araç ekle modalında vehicle number otomatik oluşmuyorsa:
+
+```bash
+# 1. Backend loglarını kontrol et
+pm2 logs otogaleri-backend --lines 50 | grep -i "vehicle\|next-number"
+
+# 2. Endpoint'i manuel test et
+curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:5005/api/vehicles/next-number
+
+# 3. Frontend console'da hata var mı kontrol et (browser dev tools)
+
+# 4. Backend'i restart et
+pm2 restart otogaleri-backend
+```
+
 ## Hızlı Update Komutu (Tüm Adımlar)
 
 ```bash

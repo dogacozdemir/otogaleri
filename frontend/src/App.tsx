@@ -24,7 +24,7 @@ function App() {
       <ThemeProvider>
         <TenantProvider>
           <CurrencyRatesProvider>
-            <Routes>
+          <Routes>
           <Route path="/login" element={<AuthPage />} />
           <Route path="/signup" element={<AuthPage />} />
           <Route
@@ -47,8 +47,8 @@ function App() {
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
-            </Routes>
-            <Toaster />
+          </Routes>
+          <Toaster />
           </CurrencyRatesProvider>
         </TenantProvider>
       </ThemeProvider>

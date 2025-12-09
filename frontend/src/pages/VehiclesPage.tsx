@@ -1324,6 +1324,12 @@ const VehiclesPage = () => {
                     }
                   }}
                 >
+                  <DialogHeader>
+                    <DialogTitle>Yeni Araç Ekle</DialogTitle>
+                    <DialogDescription>
+                      Araç bilgilerini iki adımda girin. İlk adımda temel bilgiler, ikinci adımda satış ve durum bilgileri.
+                    </DialogDescription>
+                  </DialogHeader>
                   {/* Step Indicator */}
                   <div className="mt-4 mb-6 px-2">
                     <div className="flex items-center justify-between">
@@ -1538,14 +1544,14 @@ const VehiclesPage = () => {
                             autoFocus
                           />
                         </div>
-                        <div>
+                          <div>
                           <label className="text-sm font-medium mb-1 block">Alış Fiyatı</label>
                           <CurrencyInput
-                            value={vehicleForm.paid}
+                              value={vehicleForm.paid}
                             currency={vehicleForm.purchase_currency}
                             onValueChange={(value) => setVehicleForm({ ...vehicleForm, paid: value })}
                             onCurrencyChange={(value) => setVehicleForm({ ...vehicleForm, purchase_currency: value })}
-                            className="h-8"
+                              className="h-8"
                             currencies={currencies.map(c => ({ value: c.value, label: c.label }))}
                           />
                         </div>
@@ -2717,7 +2723,7 @@ const VehiclesPage = () => {
             <div className="col-span-2">
               <label className="text-sm font-medium">Alış Fiyatı</label>
               <CurrencyInput
-                value={vehicleForm.paid}
+                  value={vehicleForm.paid}
                 currency={vehicleForm.purchase_currency}
                 onValueChange={(value) => setVehicleForm({ ...vehicleForm, paid: value })}
                 onCurrencyChange={(value) => setVehicleForm({ ...vehicleForm, purchase_currency: value })}
@@ -3013,22 +3019,22 @@ const VehiclesPage = () => {
                 />
               </div>
             </div>
-            <div>
-              <label className="text-sm font-medium">Satış Fiyatı *</label>
+              <div>
+                <label className="text-sm font-medium">Satış Fiyatı *</label>
               <CurrencyInput
-                value={sellForm.sale_price}
+                  value={sellForm.sale_price}
                 currency={sellForm.sale_currency || "TRY"}
                 onValueChange={(salePrice) => {
-                  setSellForm({ ...sellForm, sale_price: salePrice });
-                  // Taksit tutarını otomatik hesapla
-                  if (sellForm.payment_type === "installment" && sellForm.down_payment && sellForm.installment_count) {
-                    const remaining = Number(salePrice) - Number(sellForm.down_payment);
-                    const installmentAmount = remaining / Number(sellForm.installment_count);
-                    setSellForm(prev => ({ ...prev, sale_price: salePrice, installment_amount: installmentAmount.toFixed(2) }));
-                  }
-                }}
+                    setSellForm({ ...sellForm, sale_price: salePrice });
+                    // Taksit tutarını otomatik hesapla
+                    if (sellForm.payment_type === "installment" && sellForm.down_payment && sellForm.installment_count) {
+                      const remaining = Number(salePrice) - Number(sellForm.down_payment);
+                      const installmentAmount = remaining / Number(sellForm.installment_count);
+                      setSellForm(prev => ({ ...prev, sale_price: salePrice, installment_amount: installmentAmount.toFixed(2) }));
+                    }
+                  }}
                 onCurrencyChange={(value) => setSellForm({ ...sellForm, sale_currency: value })}
-                placeholder="Satış fiyatını girin"
+                  placeholder="Satış fiyatını girin"
                 currencies={currencies.map(c => ({ value: c.value, label: c.label }))}
               />
             </div>

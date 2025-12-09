@@ -49,11 +49,11 @@ export async function addVehicleCost(req: AuthRequest, res: Response) {
       if (custom_rate !== undefined && custom_rate !== null) {
         fxRate = Number(custom_rate);
       } else {
-        fxRate = await getOrFetchRate(
-          costCurrency as SupportedCurrency,
-          baseCurrency as SupportedCurrency,
+      fxRate = await getOrFetchRate(
+        costCurrency as SupportedCurrency,
+        baseCurrency as SupportedCurrency,
           formattedDate
-        );
+      );
       }
     }
 
@@ -93,11 +93,11 @@ export async function updateVehicleCost(req: AuthRequest, res: Response) {
       if (custom_rate !== undefined && custom_rate !== null) {
         fxRate = Number(custom_rate);
       } else {
-        fxRate = await getOrFetchRate(
-          costCurrency as SupportedCurrency,
-          baseCurrency as SupportedCurrency,
+      fxRate = await getOrFetchRate(
+        costCurrency as SupportedCurrency,
+        baseCurrency as SupportedCurrency,
           formattedDate
-        );
+      );
       }
     }
 
