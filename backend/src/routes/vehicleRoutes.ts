@@ -20,6 +20,7 @@ import {
 import { markVehicleAsSold } from "../controllers/vehicleSaleController";
 import { calculateVehicleProfit } from "../controllers/profitController";
 import { listVehicleImages, uploadVehicleImage, deleteVehicleImage, setPrimaryImage, upload } from "../controllers/vehicleImageController";
+import { bulkImportVehicles, bulkImportCosts, upload as bulkUpload } from "../controllers/bulkImportController";
 import {
   getBrandProfit,
   getModelProfit,
@@ -46,6 +47,8 @@ router.get("/analytics/category-costs", getCategoryCosts);
 router.get("/", paginationValidator, listVehicles);
 router.get("/next-number", getNextVehicleNumber);
 router.post("/", createVehicle);
+router.post("/bulk-import", bulkUpload.single("file"), bulkImportVehicles);
+router.post("/bulk-costs", bulkUpload.single("file"), bulkImportCosts);
 
 // Vehicle sub-routes (must come before /:id route)
 router.get("/:id/costs", listVehicleCosts);

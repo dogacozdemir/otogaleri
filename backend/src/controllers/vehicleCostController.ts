@@ -80,24 +80,40 @@ export async function updateVehicleCost(req: AuthRequest, res: Response) {
   const { cost_name, amount, currency, cost_date, category, custom_rate } = req.body;
 
   try {
+    // First, get the original cost to preserve the original cost_date for FX rate calculation
+    const [existingCostRows] = await dbPool.query(
+      "SELECT cost_date FROM vehicle_costs WHERE id = ? AND vehicle_id = ? AND tenant_id = ?",
+      [cost_id, vehicle_id, req.tenantId]
+    );
+    
+    const existingCost = (existingCostRows as any[])[0];
+    if (!existingCost) {
+      return res.status(404).json({ error: "Cost not found" });
+    }
+
     // Format date to YYYY-MM-DD (MySQL DATE format)
-    const formattedDate = cost_date ? new Date(cost_date).toISOString().split('T')[0] : null;
+    const formattedDate = cost_date ? new Date(cost_date).toISOString().split('T')[0] : existingCost.cost_date;
+    
+    // Use the original cost_date for FX rate calculation (the date when the cost was originally added)
+    // This ensures that the exchange rate reflects the rate at the time the cost was originally added
+    const originalCostDate = existingCost.cost_date;
     
     const [tenantRows] = await dbPool.query("SELECT default_currency FROM tenants WHERE id = ?", [req.tenantId]);
     const baseCurrency = (tenantRows as any[])[0]?.default_currency || "TRY";
     const costCurrency = currency || baseCurrency;
 
     let fxRate = 1;
-    if (costCurrency !== baseCurrency && formattedDate) {
-      // If custom_rate is provided, use it; otherwise fetch from API
+    if (costCurrency !== baseCurrency) {
+      // If custom_rate is provided, use it; otherwise fetch from API using the original cost_date
+      // This ensures that even if the date is changed during edit, we use the original date's rate
       if (custom_rate !== undefined && custom_rate !== null) {
         fxRate = Number(custom_rate);
       } else {
-      fxRate = await getOrFetchRate(
-        costCurrency as SupportedCurrency,
-        baseCurrency as SupportedCurrency,
-          formattedDate
-      );
+        fxRate = await getOrFetchRate(
+          costCurrency as SupportedCurrency,
+          baseCurrency as SupportedCurrency,
+          originalCostDate
+        );
       }
     }
 

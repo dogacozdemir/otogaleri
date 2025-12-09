@@ -13,7 +13,8 @@ import {
   Users,
   Wallet,
   Package,
-  Settings
+  Settings,
+  FileText
 } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import GlobalSearch from "./GlobalSearch";
@@ -57,6 +58,12 @@ const menuItems = [
     path: "/customers", 
     icon: Users,
     description: "Müşteri yönetimi ve CRM"
+  },
+  { 
+    name: "Teklifler", 
+    path: "/quotes", 
+    icon: FileText,
+    description: "Satış teklifleri ve yönetimi"
   },
   { 
     name: "Kasa", 
@@ -169,40 +176,41 @@ const SidebarLayout = () => {
   }, [dropdownOpen, profileDropdownOpen]);
 
   return (
-    <div className="flex min-h-screen bg-background">
-      {/* Sidebar */}
+    <div className="flex min-h-screen bg-[#f8f9fa]">
+      {/* Fixed Left Sidebar - Deep Navy Background */}
       <aside
         className={`
-          fixed z-40 top-0 left-0 h-screen w-80 bg-background dark:bg-card border-r border-border text-foreground transform
-          transition-transform duration-300 ease-in-out shadow-professional-lg
-          ${open ? "translate-x-0" : "-translate-x-full"}
+          fixed z-40 top-0 left-0 h-screen w-64 bg-[#003d82] text-white transform
+          transition-transform duration-300 ease-in-out shadow-xl
+          ${open || !isMobile ? "translate-x-0" : "-translate-x-full"}
+          lg:translate-x-0
         `}
-        aria-hidden={!open}
+        aria-hidden={!open && isMobile}
       >
-        <div className="p-6 flex items-center justify-between border-b border-border">
+        <div className="p-6 flex items-center justify-between border-b border-white/10">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-trustworthy rounded-xl flex items-center justify-center shadow-professional-sm">
+            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
               <Car className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-primary">
+              <h1 className="text-xl font-bold tracking-tight text-white">
                 {galleryName}
               </h1>
-              <p className="text-xs text-muted-foreground font-medium">
+              <p className="text-xs text-white/70 font-medium">
                 Profesyonel Yönetim
               </p>
             </div>
           </div>
           <button 
             onClick={() => setOpen(false)}
-            className="interactive-element p-2 rounded-lg"
+            className="lg:hidden p-2 rounded-lg hover:bg-white/10 transition-colors"
             aria-label="Sidebar'ı kapat"
           >
-            <X className="w-5 h-5 text-muted-foreground" />
+            <X className="w-5 h-5 text-white" />
           </button>
         </div>
         
-        {/* Navigation Menu - Compact */}
+        {/* Navigation Menu - Premium Styling */}
         <div className="flex-1 flex flex-col">
           <nav className="flex-1 p-4">
             <div className="space-y-1">
@@ -214,33 +222,22 @@ const SidebarLayout = () => {
                   <Link
                     key={item.path}
                     to={item.path}
-                    onClick={() => setOpen(false)}
+                    onClick={() => isMobile && setOpen(false)}
                     className={`
-                      group flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-all duration-200 animate-fade-in
+                      group flex items-center space-x-3 px-3 py-2.5 rounded-xl transition-all duration-200
                       ${isActive 
-                        ? "bg-gradient-trustworthy text-white shadow-professional-sm" 
-                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        ? "bg-white/10 text-white sidebar-active-border" 
+                        : "text-white/80 hover:bg-white/5 hover:text-white"
                       }
                     `}
                     title={item.description}
                   >
-                    <div className={`
-                      flex items-center justify-center w-7 h-7 rounded-lg transition-colors
-                      ${isActive 
-                        ? "bg-primary-foreground/20" 
-                        : "bg-accent/50 group-hover:bg-primary/10"
-                      }
-                    `}>
-                      <Icon className={`w-4 h-4 ${
-                        isActive ? "text-white" : "text-primary group-hover:text-primary"
-                      }`} />
-                    </div>
+                    <Icon className={`w-5 h-5 flex-shrink-0 ${
+                      isActive ? "text-[#F0A500]" : "text-white/70 group-hover:text-white"
+                    }`} />
                     <div className="flex-1 min-w-0">
                       <span className="font-semibold text-sm truncate block">{item.name}</span>
                     </div>
-                    {isActive && (
-                      <div className="w-1.5 h-1.5 bg-primary-foreground rounded-full animate-scale-in"></div>
-                    )}
                   </Link>
                 );
               })}
@@ -249,38 +246,36 @@ const SidebarLayout = () => {
         </div>
 
         {/* Footer - Logout Section */}
-        <div className="p-4 border-t border-border">
+        <div className="p-4 border-t border-white/10">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center space-x-3 px-3 py-2.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all duration-200 interactive-element"
+            className="w-full flex items-center justify-center space-x-3 px-3 py-2.5 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
           >
-            <div className="w-7 h-7 rounded-lg bg-destructive/10 flex items-center justify-center">
-              <LogOut className="w-4 h-4" />
-            </div>
+            <LogOut className="w-5 h-5" />
             <span className="font-semibold text-sm">Güvenli Çıkış</span>
           </button>
         </div>
       </aside>
 
-      {/* Main content */}
-      <div className="flex flex-col flex-1 min-h-screen">
-        <header className="w-full bg-card/95 backdrop-blur-md shadow-professional-sm border-b border-border sticky top-0 z-20 min-h-[72px] flex-shrink-0">
+      {/* Main content - Offset for fixed sidebar */}
+      <div className="flex flex-col flex-1 min-h-screen lg:ml-64">
+        <header className="w-full bg-white/95 backdrop-blur-md shadow-sm border-b border-[#e2e8f0] sticky top-0 z-20 min-h-[72px] flex-shrink-0">
           <div className="w-full px-4 sm:px-6 lg:px-8 py-3 sm:py-4 h-full">
             <div className="flex items-center justify-between h-full max-w-[1400px] mx-auto">
               {/* Left Section - Menu & Brand */}
               <div className="flex items-center space-x-3 sm:space-x-6 flex-1 min-w-0">
                 <button 
                   onClick={() => setOpen(true)}
-                  className="interactive-element p-2 sm:p-3 rounded-xl bg-accent/50 hover:bg-accent flex-shrink-0"
+                  className="lg:hidden p-2 sm:p-3 rounded-xl bg-[#003d82] hover:bg-[#003d82]/90 flex-shrink-0 transition-colors"
                   aria-label="Menüyü aç"
                 >
-                  <Menu className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+                  <Menu className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </button>
-                <div className="border-l border-border pl-3 sm:pl-6 flex-shrink-0 min-w-0">
-                  <h2 className="text-lg sm:text-xl font-bold text-primary truncate">
+                <div className="border-l border-[#e2e8f0] pl-3 sm:pl-6 flex-shrink-0 min-w-0">
+                  <h2 className="text-lg sm:text-xl font-bold text-[#2d3748] truncate">
                     {isMobile ? galleryName.split(' ')[0] : galleryName}
                   </h2>
-                  <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block min-h-[16px]">
+                  <p className="text-xs sm:text-sm text-[#2d3748]/70 hidden sm:block min-h-[16px]">
                     {menuItems.find(item => item.path === location.pathname)?.description || "Profesyonel Yönetim Paneli"}
                   </p>
                 </div>
@@ -312,7 +307,7 @@ const SidebarLayout = () => {
                 <div className="relative quick-actions-dropdown flex-shrink-0">
                   <button 
                     onClick={() => setDropdownOpen(!dropdownOpen)}
-                    className="flex items-center space-x-2 px-3 py-2 bg-gradient-trustworthy rounded-xl shadow-professional-sm hover:shadow-professional-md transition-all duration-200 whitespace-nowrap"
+                    className="flex items-center space-x-2 px-3 py-2 bg-[#003d82] rounded-xl shadow-sm hover:shadow-md transition-all duration-200 whitespace-nowrap"
                   >
                     <Plus className="w-5 h-5 text-white flex-shrink-0" />
                     <span className="text-white font-medium text-sm hidden sm:inline">Hızlı İşlemler</span>
@@ -400,8 +395,8 @@ const SidebarLayout = () => {
           </div>
         </header>
 
-        <main className="flex-1 bg-background dark:bg-background">
-          <div className="w-full px-4 sm:px-6 lg:px-8">
+        <main className="flex-1 bg-[#f8f9fa]">
+          <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
             <div className="max-w-[1400px] mx-auto">
               <Outlet />
             </div>

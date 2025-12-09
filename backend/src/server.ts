@@ -19,6 +19,8 @@ import inventoryRoutes from "./routes/inventoryRoutes";
 import tenantRoutes from "./routes/tenantRoutes";
 import installmentRoutes from "./routes/installmentRoutes";
 import currencyRoutes from "./routes/currencyRoutes";
+import quoteRoutes from "./routes/quoteRoutes";
+import aclRoutes from "./routes/aclRoutes";
 import path from "path";
 
 const app = express();
@@ -80,6 +82,8 @@ app.use("/api/inventory", inventoryRoutes);
 app.use("/api/tenant", tenantRoutes);
 app.use("/api/installments", installmentRoutes);
 app.use("/api/currency", currencyRoutes);
+app.use("/api/quotes", quoteRoutes);
+app.use("/api/acl", aclRoutes);
 
 const PORT = process.env.PORT || 5005;
 

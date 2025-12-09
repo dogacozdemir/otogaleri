@@ -11,6 +11,8 @@ import {
   getRemainingBalance,
   getOverdueInstallments,
   getActiveInstallments,
+  getTopOverdueInstallments,
+  sendReminder,
 } from "../controllers/installmentController";
 
 const router = Router();
@@ -23,7 +25,9 @@ router.post("/payments", recordPayment);
 router.put("/payments/:payment_id", updatePayment);
 router.delete("/payments/:payment_id", deletePayment);
 router.get("/overdue", getOverdueInstallments);
+router.get("/overdue/top", getTopOverdueInstallments);
 router.get("/active", getActiveInstallments);
+router.post("/:installment_sale_id/send-reminder", sendReminder);
 router.get("/:id", getInstallmentDetails);
 router.get("/vehicle/:vehicle_id", getInstallmentByVehicleId);
 router.get("/:id/balance", getRemainingBalance);

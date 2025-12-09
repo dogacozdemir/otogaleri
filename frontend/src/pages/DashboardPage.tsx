@@ -15,7 +15,8 @@ import {
   ArrowUp,
   ArrowDown,
   Activity,
-  CreditCard
+  CreditCard,
+  CheckCircle
 } from "lucide-react";
 import {
   BarChart,
@@ -54,6 +55,7 @@ export default function DashboardPage() {
   const [followupsLimit, setFollowupsLimit] = useState(5);
   const [weeklySales, setWeeklySales] = useState<any[]>([]);
   const [weeklyInventory, setWeeklyInventory] = useState<any[]>([]);
+  const [topOverdueInstallments, setTopOverdueInstallments] = useState<any[]>([]);
 
   useEffect(() => {
     fetchStats();
@@ -61,7 +63,7 @@ export default function DashboardPage() {
 
   const fetchStats = async () => {
     try {
-      const [vehiclesRes, installmentRes, branchesRes, followupsRes, overdueInstallmentsRes, documentsRes, activeInstallmentsRes, monthlySalesRes, inventoryStatsRes, recentActivitiesRes, brandProfitRes, weeklySalesRes, weeklyInventoryRes] = await Promise.all([
+      const [vehiclesRes, installmentRes, branchesRes, followupsRes, overdueInstallmentsRes, documentsRes, activeInstallmentsRes, monthlySalesRes, inventoryStatsRes, recentActivitiesRes, brandProfitRes, weeklySalesRes, weeklyInventoryRes, topOverdueRes] = await Promise.all([
         api.get("/vehicles?limit=100"),
         api.get("/analytics/active-installment-count").catch(() => ({ data: { count: 0 } })),
         api.get("/branches").catch(() => ({ data: { branches: [] } })),
@@ -75,6 +77,7 @@ export default function DashboardPage() {
         api.get("/analytics/brand-profit?limit=1").catch(() => ({ data: [] })),
         api.get("/analytics/weekly-sales").catch(() => ({ data: [] })),
         api.get("/analytics/weekly-inventory").catch(() => ({ data: [] })),
+        api.get("/installments/overdue/top").catch(() => ({ data: [] })),
       ]);
       const vehicles = vehiclesRes.data?.vehicles || [];
       const totalVehicles = vehicles.length;
@@ -128,6 +131,7 @@ export default function DashboardPage() {
       setTopBrand(brandProfitRes.data?.[0] || null);
       setWeeklySales(weeklySalesRes.data || []);
       setWeeklyInventory(weeklyInventoryRes.data || []);
+      setTopOverdueInstallments(topOverdueRes.data || []);
     } catch (err) {
       console.error("Failed to fetch stats", err);
     } finally {
@@ -156,14 +160,14 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 pt-4">
+      {/* KPI Cards Grid */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <KPICard
           title="Toplam Araç"
           value={stats?.unsoldVehicles || 0}
           subtitle="Satılmamış araç sayısı"
           icon={Car}
-          iconColor="text-primary"
-          className="bg-accent/20"
+          iconColor="text-[#003d82]"
         />
 
         <KPICard
@@ -171,8 +175,7 @@ export default function DashboardPage() {
           value={stats?.totalSales || 0}
           subtitle="Satılan araç sayısı"
           icon={TrendingUp}
-          iconColor="text-success"
-          className="bg-accent/20"
+          iconColor="text-[#F0A500]"
         />
 
         <KPICard
@@ -180,8 +183,7 @@ export default function DashboardPage() {
           value={stats?.activeInstallmentCount || 0}
           subtitle="Kalan borcu olan araç sayısı"
           icon={Clock}
-          iconColor="text-warning"
-          className="bg-accent/20"
+          iconColor="text-[#F0A500]"
         />
 
         <KPICard
@@ -189,8 +191,7 @@ export default function DashboardPage() {
           value={stats?.totalBranches || 0}
           subtitle="Aktif şube sayısı"
           icon={Building2}
-          iconColor="text-primary"
-          className="bg-accent/20"
+          iconColor="text-[#003d82]"
         />
       </div>
 
@@ -233,10 +234,10 @@ export default function DashboardPage() {
       {/* Haftalık Grafikler */}
       <div className="grid gap-4 md:grid-cols-2">
         {/* Haftalık Satış Grafiği */}
-        <Card className="card-hover">
+        <Card className="bg-white rounded-xl border border-[#e2e8f0] shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-medium flex items-center gap-2 text-[#2d3748]">
+              <TrendingUp className="h-4 w-4 text-[#003d82]" />
               Haftalık Araç Çıkışı
             </CardTitle>
           </CardHeader>
@@ -244,7 +245,7 @@ export default function DashboardPage() {
             {weeklySales.length > 0 ? (
               <ResponsiveContainer width="100%" height={200} minHeight={200}>
                 <BarChart data={weeklySales} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={true} vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={true} vertical={false} />
                   <XAxis 
                     dataKey="week" 
                     tick={{ fill: "#2d3748", fontSize: 11 }}
@@ -264,8 +265,8 @@ export default function DashboardPage() {
                     contentStyle={{
                       backgroundColor: "#ffffff",
                       border: "1px solid #e2e8f0",
-                      borderRadius: "6px",
-                      boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
+                      borderRadius: "12px",
+                      boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
                       padding: "8px 12px",
                     }}
                     labelStyle={{ 
@@ -283,25 +284,25 @@ export default function DashboardPage() {
                   <Bar
                     dataKey="sales_count"
                     fill="#003d82"
-                    radius={[4, 4, 0, 0]}
+                    radius={[12, 12, 0, 0]}
                     name="Satış Sayısı"
                   />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
               <div className="text-center py-6">
-                <TrendingUp className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">Satış verisi yok</p>
+                <TrendingUp className="h-8 w-8 text-[#2d3748]/40 mx-auto mb-2" />
+                <p className="text-sm text-[#2d3748]/60">Satış verisi yok</p>
               </div>
             )}
           </CardContent>
         </Card>
 
         {/* Haftalık Stok Grafiği */}
-        <Card className="card-hover">
+        <Card className="bg-white rounded-xl border border-[#e2e8f0] shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Package className="h-4 w-4 text-warning" />
+            <CardTitle className="text-sm font-medium flex items-center gap-2 text-[#2d3748]">
+              <Package className="h-4 w-4 text-[#F0A500]" />
               Haftalık Ürün/Servis Çıkışı
             </CardTitle>
           </CardHeader>
@@ -309,7 +310,7 @@ export default function DashboardPage() {
             {weeklyInventory.length > 0 ? (
               <ResponsiveContainer width="100%" height={200} minHeight={200}>
                 <BarChart data={weeklyInventory} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={true} vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={true} vertical={false} />
                   <XAxis 
                     dataKey="week" 
                     tick={{ fill: "#2d3748", fontSize: 11 }}
@@ -329,8 +330,8 @@ export default function DashboardPage() {
                     contentStyle={{
                       backgroundColor: "#ffffff",
                       border: "1px solid #e2e8f0",
-                      borderRadius: "6px",
-                      boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
+                      borderRadius: "12px",
+                      boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
                       padding: "8px 12px",
                     }}
                     labelStyle={{ 
@@ -351,22 +352,22 @@ export default function DashboardPage() {
                   />
                   <Bar
                     dataKey="service_count"
-                    fill="#16a34a"
-                    radius={[4, 4, 0, 0]}
+                    fill="#003d82"
+                    radius={[12, 12, 0, 0]}
                     name="Servis"
                   />
                   <Bar
                     dataKey="sale_count"
-                    fill="#003d82"
-                    radius={[4, 4, 0, 0]}
+                    fill="#F0A500"
+                    radius={[12, 12, 0, 0]}
                     name="Satış"
                   />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
               <div className="text-center py-6">
-                <Package className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">Stok verisi yok</p>
+                <Package className="h-8 w-8 text-[#2d3748]/40 mx-auto mb-2" />
+                <p className="text-sm text-[#2d3748]/60">Stok verisi yok</p>
               </div>
             )}
           </CardContent>
@@ -376,10 +377,10 @@ export default function DashboardPage() {
       {/* Satış Performansı ve Stok Durumu */}
       <div className="grid gap-4 md:grid-cols-2">
         {/* Satış Performansı Widget */}
-        <Card className="card-hover">
+        <Card className="bg-white rounded-xl border border-[#e2e8f0] shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-medium flex items-center gap-2 text-[#2d3748]">
+              <TrendingUp className="h-4 w-4 text-[#003d82]" />
               Satış Performansı
             </CardTitle>
           </CardHeader>
@@ -429,10 +430,10 @@ export default function DashboardPage() {
         </Card>
 
         {/* Stok Durumu Widget */}
-        <Card className="card-hover">
+        <Card className="bg-white rounded-xl border border-[#e2e8f0] shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Package className="h-4 w-4 text-warning" />
+            <CardTitle className="text-sm font-medium flex items-center gap-2 text-[#2d3748]">
+              <Package className="h-4 w-4 text-[#F0A500]" />
               Stok Durumu
             </CardTitle>
           </CardHeader>
@@ -485,10 +486,10 @@ export default function DashboardPage() {
       {/* Süresi Dolacak Belgeler ve Taksitler */}
       <div className="grid gap-4 md:grid-cols-2">
         {/* Expiring Documents Widget */}
-        <Card className="card-hover">
+        <Card className="bg-white rounded-xl border border-[#e2e8f0] shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <FileText className="h-4 w-4 text-warning" />
+            <CardTitle className="text-sm font-medium flex items-center gap-2 text-[#2d3748]">
+              <FileText className="h-4 w-4 text-[#F0A500]" />
               Süresi Dolacak Belgeler
             </CardTitle>
             <Badge variant={expiringDocuments.length > 0 ? "destructive" : "secondary"}>{expiringDocuments.length}</Badge>
@@ -545,67 +546,67 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Installments Widget */}
-        <Card className="card-hover">
+        {/* Top 5 Overdue Installments Widget */}
+        <Card className="bg-white rounded-xl border border-[#e2e8f0] shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-primary" />
-              Taksitler
+            <CardTitle className="text-sm font-medium flex items-center gap-2 text-[#2d3748]">
+              <AlertCircle className="h-4 w-4 text-[#F0A500]" />
+              Gecikmiş Taksitler (Top 5)
             </CardTitle>
-            <Badge variant={activeInstallments.length > 0 ? "secondary" : "outline"}>{activeInstallments.length}</Badge>
+            <Badge variant={topOverdueInstallments.length > 0 ? "destructive" : "outline"}>{topOverdueInstallments.length}</Badge>
           </CardHeader>
           <CardContent>
-            {activeInstallments.length > 0 ? (
+            {topOverdueInstallments.length > 0 ? (
               <div className="space-y-3">
-                {activeInstallments.slice(0, 5).map((installment: any) => (
+                {topOverdueInstallments.map((installment: any) => (
                   <div
                     key={installment.installment_sale_id}
-                    className="flex items-start justify-between p-3 bg-accent/50 rounded-lg border border-border hover:bg-accent hover:shadow-sm transition-all duration-200 cursor-pointer micro-bounce"
-                    onClick={() => navigate(`/vehicles`)}
+                    className="flex items-start justify-between p-3 bg-red-50 rounded-lg border border-red-200 hover:bg-red-100 hover:shadow-sm transition-all duration-200 cursor-pointer"
+                    onClick={() => {
+                      if (installment.customer_id) {
+                        navigate(`/customers/${installment.customer_id}`);
+                      } else {
+                        navigate("/vehicles");
+                      }
+                    }}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <p className="text-sm font-medium truncate">
-                          {installment.customer_name_full || installment.customer_name || "Müşteri"}
+                        <p className="text-sm font-medium truncate text-[#2d3748]">
+                          {installment.customer_name || "Müşteri"}
                         </p>
                         <Badge
-                          variant={installment.days_since_last_payment >= 30 ? "destructive" : installment.days_since_last_payment >= 15 ? "warning" : "secondary"}
+                          variant="destructive"
                           className="text-xs flex-shrink-0"
                         >
-                          {installment.days_since_last_payment || 0} gün
+                          {installment.days_overdue || 0} gün gecikme
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground truncate">
                         {installment.maker} {installment.model} {installment.year}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="text-xs font-semibold text-[#F0A500] mt-1">
+                        Geciken: {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: installment.currency || 'TRY' }).format((installment.installment_amount || 0) * (installment.fx_rate_to_base || 1))}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         Kalan: {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: installment.currency || 'TRY' }).format(installment.remaining_balance || 0)}
                       </p>
-                      {installment.last_payment_date && (
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Son ödeme: {format(new Date(installment.last_payment_date), "dd MMM yyyy", { locale: tr })}
-                        </p>
-                      )}
                     </div>
-                    {installment.days_since_last_payment >= 30 && (
-                      <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 ml-2" />
-                    )}
+                    <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 ml-2" />
                   </div>
                 ))}
-                {activeInstallments.length > 5 && (
-                  <Button
-                    variant="outline"
-                    className="w-full mt-2"
-                    onClick={() => navigate("/vehicles")}
-                  >
-                    Tümünü Gör ({activeInstallments.length})
-                  </Button>
-                )}
+                <Button
+                  variant="outline"
+                  className="w-full mt-2"
+                  onClick={() => navigate("/vehicles?tab=sold")}
+                >
+                  Tüm Gecikmiş Taksitleri Gör
+                </Button>
               </div>
             ) : (
               <div className="text-center py-6">
-                <CreditCard className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">Aktif taksit yok</p>
+                <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">Gecikmiş taksit yok</p>
               </div>
             )}
           </CardContent>
@@ -615,10 +616,10 @@ export default function DashboardPage() {
       {/* Son Aktiviteler ve Takip Görevleri */}
       <div className="grid gap-4 md:grid-cols-2">
         {/* Son Aktiviteler Widget */}
-        <Card className="card-hover">
+        <Card className="bg-white rounded-xl border border-[#e2e8f0] shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Activity className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-medium flex items-center gap-2 text-[#2d3748]">
+              <Activity className="h-4 w-4 text-[#003d82]" />
               Son Aktiviteler
             </CardTitle>
           </CardHeader>
@@ -674,10 +675,10 @@ export default function DashboardPage() {
         </Card>
 
         {/* Today's Followups Widget */}
-        <Card className="card-hover">
+        <Card className="bg-white rounded-xl border border-[#e2e8f0] shadow-md">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <MessageSquare className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-medium flex items-center gap-2 text-[#2d3748]">
+              <MessageSquare className="h-4 w-4 text-[#003d82]" />
               Takip Görevleri
             </CardTitle>
             <Badge variant="secondary">{todayFollowups.length}</Badge>

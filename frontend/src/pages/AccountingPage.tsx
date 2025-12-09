@@ -312,56 +312,6 @@ const AccountingPage = () => {
 
   return (
     <div className="space-y-6">
-      {/* Tarih Filtreleme */}
-      <div className="pt-4">
-        <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Filter className="w-5 h-5 mr-2 text-primary" />
-            Tarih Filtreleme
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center space-x-2 mb-4">
-            {(["7", "30", "90", "all", "custom"] as const).map((period) => (
-              <Button
-                key={period}
-                variant={dateFilterPeriod === period ? "default" : "outline"}
-                size="sm"
-                onClick={() => setDateFilterPeriod(period)}
-              >
-                {period === "all" ? "Tüm Tarihler" : period === "custom" ? "Özel Tarih" : `Son ${period} Gün`}
-              </Button>
-            ))}
-          </div>
-          {dateFilterPeriod === "custom" && (
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <Calendar className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Başlangıç:</span>
-                <Input
-                  type="date"
-                  value={selectedDateRange.startDate}
-                  onChange={(e) => setSelectedDateRange((prev) => ({ ...prev, startDate: e.target.value }))}
-                  className="w-40"
-                />
-              </div>
-              <div className="flex items-center space-x-2">
-                <Calendar className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Bitiş:</span>
-                <Input
-                  type="date"
-                  value={selectedDateRange.endDate}
-                  onChange={(e) => setSelectedDateRange((prev) => ({ ...prev, endDate: e.target.value }))}
-                  className="w-40"
-                />
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      </div>
-
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
@@ -445,6 +395,54 @@ const AccountingPage = () => {
             Giderler
           </TabsTrigger>
         </TabsList>
+
+        {/* Tarih Filtreleme */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Filter className="w-5 h-5 mr-2 text-primary" />
+              Tarih Filtreleme
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center space-x-2 mb-4">
+              {(["7", "30", "90", "all", "custom"] as const).map((period) => (
+                <Button
+                  key={period}
+                  variant={dateFilterPeriod === period ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setDateFilterPeriod(period)}
+                >
+                  {period === "all" ? "Tüm Tarihler" : period === "custom" ? "Özel Tarih" : `Son ${period} Gün`}
+                </Button>
+              ))}
+            </div>
+            {dateFilterPeriod === "custom" && (
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <Calendar className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Başlangıç:</span>
+                  <Input
+                    type="date"
+                    value={selectedDateRange.startDate}
+                    onChange={(e) => setSelectedDateRange((prev) => ({ ...prev, startDate: e.target.value }))}
+                    className="w-40"
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Calendar className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Bitiş:</span>
+                  <Input
+                    type="date"
+                    value={selectedDateRange.endDate}
+                    onChange={(e) => setSelectedDateRange((prev) => ({ ...prev, endDate: e.target.value }))}
+                    className="w-40"
+                  />
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">

@@ -38,14 +38,14 @@ export const upload = multer({
   },
 });
 
-// Resim optimizasyonu
+// Resim optimizasyonu - WebP formatına dönüştür
 async function optimizeImage(inputPath: string, outputPath: string): Promise<void> {
   await sharp(inputPath)
     .resize(1920, 1080, {
       fit: "inside",
       withoutEnlargement: true,
     })
-    .jpeg({ quality: 85 })
+    .webp({ quality: 85, effort: 6 })
     .toFile(outputPath);
 }
 
@@ -110,7 +110,10 @@ export async function uploadVehicleImage(req: AuthRequest, res: Response) {
     }
 
     const originalPath = req.file.path;
-    const optimizedFilename = `optimized-${req.file.filename}`;
+    // Change extension to .webp
+    const originalExt = path.extname(req.file.filename);
+    const baseFilename = path.basename(req.file.filename, originalExt);
+    const optimizedFilename = `optimized-${baseFilename}.webp`;
     const optimizedPath = path.join(path.dirname(originalPath), optimizedFilename);
 
     // Optimize image
@@ -151,7 +154,7 @@ export async function uploadVehicleImage(req: AuthRequest, res: Response) {
         `/uploads/vehicles/${finalFilename}`,
         finalFilename,
         fileSize,
-        req.file.mimetype,
+        'image/webp', // WebP mime type
         nextOrder,
         req.userId || null,
       ]

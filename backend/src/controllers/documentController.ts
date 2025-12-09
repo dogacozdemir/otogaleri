@@ -1,293 +1,217 @@
 import { Response } from "express";
 import { AuthRequest } from "../middleware/auth";
 import { dbPool } from "../config/database";
-import multer from "multer";
-import path from "path";
-import fs from "fs";
+import { generateSalesContract, generateInvoice } from "../services/pdfService";
 
-// Dosya yükleme için multer yapılandırması
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, "../../uploads");
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  },
-});
+export async function generateSalesContractPDF(req: AuthRequest, res: Response) {
+  const { sale_id } = req.params;
 
-export const upload = multer({
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-
-    if (mimetype && extname) {
-      return cb(null, true);
-    } else {
-      cb(new Error("Invalid file type. Only images and PDFs are allowed."));
-    }
-  },
-});
-
-// Araç belgeleri listesi
-export async function listVehicleDocuments(req: AuthRequest, res: Response) {
-  const { vehicle_id } = req.params;
+  if (!sale_id) {
+    return res.status(400).json({ error: "Sale ID is required" });
+  }
 
   try {
-    const [documents] = await dbPool.query(
+    // Fetch sale data with related information
+    const [sales] = await dbPool.query(
       `SELECT 
-        d.*,
-        s.name as uploaded_by_name
-      FROM vehicle_documents d
-      LEFT JOIN staff s ON d.uploaded_by = s.id
-      WHERE d.tenant_id = ? AND d.vehicle_id = ?
-      ORDER BY d.uploaded_at DESC`,
-      [req.tenantId, vehicle_id]
-    );
-    res.json(documents);
-  } catch (err) {
-    console.error("[document] Vehicle documents list error", err);
-    res.status(500).json({ error: "Failed to list vehicle documents" });
-  }
-}
-
-// Araç belgesi yükle
-export async function uploadVehicleDocument(req: AuthRequest, res: Response) {
-  const { vehicle_id } = req.params;
-  const { document_type, document_name, expiry_date, notes } = req.body;
-
-  if (!req.file) {
-    return res.status(400).json({ error: "File is required" });
-  }
-
-  if (!document_type || !document_name) {
-    return res.status(400).json({ error: "Document type and name are required" });
-  }
-
-  try {
-    const filePath = `/uploads/${req.file.filename}`;
-    const fileSize = req.file.size;
-    const mimeType = req.file.mimetype;
-
-    const [result] = await dbPool.query(
-      `INSERT INTO vehicle_documents (
-        tenant_id, vehicle_id, document_type, document_name,
-        file_path, file_size, mime_type, uploaded_by,
-        expiry_date, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        req.tenantId,
-        vehicle_id,
-        document_type,
-        document_name,
-        filePath,
-        fileSize,
-        mimeType,
-        req.userId || null,
-        expiry_date || null,
-        notes || null,
-      ]
-    );
-
-    const docId = (result as any).insertId;
-    const [rows] = await dbPool.query("SELECT * FROM vehicle_documents WHERE id = ?", [docId]);
-    res.status(201).json((rows as any[])[0]);
-  } catch (err) {
-    console.error("[document] Upload vehicle document error", err);
-    res.status(500).json({ error: "Failed to upload document" });
-  }
-}
-
-// Araç belgesi sil
-export async function deleteVehicleDocument(req: AuthRequest, res: Response) {
-  const { id } = req.params;
-
-  try {
-    // Önce dosyayı bul
-    const [docRows] = await dbPool.query(
-      "SELECT file_path FROM vehicle_documents WHERE id = ? AND tenant_id = ?",
-      [id, req.tenantId]
-    );
-
-    if ((docRows as any[]).length === 0) {
-      return res.status(404).json({ error: "Document not found" });
-    }
-
-    const filePath = (docRows as any[])[0].file_path;
-    const fullPath = path.join(__dirname, "../..", filePath);
-
-    // Dosyayı sil
-    if (fs.existsSync(fullPath)) {
-      fs.unlinkSync(fullPath);
-    }
-
-    // Veritabanından sil
-    await dbPool.query("DELETE FROM vehicle_documents WHERE id = ? AND tenant_id = ?", [id, req.tenantId]);
-
-    res.json({ message: "Document deleted successfully" });
-  } catch (err) {
-    console.error("[document] Delete vehicle document error", err);
-    res.status(500).json({ error: "Failed to delete document" });
-  }
-}
-
-// Süresi dolacak araç belgeleri
-export async function getExpiringVehicleDocuments(req: AuthRequest, res: Response) {
-  const { days = 30 } = req.query;
-
-  try {
-    const [documents] = await dbPool.query(
-      `SELECT 
-        d.*,
+        vs.*,
         v.maker,
         v.model,
-        v.production_year as year,
-        DATEDIFF(d.expiry_date, CURDATE()) as days_until_expiry
-      FROM vehicle_documents d
-      LEFT JOIN vehicles v ON d.vehicle_id = v.id
-      WHERE d.tenant_id = ?
-        AND d.expiry_date IS NOT NULL
-        AND d.expiry_date >= CURDATE()
-        AND d.expiry_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
-      ORDER BY d.expiry_date ASC`,
-      [req.tenantId, days]
+        v.production_year,
+        v.chassis_no,
+        v.km,
+        v.color,
+        v.fuel,
+        v.transmission,
+        b.name as branch_name,
+        s.name as staff_name,
+        t.name as tenant_name
+      FROM vehicle_sales vs
+      LEFT JOIN vehicles v ON vs.vehicle_id = v.id
+      LEFT JOIN branches b ON vs.branch_id = b.id
+      LEFT JOIN staff s ON vs.staff_id = s.id
+      LEFT JOIN tenants t ON vs.tenant_id = t.id
+      WHERE vs.id = ? AND vs.tenant_id = ?`,
+      [sale_id, req.tenantId]
     );
-    res.json(documents);
-  } catch (err) {
-    console.error("[document] Expiring documents error", err);
-    res.status(500).json({ error: "Failed to get expiring documents" });
+
+    const salesArray = sales as any[];
+    if (salesArray.length === 0) {
+      return res.status(404).json({ error: "Sale not found" });
+    }
+
+    const sale = salesArray[0];
+
+    // Check for installment sale
+    let installment = null;
+    const [installments] = await dbPool.query(
+      `SELECT 
+        down_payment,
+        installment_count,
+        installment_amount,
+        total_amount
+      FROM vehicle_installment_sales
+      WHERE sale_id = ? AND tenant_id = ?`,
+      [sale_id, req.tenantId]
+    );
+
+    const installmentsArray = installments as any[];
+    if (installmentsArray.length > 0) {
+      installment = installmentsArray[0];
+    }
+
+    const saleData = {
+      sale_id: sale.id,
+      sale_date: sale.sale_date,
+      sale_amount: Number(sale.sale_amount),
+      sale_currency: sale.sale_currency,
+      customer_name: sale.customer_name,
+      customer_phone: sale.customer_phone,
+      customer_address: sale.customer_address,
+      plate_number: sale.plate_number,
+      vehicle: {
+        maker: sale.maker,
+        model: sale.model,
+        production_year: sale.production_year,
+        chassis_no: sale.chassis_no,
+        km: sale.km,
+        color: sale.color,
+        fuel: sale.fuel,
+        transmission: sale.transmission,
+      },
+      branch_name: sale.branch_name,
+      staff_name: sale.staff_name,
+      tenant_name: sale.tenant_name,
+      installment: installment,
+    };
+
+    generateSalesContract(saleData, res);
+  } catch (error) {
+    console.error("[document] Generate sales contract error:", error);
+    res.status(500).json({ error: "Failed to generate sales contract" });
   }
 }
 
-// Müşteri belgeleri listesi
-export async function listCustomerDocuments(req: AuthRequest, res: Response) {
-  const { customer_id } = req.params;
+export async function generateInvoicePDF(req: AuthRequest, res: Response) {
+  const { sale_id } = req.params;
+
+  if (!sale_id) {
+    return res.status(400).json({ error: "Sale ID is required" });
+  }
 
   try {
+    // Fetch sale data with related information
+    const [sales] = await dbPool.query(
+      `SELECT 
+        vs.*,
+        v.maker,
+        v.model,
+        v.production_year,
+        v.chassis_no,
+        v.km,
+        v.color,
+        v.fuel,
+        v.transmission,
+        b.name as branch_name,
+        s.name as staff_name,
+        t.name as tenant_name
+      FROM vehicle_sales vs
+      LEFT JOIN vehicles v ON vs.vehicle_id = v.id
+      LEFT JOIN branches b ON vs.branch_id = b.id
+      LEFT JOIN staff s ON vs.staff_id = s.id
+      LEFT JOIN tenants t ON vs.tenant_id = t.id
+      WHERE vs.id = ? AND vs.tenant_id = ?`,
+      [sale_id, req.tenantId]
+    );
+
+    const salesArray = sales as any[];
+    if (salesArray.length === 0) {
+      return res.status(404).json({ error: "Sale not found" });
+    }
+
+    const sale = salesArray[0];
+
+    // Check for installment sale
+    let installment = null;
+    const [installments] = await dbPool.query(
+      `SELECT 
+        down_payment,
+        installment_count,
+        installment_amount,
+        total_amount
+      FROM vehicle_installment_sales
+      WHERE sale_id = ? AND tenant_id = ?`,
+      [sale_id, req.tenantId]
+    );
+
+    const installmentsArray = installments as any[];
+    if (installmentsArray.length > 0) {
+      installment = installmentsArray[0];
+    }
+
+    const saleData = {
+      sale_id: sale.id,
+      sale_date: sale.sale_date,
+      sale_amount: Number(sale.sale_amount),
+      sale_currency: sale.sale_currency,
+      customer_name: sale.customer_name,
+      customer_phone: sale.customer_phone,
+      customer_address: sale.customer_address,
+      plate_number: sale.plate_number,
+      vehicle: {
+        maker: sale.maker,
+        model: sale.model,
+        production_year: sale.production_year,
+        chassis_no: sale.chassis_no,
+        km: sale.km,
+        color: sale.color,
+        fuel: sale.fuel,
+        transmission: sale.transmission,
+      },
+      branch_name: sale.branch_name,
+      staff_name: sale.staff_name,
+      tenant_name: sale.tenant_name,
+      installment: installment,
+    };
+
+    generateInvoice(saleData, res);
+  } catch (error) {
+    console.error("[document] Generate invoice error:", error);
+    res.status(500).json({ error: "Failed to generate invoice" });
+  }
+}
+
+export async function getExpiringVehicleDocuments(req: AuthRequest, res: Response) {
+  const { days = 30 } = req.query;
+  const daysNum = Math.max(1, Math.min(365, Number(days) || 30));
+
+  try {
+    const today = new Date();
+    const expiryDate = new Date();
+    expiryDate.setDate(today.getDate() + daysNum);
+
     const [documents] = await dbPool.query(
       `SELECT 
-        d.*,
-        s1.name as uploaded_by_name,
-        s2.name as verified_by_name
-      FROM customer_documents d
-      LEFT JOIN staff s1 ON d.uploaded_by = s1.id
-      LEFT JOIN staff s2 ON d.verified_by = s2.id
-      WHERE d.tenant_id = ? AND d.customer_id = ?
-      ORDER BY d.uploaded_at DESC`,
-      [req.tenantId, customer_id]
+        vd.*,
+        v.maker,
+        v.model,
+        v.production_year,
+        v.vehicle_number,
+        v.chassis_no,
+        DATEDIFF(vd.expiry_date, CURDATE()) as days_until_expiry
+      FROM vehicle_documents vd
+      INNER JOIN vehicles v ON vd.vehicle_id = v.id
+      WHERE vd.tenant_id = ?
+        AND vd.expiry_date IS NOT NULL
+        AND vd.expiry_date >= CURDATE()
+        AND vd.expiry_date <= ?
+      ORDER BY vd.expiry_date ASC`,
+      [req.tenantId, expiryDate.toISOString().split('T')[0]]
     );
+
     res.json(documents);
-  } catch (err) {
-    console.error("[document] Customer documents list error", err);
-    res.status(500).json({ error: "Failed to list customer documents" });
+  } catch (error) {
+    console.error("[document] Get expiring documents error:", error);
+    res.status(500).json({ error: "Failed to fetch expiring documents" });
   }
 }
-
-// Müşteri belgesi yükle
-export async function uploadCustomerDocument(req: AuthRequest, res: Response) {
-  const { customer_id } = req.params;
-  const { document_type, document_name, expiry_date, notes } = req.body;
-
-  if (!req.file) {
-    return res.status(400).json({ error: "File is required" });
-  }
-
-  if (!document_type || !document_name) {
-    return res.status(400).json({ error: "Document type and name are required" });
-  }
-
-  try {
-    const filePath = `/uploads/${req.file.filename}`;
-    const fileSize = req.file.size;
-    const mimeType = req.file.mimetype;
-
-    const [result] = await dbPool.query(
-      `INSERT INTO customer_documents (
-        tenant_id, customer_id, document_type, document_name,
-        file_path, file_size, mime_type, uploaded_by,
-        expiry_date, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        req.tenantId,
-        customer_id,
-        document_type,
-        document_name,
-        filePath,
-        fileSize,
-        mimeType,
-        req.userId || null,
-        expiry_date || null,
-        notes || null,
-      ]
-    );
-
-    const docId = (result as any).insertId;
-    const [rows] = await dbPool.query("SELECT * FROM customer_documents WHERE id = ?", [docId]);
-    res.status(201).json((rows as any[])[0]);
-  } catch (err) {
-    console.error("[document] Upload customer document error", err);
-    res.status(500).json({ error: "Failed to upload document" });
-  }
-}
-
-// Müşteri belgesi doğrula
-export async function verifyCustomerDocument(req: AuthRequest, res: Response) {
-  const { id } = req.params;
-  const { is_verified } = req.body;
-
-  try {
-    await dbPool.query(
-      `UPDATE customer_documents 
-       SET is_verified = ?, verified_by = ?, verified_at = NOW()
-       WHERE id = ? AND tenant_id = ?`,
-      [is_verified, req.userId || null, id, req.tenantId]
-    );
-
-    const [rows] = await dbPool.query("SELECT * FROM customer_documents WHERE id = ?", [id]);
-    res.json((rows as any[])[0]);
-  } catch (err) {
-    console.error("[document] Verify document error", err);
-    res.status(500).json({ error: "Failed to verify document" });
-  }
-}
-
-// Müşteri belgesi sil
-export async function deleteCustomerDocument(req: AuthRequest, res: Response) {
-  const { id } = req.params;
-
-  try {
-    // Önce dosyayı bul
-    const [docRows] = await dbPool.query(
-      "SELECT file_path FROM customer_documents WHERE id = ? AND tenant_id = ?",
-      [id, req.tenantId]
-    );
-
-    if ((docRows as any[]).length === 0) {
-      return res.status(404).json({ error: "Document not found" });
-    }
-
-    const filePath = (docRows as any[])[0].file_path;
-    const fullPath = path.join(__dirname, "../..", filePath);
-
-    // Dosyayı sil
-    if (fs.existsSync(fullPath)) {
-      fs.unlinkSync(fullPath);
-    }
-
-    // Veritabanından sil
-    await dbPool.query("DELETE FROM customer_documents WHERE id = ? AND tenant_id = ?", [id, req.tenantId]);
-
-    res.json({ message: "Document deleted successfully" });
-  } catch (err) {
-    console.error("[document] Delete customer document error", err);
-    res.status(500).json({ error: "Failed to delete document" });
-  }
-}
-

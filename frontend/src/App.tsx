@@ -12,6 +12,7 @@ import StaffPage from "./pages/StaffPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import CustomerList from "./pages/CustomerList";
 import CustomerDetails from "./pages/CustomerDetails";
+import QuotesPage from "./pages/QuotesPage";
 import AccountingPage from "./pages/AccountingPage";
 import InventoryPage from "./pages/InventoryPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -43,6 +44,7 @@ function App() {
             <Route path="analytics" element={<AnalyticsPage />} />
             <Route path="customers" element={<CustomerList />} />
             <Route path="customers/:id" element={<CustomerDetails />} />
+            <Route path="quotes" element={<QuotesPage />} />
             <Route path="accounting" element={<AccountingPage />} />
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="settings" element={<SettingsPage />} />

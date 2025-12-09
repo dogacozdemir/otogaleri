@@ -3,6 +3,7 @@ import { AuthRequest } from "../middleware/auth";
 import { dbPool } from "../config/database";
 import { getOrFetchRate } from "../services/fxCacheService";
 import { SupportedCurrency } from "../services/currencyService";
+import { sendReminderForInstallment } from "../services/installmentAlertService";
 
 // Taksitli satış oluştur
 export async function createInstallmentSale(req: AuthRequest, res: Response) {
@@ -637,5 +638,87 @@ export async function getActiveInstallments(req: AuthRequest, res: Response) {
   } catch (err) {
     console.error("[installment] Get active installments error", err);
     res.status(500).json({ error: "Failed to get active installments" });
+  }
+}
+
+// Top 5 gecikmiş taksitleri getir (Dashboard için)
+export async function getTopOverdueInstallments(req: AuthRequest, res: Response) {
+  try {
+    if (!req.tenantId) {
+      return res.status(401).json({ error: "Tenant ID missing" });
+    }
+
+    const [rows] = await dbPool.query(
+      `SELECT 
+        vis.id as installment_sale_id,
+        vis.vehicle_id,
+        vis.installment_amount,
+        vis.currency,
+        vis.fx_rate_to_base,
+        v.maker,
+        v.model,
+        v.production_year as year,
+        vs.customer_name,
+        vs.customer_phone,
+        COALESCE(payment_summary.total_paid, 0) as total_paid,
+        (vis.total_amount * vis.fx_rate_to_base) - COALESCE(payment_summary.total_paid, 0) as remaining_balance,
+        payment_summary.last_payment_date,
+        DATEDIFF(CURDATE(), COALESCE(payment_summary.last_payment_date, vis.sale_date)) as days_overdue
+      FROM vehicle_installment_sales vis
+      LEFT JOIN vehicles v ON vis.vehicle_id = v.id
+      LEFT JOIN vehicle_sales vs ON v.id = vs.vehicle_id AND vs.tenant_id = vis.tenant_id
+      LEFT JOIN (
+        SELECT 
+          installment_sale_id,
+          COALESCE(SUM(amount * fx_rate_to_base), 0) as total_paid,
+          MAX(payment_date) as last_payment_date
+        FROM vehicle_installment_payments
+        GROUP BY installment_sale_id
+      ) payment_summary ON payment_summary.installment_sale_id = vis.id
+      WHERE vis.tenant_id = ?
+        AND vis.status = 'active'
+        AND (vis.total_amount * vis.fx_rate_to_base) - COALESCE(payment_summary.total_paid, 0) > 0
+        AND DATEDIFF(CURDATE(), COALESCE(payment_summary.last_payment_date, vis.sale_date)) >= 30
+      ORDER BY days_overdue DESC
+      LIMIT 5`,
+      [req.tenantId]
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error("[installment] Get top overdue installments error", err);
+    res.status(500).json({ error: "Failed to get top overdue installments" });
+  }
+}
+
+// Manuel hatırlatma gönder
+export async function sendReminder(req: AuthRequest, res: Response) {
+  const { installment_sale_id } = req.params;
+  const { send_email = true, send_sms = false } = req.body;
+
+  if (!req.tenantId) {
+    return res.status(401).json({ error: "Tenant ID missing" });
+  }
+
+  if (!installment_sale_id) {
+    return res.status(400).json({ error: "Installment sale ID is required" });
+  }
+
+  try {
+    const result = await sendReminderForInstallment(
+      Number(installment_sale_id),
+      req.tenantId,
+      send_email,
+      send_sms
+    );
+
+    if (!result.success) {
+      return res.status(500).json({ error: result.error || "Failed to send reminder" });
+    }
+
+    res.json({ message: "Reminder sent successfully" });
+  } catch (err) {
+    console.error("[installment] Send reminder error", err);
+    res.status(500).json({ error: "Failed to send reminder" });
   }
 }

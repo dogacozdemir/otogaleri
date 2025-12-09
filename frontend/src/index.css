@@ -29,9 +29,9 @@
     --muted: 220 14% 96%; /* #f1f3f4 - very light gray */
     --muted-foreground: 220 9% 46%; /* #6b7280 - readable gray */
 
-    /* Accent - Soft Professional */
-    --accent: 220 60% 97%; /* #f0f4ff - very light blue */
-    --accent-foreground: 220 100% 25%; /* #003d82 - primary blue */
+    /* Accent - Deep Gold/Amber (Luxury Highlight) */
+    --accent: 38 100% 47%; /* #F0A500 - deep gold/amber */
+    --accent-foreground: 0 0% 98%; /* white */
 
     /* Status Colors - Clear & Accessible (Enhanced for 2025) */
     --success: 142 76% 40%; /* #16a34a - more vibrant green */
@@ -50,7 +50,7 @@
     /* Borders & Inputs - Defined & Clear */
     --border: 220 13% 91%; /* #e2e8f0 - clear border */
     --input: 220 13% 91%; /* #e2e8f0 - clear input border */
-    --ring: 220 100% 25%; /* #003d82 - primary focus ring */
+    --ring: 38 100% 47%; /* #F0A500 - accent focus ring for luxury feel */
 
     /* Chart Colors - Professional & Distinct */
     --chart-1: 220 100% 25%; /* #003d82 - primary blue */
@@ -59,18 +59,18 @@
     --chart-4: 0 84% 60%; /* #ef4444 - error red */
     --chart-5: 271 81% 56%; /* #8b5cf6 - accent purple */
 
-    /* Professional Border Radius */
-    --radius: 0.75rem; /* 12px - more professional than 8px */
+    /* Professional Border Radius - Strict 12px */
+    --radius: 0.75rem; /* 12px - strict adherence for all cards, buttons, components */
 
-    /* Sidebar - Clean & Professional */
-    --sidebar-background: 0 0% 100%; /* pure white */
-    --sidebar-foreground: 220 13% 18%; /* #2d3748 */
+    /* Sidebar - Fixed Left Sidebar with Deep Navy Background */
+    --sidebar-background: 220 100% 25%; /* #003d82 - deep navy blue */
+    --sidebar-foreground: 0 0% 98%; /* white text/icons */
     --sidebar-primary: 220 100% 25%; /* #003d82 */
     --sidebar-primary-foreground: 0 0% 98%; /* white */
-    --sidebar-accent: 220 60% 97%; /* #f0f4ff */
-    --sidebar-accent-foreground: 220 100% 25%; /* #003d82 */
+    --sidebar-accent: 38 100% 47%; /* #F0A500 - gold accent for active links */
+    --sidebar-accent-foreground: 0 0% 98%; /* white */
     --sidebar-border: 220 13% 91%; /* #e2e8f0 */
-    --sidebar-ring: 220 100% 25%; /* #003d82 */
+    --sidebar-ring: 38 100% 47%; /* #F0A500 */
 
     /* Custom Business Variables */
     --business-primary: 220 100% 25%; /* #003d82 - trustworthy navy */
@@ -644,5 +644,20 @@
   .btn-ripple:active::after {
     width: 300px;
     height: 300px;
+  }
+
+  /* Accent Button - Luxury Gold/Amber */
+  .btn-accent {
+    @apply bg-[#F0A500] text-white shadow-sm hover:bg-[#F0A500]/90 hover:shadow-md;
+    transition: all 0.2s ease-in-out;
+  }
+  
+  .btn-accent:hover {
+    background-color: #d89400;
+  }
+
+  /* Sidebar Active Link Border */
+  .sidebar-active-border {
+    border-left: 4px solid #F0A500;
   }
 }

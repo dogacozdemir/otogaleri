@@ -23,6 +23,10 @@ import {
   Upload,
   Trash2,
   Star,
+  Eye,
+  ArrowRight,
+  Download,
+  Bell,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
@@ -94,8 +98,10 @@ const CustomerDetails: React.FC = () => {
   const { formatCurrency } = useCurrency();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [sales, setSales] = useState<VehicleSale[]>([]);
+  const [quotes, setQuotes] = useState<any[]>([]);
   const [notFound, setNotFound] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [openQuoteDialog, setOpenQuoteDialog] = useState(false);
   const [editForm, setEditForm] = useState({
     name: "",
     phone: "",
@@ -164,6 +170,16 @@ const CustomerDetails: React.FC = () => {
     }
   };
 
+  const fetchCustomerQuotes = async () => {
+    if (!id) return;
+    try {
+      const response = await api.get(`/quotes?customer_id=${id}&limit=100`);
+      setQuotes(response.data.quotes || []);
+    } catch (error) {
+      console.error("Failed to fetch quotes", error);
+    }
+  };
+
   const fetchCustomerDocuments = async () => {
     if (!id) return;
     try {
@@ -179,6 +195,7 @@ const CustomerDetails: React.FC = () => {
       fetchCustomer(id);
       fetchFollowups();
       fetchCustomerDocuments();
+      fetchCustomerQuotes();
     }
   }, [id]);
 
@@ -231,6 +248,47 @@ const CustomerDetails: React.FC = () => {
     if (totalSpent > 50000 && saleCount > 3) return { name: "VIP", color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400" };
     if (totalSpent > 10000 && saleCount > 1) return { name: "Düzenli", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400" };
     return { name: "Yeni", color: "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400" };
+  };
+
+  const downloadPDF = async (saleId: number, type: "contract" | "invoice") => {
+    try {
+      const token = localStorage.getItem("otogaleri_token");
+      const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5005/api";
+      const endpoint = type === "contract" ? `/documents/sales-contract/${saleId}` : `/documents/invoice/${saleId}`;
+      
+      const response = await fetch(`${API_BASE}${endpoint}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("PDF indirilemedi");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${type === "contract" ? "satis-sozlesmesi" : "fatura"}-${saleId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Başarılı",
+        description: `${type === "contract" ? "Satış sözleşmesi" : "Fatura"} indirildi`,
+      });
+    } catch (error: any) {
+      console.error("PDF indirme hatası:", error);
+      toast({
+        title: "Hata",
+        description: error?.message || "PDF indirilemedi",
+        variant: "destructive",
+      });
+    }
   };
 
   if (notFound) {
@@ -420,8 +478,9 @@ const CustomerDetails: React.FC = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <TabsList className="grid w-full grid-cols-3 mb-6">
+                <TabsList className="grid w-full grid-cols-4 mb-6">
                   <TabsTrigger value="sales">Satışlar</TabsTrigger>
+                  <TabsTrigger value="quotes">Teklifler</TabsTrigger>
                   <TabsTrigger value="followups">Satış Sonrası Takip</TabsTrigger>
                   <TabsTrigger value="documents">Belgeler</TabsTrigger>
                 </TabsList>
@@ -489,21 +548,74 @@ const CustomerDetails: React.FC = () => {
                               </div>
                             )}
                           </div>
+                          {/* PDF Download Buttons */}
+                          <div className="flex gap-2 mt-3">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => downloadPDF(sale.id, "contract")}
+                              className="rounded-xl border-[#003d82] text-[#003d82] hover:bg-[#003d82] hover:text-white"
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              Sözleşme İndir
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => downloadPDF(sale.id, "invoice")}
+                              className="rounded-xl border-[#F0A500] text-[#F0A500] hover:bg-[#F0A500] hover:text-white"
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              Fatura İndir
+                            </Button>
+                          </div>
                           {/* Taksitli Satış Bilgileri */}
                           {sale.installment && (
                             <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                               <div className="flex justify-between items-center mb-4">
                                 <h3 className="font-semibold">Taksitli Satış Bilgileri</h3>
-                                {sale.installment.status === 'active' && sale.installment.remaining_balance > 0 && (
-                                  <Badge variant="outline" className="bg-orange-100 text-orange-800">
-                                    Kalan Borç: {formatCurrency(sale.installment.remaining_balance)}
-                                  </Badge>
-                                )}
-                                {sale.installment.status === 'completed' && (
-                                  <Badge variant="outline" className="bg-green-100 text-green-800">
-                                    Tamamlandı
-                                  </Badge>
-                                )}
+                                <div className="flex items-center gap-2">
+                                  {sale.installment.status === 'active' && sale.installment.remaining_balance > 0 && (
+                                    <>
+                                      <Badge variant="outline" className="bg-orange-100 text-orange-800">
+                                        Kalan Borç: {formatCurrency(sale.installment.remaining_balance)}
+                                      </Badge>
+                                      {sale.installment_sale_id && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={async () => {
+                                            try {
+                                              await api.post(`/installments/${sale.installment_sale_id}/send-reminder`, {
+                                                send_email: true,
+                                                send_sms: false,
+                                              });
+                                              toast({
+                                                title: "Başarılı",
+                                                description: "Hatırlatma gönderildi",
+                                              });
+                                            } catch (error: any) {
+                                              toast({
+                                                title: "Hata",
+                                                description: error?.response?.data?.error || "Hatırlatma gönderilemedi",
+                                                variant: "destructive",
+                                              });
+                                            }
+                                          }}
+                                          className="rounded-xl border-[#F0A500] text-[#F0A500] hover:bg-[#F0A500] hover:text-white"
+                                        >
+                                          <Bell className="h-4 w-4 mr-2" />
+                                          Hatırlatma Gönder
+                                        </Button>
+                                      )}
+                                    </>
+                                  )}
+                                  {sale.installment.status === 'completed' && (
+                                    <Badge variant="outline" className="bg-green-100 text-green-800">
+                                      Tamamlandı
+                                    </Badge>
+                                  )}
+                                </div>
                               </div>
                               <div className="grid grid-cols-2 gap-4 mb-4">
                                 <div><strong>Toplam Satış Fiyatı:</strong> {formatCurrency(sale.installment.total_amount)}</div>
@@ -567,6 +679,99 @@ const CustomerDetails: React.FC = () => {
                     <div className="text-center py-8">
                       <Car className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                       <p className="text-gray-500">Henüz satış kaydı bulunmuyor</p>
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Quotes Tab */}
+                <TabsContent value="quotes" className="space-y-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-[#2d3748]">Müşteri Teklifleri</h3>
+                    <Button
+                      onClick={() => navigate(`/quotes`)}
+                      className="bg-[#F0A500] hover:bg-[#d89400] text-white rounded-xl"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Yeni Teklif
+                    </Button>
+                  </div>
+                  {quotes.length === 0 ? (
+                    <Card className="bg-white rounded-xl border border-[#e2e8f0]">
+                      <CardContent className="p-8 text-center">
+                        <FileText className="h-12 w-12 text-[#2d3748]/40 mx-auto mb-4" />
+                        <p className="text-[#2d3748]/60">Bu müşteri için henüz teklif oluşturulmamış.</p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-3">
+                      {quotes.map((quote) => (
+                        <Card key={quote.id} className="bg-white rounded-xl border border-[#e2e8f0] shadow-sm">
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <h4 className="font-semibold text-[#2d3748]">{quote.quote_number}</h4>
+                                  <Badge
+                                    className={`rounded-xl px-2 py-0.5 text-xs ${
+                                      quote.status === "approved"
+                                        ? "bg-green-600 text-white"
+                                        : quote.status === "rejected"
+                                        ? "bg-red-500 text-white"
+                                        : quote.status === "sent"
+                                        ? "bg-blue-500 text-white"
+                                        : "bg-gray-500 text-white"
+                                    }`}
+                                  >
+                                    {quote.status === "approved"
+                                      ? "Onaylandı"
+                                      : quote.status === "rejected"
+                                      ? "Reddedildi"
+                                      : quote.status === "sent"
+                                      ? "Gönderildi"
+                                      : "Taslak"}
+                                  </Badge>
+                                </div>
+                                <p className="text-sm text-[#2d3748] mb-1">
+                                  <strong>Araç:</strong> {quote.maker} {quote.model} {quote.production_year}
+                                </p>
+                                <p className="text-lg font-bold text-[#003d82] mb-1">
+                                  {formatCurrency(quote.sale_price * quote.fx_rate_to_base)}
+                                </p>
+                                <div className="flex gap-4 text-xs text-[#2d3748]/60">
+                                  <span>
+                                    <Calendar className="h-3 w-3 inline mr-1" />
+                                    {format(new Date(quote.quote_date), "dd MMM yyyy", { locale: tr })}
+                                  </span>
+                                  <span>
+                                    Geçerlilik: {format(new Date(quote.valid_until), "dd MMM yyyy", { locale: tr })}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => navigate(`/quotes`)}
+                                  className="rounded-xl"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                {quote.status === "approved" && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => navigate(`/quotes`)}
+                                    className="rounded-xl text-green-600 hover:text-green-700"
+                                    title="Satışa Dönüştür"
+                                  >
+                                    <ArrowRight className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
                     </div>
                   )}
                 </TabsContent>

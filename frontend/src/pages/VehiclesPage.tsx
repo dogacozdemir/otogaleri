@@ -21,7 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Plus, Search, Edit, Trash2, 
   Calculator, CheckCircle, XCircle, Image as ImageIcon, FileDown, List, Grid3x3, Eye,
-  FileText, Upload, AlertCircle
+  FileText, Upload, AlertCircle, FileSpreadsheet, MessageSquare
 } from "lucide-react";
 import {
   BarChart,
@@ -43,6 +43,7 @@ import VehicleImageUpload from "@/components/VehicleImageUpload";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { useCurrencyRates } from "@/contexts/CurrencyRatesContext";
 import { useTenant } from "@/contexts/TenantContext";
+import { BulkImportDialog } from "@/components/BulkImportDialog";
 
 type Vehicle = {
   id: number;
@@ -289,6 +290,7 @@ const VehiclesPage = () => {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
+  const [editModalStep, setEditModalStep] = useState(1);
   const [openDetail, setOpenDetail] = useState(false);
   const [openCost, setOpenCost] = useState(false);
   const [openEditCost, setOpenEditCost] = useState(false);
@@ -296,6 +298,23 @@ const VehiclesPage = () => {
   const [openSell, setOpenSell] = useState(false);
   const [openPayment, setOpenPayment] = useState(false);
   const [editingPaymentId, setEditingPaymentId] = useState<number | null>(null);
+  const [openBulkImport, setOpenBulkImport] = useState(false);
+  const [bulkImportType, setBulkImportType] = useState<"vehicles" | "costs">("vehicles");
+  const [openQuote, setOpenQuote] = useState(false);
+  const [quoteForm, setQuoteForm] = useState({
+    vehicle_id: "",
+    customer_id: "",
+    quote_date: new Date().toISOString().split("T")[0],
+    valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+    sale_price: "",
+    currency: "TRY",
+    down_payment: "",
+    installment_count: "",
+    installment_amount: "",
+    notes: "",
+    status: "draft" as "draft" | "sent" | "approved" | "rejected",
+  });
+  const [customers, setCustomers] = useState<any[]>([]);
   const [paymentForm, setPaymentForm] = useState({
     installment_sale_id: "",
     payment_type: "installment",
@@ -470,6 +489,77 @@ const VehiclesPage = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCustomers = async () => {
+    try {
+      const response = await api.get("/customers?limit=100");
+      setCustomers(response.data.customers || []);
+    } catch (error) {
+      console.error("Failed to fetch customers", error);
+    }
+  };
+
+  const openQuoteModal = (vehicle: Vehicle) => {
+    setSelectedVehicle(vehicle);
+    setQuoteForm({
+      vehicle_id: vehicle.id.toString(),
+      customer_id: "",
+      quote_date: new Date().toISOString().split("T")[0],
+      valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+      sale_price: vehicle.sale_price?.toString() || "",
+      currency: "TRY",
+      down_payment: "",
+      installment_count: "",
+      installment_amount: "",
+      notes: "",
+      status: "draft",
+    });
+    fetchCustomers();
+    setOpenQuote(true);
+  };
+
+  const handleCreateQuote = async () => {
+    if (!quoteForm.vehicle_id || !quoteForm.sale_price) {
+      toast({
+        title: "Uyarı",
+        description: "Araç ve satış fiyatı zorunludur.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const payload = {
+        ...quoteForm,
+        customer_id: quoteForm.customer_id === "none" || !quoteForm.customer_id ? "" : quoteForm.customer_id,
+      };
+      await api.post("/quotes", payload);
+      toast({
+        title: "Başarılı",
+        description: "Teklif oluşturuldu.",
+      });
+      setOpenQuote(false);
+      setQuoteForm({
+        vehicle_id: "",
+        customer_id: "",
+        quote_date: new Date().toISOString().split("T")[0],
+        valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+        sale_price: "",
+        currency: "TRY",
+        down_payment: "",
+        installment_count: "",
+        installment_amount: "",
+        notes: "",
+        status: "draft",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Hata",
+        description: error?.response?.data?.error || "Teklif oluşturulamadı.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -749,6 +839,7 @@ const VehiclesPage = () => {
       await api.put(`/vehicles/${selectedVehicle.id}`, payload);
       toast({ title: "Başarılı", description: "Araç güncellendi." });
       setOpenEdit(false);
+      setEditModalStep(1);
       resetVehicleForm();
       fetchVehicles();
     } catch (e: any) {
@@ -802,6 +893,7 @@ const VehiclesPage = () => {
 
   const openEditModal = (vehicle: Vehicle) => {
     setSelectedVehicle(vehicle);
+    setEditModalStep(1);
     
     // Features'ı parse et
     let featuresObj: Record<string, boolean> = {};
@@ -1287,11 +1379,33 @@ const VehiclesPage = () => {
 
         <TabsContent value="vehicles" className="space-y-6">
       {/* Vehicles Table/List */}
-      <Card>
+      <Card className="bg-white rounded-xl border border-[#e2e8f0] shadow-md">
         <CardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle>Araç Listesi</CardTitle>
+            <CardTitle className="text-[#2d3748]">Araç Listesi</CardTitle>
             <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setBulkImportType("vehicles");
+                  setOpenBulkImport(true);
+                }}
+                className="rounded-xl border-[#003d82] text-[#003d82] hover:bg-[#003d82] hover:text-white"
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Toplu İçe Aktar
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setBulkImportType("costs");
+                  setOpenBulkImport(true);
+                }}
+                className="rounded-xl border-[#003d82] text-[#003d82] hover:bg-[#003d82] hover:text-white"
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Masraf İçe Aktar
+              </Button>
               <Dialog open={openAdd} onOpenChange={(open) => {
                 setOpenAdd(open);
                 if (!open) {
@@ -1302,11 +1416,14 @@ const VehiclesPage = () => {
                 }
               }}>
                 <DialogTrigger asChild>
-                  <Button onClick={() => {
-                    resetVehicleForm();
-                    setAddModalStep(1);
-                    setFormErrors({});
-                  }}>
+                  <Button 
+                    onClick={() => {
+                      resetVehicleForm();
+                      setAddModalStep(1);
+                      setFormErrors({});
+                    }}
+                    className="bg-[#F0A500] hover:bg-[#d89400] text-white shadow-md hover:shadow-lg rounded-xl"
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Yeni Araç Ekle
                   </Button>
@@ -1656,63 +1773,69 @@ const VehiclesPage = () => {
         </CardHeader>
         <CardContent>
           {viewMode === 'table' ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Araç No</TableHead>
-                <TableHead>Marka/Model</TableHead>
-                <TableHead>Yıl</TableHead>
-                <TableHead>Şasi No</TableHead>
-                <TableHead>Satış Fiyatı</TableHead>
-                <TableHead>Toplam Maliyet</TableHead>
-                <TableHead>Durum</TableHead>
-                <TableHead>İşlemler</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center">Yükleniyor...</TableCell>
+          <div className="rounded-xl overflow-hidden border border-[#e2e8f0]">
+            <Table className="table-zebra">
+              <TableHeader className="bg-[#f8f9fa] sticky top-0 z-10">
+                <TableRow className="border-b border-[#e2e8f0] hover:bg-transparent">
+                  <TableHead className="text-[#2d3748] font-semibold">Araç No</TableHead>
+                  <TableHead className="text-[#2d3748] font-semibold">Marka/Model</TableHead>
+                  <TableHead className="text-[#2d3748] font-semibold">Yıl</TableHead>
+                  <TableHead className="text-[#2d3748] font-semibold">Şasi No</TableHead>
+                  <TableHead className="text-[#2d3748] font-semibold">Satış Fiyatı</TableHead>
+                  <TableHead className="text-[#2d3748] font-semibold">Toplam Maliyet</TableHead>
+                  <TableHead className="text-[#2d3748] font-semibold">Durum</TableHead>
+                  <TableHead className="text-[#2d3748] font-semibold">İşlemler</TableHead>
                 </TableRow>
-              ) : filteredVehicles.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center">Araç bulunamadı.</TableCell>
-                </TableRow>
-              ) : (
-                filteredVehicles.map((vehicle) => (
-                  <TableRow key={vehicle.id}>
-                    <TableCell>{vehicle.vehicle_number || "-"}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        {vehicle.primary_image_url ? (
-                          <img
-                            src={vehicle.primary_image_url.startsWith('http') 
-                              ? vehicle.primary_image_url 
-                              : vehicle.primary_image_url.startsWith('/uploads')
-                              ? `${getApiBaseUrl()}${vehicle.primary_image_url}`
-                              : vehicle.primary_image_url}
-                            alt={`${vehicle.maker} ${vehicle.model}`}
-                            className="w-16 h-16 object-cover rounded"
-                            loading="lazy"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
-                        ) : (
-                          <div className="w-16 h-16 bg-muted rounded flex items-center justify-center">
-                            <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                          </div>
-                        )}
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center text-[#2d3748]">Yükleniyor...</TableCell>
+                  </TableRow>
+                ) : filteredVehicles.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center text-[#2d3748]">Araç bulunamadı.</TableCell>
+                  </TableRow>
+                ) : (
+                  filteredVehicles.map((vehicle, index) => (
+                    <TableRow 
+                      key={vehicle.id}
+                      className={`table-row-modern border-b border-[#e2e8f0] ${
+                        index % 2 === 0 ? 'bg-white' : 'bg-[#f8f9fa]'
+                      }`}
+                    >
+                      <TableCell className="text-[#2d3748]">{vehicle.vehicle_number || "-"}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          {vehicle.primary_image_url ? (
+                            <img
+                              src={vehicle.primary_image_url.startsWith('http') 
+                                ? vehicle.primary_image_url 
+                                : vehicle.primary_image_url.startsWith('/uploads')
+                                ? `${getApiBaseUrl()}${vehicle.primary_image_url}`
+                                : vehicle.primary_image_url}
+                              alt={`${vehicle.maker} ${vehicle.model}`}
+                              className="w-[60px] h-[40px] object-cover rounded-xl border border-[#e2e8f0] shadow-sm"
+                              loading="lazy"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <div className="w-[60px] h-[40px] bg-[#f8f9fa] rounded-xl border border-[#e2e8f0] flex items-center justify-center">
+                              <ImageIcon className="h-5 w-5 text-[#2d3748]/40" />
+                            </div>
+                          )}
                         <div>
-                          <div className="font-medium flex items-center gap-2">
+                          <div className="font-medium flex items-center gap-2 text-[#2d3748]">
                             {vehicle.maker || "-"} {vehicle.model || ""}
                             {(() => {
                               const overdueDays = getInstallmentOverdueDays(vehicle);
                               if (overdueDays !== null) {
                                 return (
                                   <div className="relative group">
-                                    <AlertCircle className="h-4 w-4 text-orange-500" />
-                                    <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-50">
+                                    <AlertCircle className="h-4 w-4 text-[#F0A500]" />
+                                    <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block bg-[#2d3748] text-white text-xs rounded-xl py-1 px-2 whitespace-nowrap z-50 shadow-lg">
                                       Son taksit ödemesinin üzerinden {overdueDays} gün geçti.
                                     </div>
                                   </div>
@@ -1722,17 +1845,17 @@ const VehiclesPage = () => {
                             })()}
                           </div>
                           {vehicle.chassis_no && (
-                            <div className="text-sm text-muted-foreground">
+                            <div className="text-sm text-[#2d3748]/60">
                               {vehicle.chassis_no}
                             </div>
                           )}
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>{vehicle.production_year || "-"}</TableCell>
-                    <TableCell>{vehicle.chassis_no || "-"}</TableCell>
-                    <TableCell>{currency(vehicle.sale_price)}</TableCell>
-                    <TableCell>{currency(vehicle.total_costs)}</TableCell>
+                    <TableCell className="text-[#2d3748]">{vehicle.production_year || "-"}</TableCell>
+                    <TableCell className="text-[#2d3748]">{vehicle.chassis_no || "-"}</TableCell>
+                    <TableCell className="text-[#2d3748] font-medium">{currency(vehicle.sale_price)}</TableCell>
+                    <TableCell className="text-[#2d3748] font-medium">{currency(vehicle.total_costs)}</TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1">
                         {(() => {
@@ -1741,17 +1864,17 @@ const VehiclesPage = () => {
                             if (status.isInstallment) {
                               return (
                                 <>
-                                  <Badge variant="default" className="bg-green-500">
+                                  <Badge className="bg-green-600 text-white rounded-xl px-2 py-0.5 text-xs">
                                     <CheckCircle className="h-3 w-3 mr-1" />
                                     Taksitle Satıldı
                                   </Badge>
                                   {status.isOverdue ? (
-                                    <Badge variant="destructive" className="flex items-center gap-1">
+                                    <Badge className="bg-red-500 text-white rounded-xl px-2 py-0.5 text-xs flex items-center gap-1">
                                       <AlertCircle className="h-3 w-3" />
                                       Gecikmiş Taksit
                                     </Badge>
                                   ) : (
-                                    <Badge variant="outline" className="bg-orange-100 text-orange-800">
+                                    <Badge className="bg-[#F0A500] text-white rounded-xl px-2 py-0.5 text-xs">
                                       {status.paidCount}/{status.totalCount}
                                     </Badge>
                                   )}
@@ -1759,7 +1882,7 @@ const VehiclesPage = () => {
                               );
                             } else {
                               return (
-                                <Badge variant="default" className="bg-green-500">
+                                <Badge className="bg-green-600 text-white rounded-xl px-2 py-0.5 text-xs">
                                   <CheckCircle className="h-3 w-3 mr-1" />
                                   Satıldı
                                 </Badge>
@@ -1767,22 +1890,21 @@ const VehiclesPage = () => {
                             }
                           } else {
                             return (
-                              <Badge variant="secondary">
+                              <Badge className="bg-[#003d82] text-white rounded-xl px-2 py-0.5 text-xs">
                                 <XCircle className="h-3 w-3 mr-1" />
-                                Satılmadı
+                                Stokta
                               </Badge>
                             );
                           }
                         })()}
                         {vehicle.stock_status && !getInstallmentStatus(vehicle).isInstallment && (
                           <Badge 
-                            variant="outline" 
-                            className={
-                              vehicle.stock_status === 'sold' ? 'bg-green-100 text-green-800' :
-                              vehicle.stock_status === 'on_sale' ? 'bg-blue-100 text-blue-800' :
-                              vehicle.stock_status === 'reserved' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-gray-100 text-gray-800'
-                            }
+                            className={`rounded-xl px-2 py-0.5 text-xs ${
+                              vehicle.stock_status === 'sold' ? 'bg-green-600 text-white' :
+                              vehicle.stock_status === 'on_sale' ? 'bg-[#003d82] text-white' :
+                              vehicle.stock_status === 'reserved' ? 'bg-[#F0A500] text-white' :
+                              'bg-[#003d82] text-white'
+                            }`}
                           >
                             {vehicle.stock_status === 'in_stock' ? 'Stokta' :
                              vehicle.stock_status === 'on_sale' ? 'Satışta' :
@@ -1791,7 +1913,7 @@ const VehiclesPage = () => {
                           </Badge>
                         )}
                         {vehicle.location && (
-                          <span className="text-xs text-muted-foreground">{vehicle.location}</span>
+                          <span className="text-xs text-[#2d3748]/60">{vehicle.location}</span>
                         )}
                       </div>
                     </TableCell>
@@ -1811,13 +1933,24 @@ const VehiclesPage = () => {
                               variant="ghost"
                               size="sm"
                               onClick={() => openEditModal(vehicle)}
+                              title="Düzenle"
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
+                              onClick={() => openQuoteModal(vehicle)}
+                              title="Teklif Oluştur"
+                              className="text-[#F0A500] hover:text-[#d89400]"
+                            >
+                              <FileText className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => openSellModal(vehicle)}
+                              title="Sat"
                             >
                               <CheckCircle className="h-4 w-4" />
                             </Button>
@@ -1827,6 +1960,7 @@ const VehiclesPage = () => {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleDeleteVehicle(vehicle.id)}
+                          title="Sil"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -1835,8 +1969,9 @@ const VehiclesPage = () => {
                   </TableRow>
                 ))
               )}
-            </TableBody>
-          </Table>
+              </TableBody>
+            </Table>
+          </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {loading ? (
@@ -2589,220 +2724,339 @@ const VehiclesPage = () => {
       </Dialog>
 
       {/* Edit Modal */}
-      <Dialog open={openEdit} onOpenChange={setOpenEdit}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={openEdit} onOpenChange={(open) => {
+        setOpenEdit(open);
+        if (!open) {
+          setEditModalStep(1);
+          setFormErrors({});
+        } else {
+          setFormErrors({});
+        }
+      }}>
+        <DialogContent 
+          className="max-w-4xl max-h-[90vh] overflow-y-auto"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !isSubmitting) {
+              e.preventDefault();
+              if (editModalStep === 1) {
+                setEditModalStep(2);
+              } else {
+                handleEditVehicle();
+              }
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle>Araç Düzenle</DialogTitle>
             <DialogDescription>
-              Tüm alanlar opsiyoneldir, istediğiniz bilgileri güncelleyebilirsiniz.
+              Araç bilgilerini iki adımda güncelleyin. İlk adımda temel bilgiler, ikinci adımda satış ve durum bilgileri.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 mt-4">
-            <div>
-              <label className="text-sm font-medium">Araç No</label>
-              <Input
-                type="number"
-                value={vehicleForm.vehicle_number}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, vehicle_number: e.target.value })}
-                placeholder="Araç No"
-              />
+          {/* Step Indicator */}
+          <div className="mt-4 mb-6 px-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center flex-1">
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300 shadow-sm ${
+                  editModalStep >= 1 
+                    ? 'bg-primary text-primary-foreground border-primary shadow-md scale-105' 
+                    : 'bg-muted border-muted-foreground/20 text-muted-foreground'
+                }`}>
+                  {editModalStep > 1 ? (
+                    <CheckCircle className="h-5 w-5" />
+                  ) : (
+                    <span className="text-sm font-bold">1</span>
+                  )}
+                </div>
+                <div className={`flex-1 h-1.5 mx-3 rounded-full transition-all duration-500 ${
+                  editModalStep > 1 ? 'bg-primary shadow-sm' : 'bg-muted'
+                }`} />
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300 shadow-sm ${
+                  editModalStep >= 2 
+                    ? 'bg-primary text-primary-foreground border-primary shadow-md scale-105' 
+                    : 'bg-muted border-muted-foreground/20 text-muted-foreground'
+                }`}>
+                  <span className="text-sm font-bold">2</span>
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="text-sm font-medium">Marka</label>
-              <Input
-                value={vehicleForm.maker}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, maker: e.target.value })}
-                placeholder="Örn: Toyota"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Model</label>
-              <Input
-                value={vehicleForm.model}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, model: e.target.value })}
-                placeholder="Örn: Corolla"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Üretim Yılı</label>
-              <Input
-                type="number"
-                value={vehicleForm.production_year}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, production_year: e.target.value })}
-                placeholder="Örn: 2023"
-                min="1900"
-                max={new Date().getFullYear() + 1}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Bayiye Geliş Tarihi</label>
-              <Input
-                type="date"
-                value={vehicleForm.arrival_date}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, arrival_date: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Vites</label>
-              <Input
-                value={vehicleForm.transmission}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, transmission: e.target.value })}
-                placeholder="Örn: Otomatik"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Şasi No</label>
-              <Input
-                value={vehicleForm.chassis_no}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, chassis_no: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Plaka</label>
-              <Input
-                value={vehicleForm.plate_number}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, plate_number: e.target.value })}
-                placeholder="Örn: 34ABC123"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Km</label>
-              <Input
-                type="number"
-                value={vehicleForm.km}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, km: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Yakıt</label>
-              <Input
-                value={vehicleForm.fuel}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, fuel: e.target.value })}
-                placeholder="Örn: Benzin"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Sınıf</label>
-              <Input
-                value={vehicleForm.grade}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, grade: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">CC</label>
-              <Input
-                type="number"
-                value={vehicleForm.cc}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, cc: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Renk</label>
-              <Input
-                value={vehicleForm.color}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, color: e.target.value })}
-              />
-            </div>
-            <div className="col-span-2">
-              <label className="text-sm font-medium">Diğer</label>
-              <Input
-                value={vehicleForm.other}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, other: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Önerilen Satış Fiyatı</label>
-              <Input
-                type="number"
-                step="0.01"
-                value={vehicleForm.sale_price}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, sale_price: e.target.value })}
-                placeholder="Önerilen satış fiyatı (opsiyonel)"
-              />
-            </div>
-            <div className="col-span-2">
-              <label className="text-sm font-medium">Alış Fiyatı</label>
-              <CurrencyInput
-                  value={vehicleForm.paid}
-                currency={vehicleForm.purchase_currency}
-                onValueChange={(value) => setVehicleForm({ ...vehicleForm, paid: value })}
-                onCurrencyChange={(value) => setVehicleForm({ ...vehicleForm, purchase_currency: value })}
-                currencies={currencies.map(c => ({ value: c.value, label: c.label }))}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Teslimat Tarihi</label>
-              <Input
-                type="date"
-                value={vehicleForm.delivery_date}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, delivery_date: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Teslimat Saati</label>
-              <Input
-                type="time"
-                value={vehicleForm.delivery_time}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, delivery_time: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Araç Durumu</label>
-              <Select
-                value={vehicleForm.status || "used"}
-                onValueChange={(value) => setVehicleForm({ ...vehicleForm, status: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Araç durumu seçin" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="new">Sıfır</SelectItem>
-                  <SelectItem value="used">İkinci El</SelectItem>
-                  <SelectItem value="damaged">Hasarlı</SelectItem>
-                  <SelectItem value="repaired">Onarılmış</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Stok Durumu</label>
-              <Select
-                value={vehicleForm.stock_status || "in_stock"}
-                onValueChange={(value) => setVehicleForm({ ...vehicleForm, stock_status: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Stok durumu seçin" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="in_stock">Stokta</SelectItem>
-                  <SelectItem value="on_sale">Satışta</SelectItem>
-                  <SelectItem value="reserved">Rezerve</SelectItem>
-                  <SelectItem value="sold">Satıldı</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Lokasyon</label>
-              <Input
-                value={vehicleForm.location}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, location: e.target.value })}
-                placeholder="Örn: Şube A, Park Yeri 5"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Hedef Kar (Opsiyonel)</label>
-              <Input
-                type="number"
-                step="0.01"
-                value={vehicleForm.target_profit}
-                onChange={(e) => setVehicleForm({ ...vehicleForm, target_profit: e.target.value })}
-                placeholder="Hedef kar tutarı"
-              />
+            <div className="flex justify-between mt-3 px-1">
+              <span className={`text-xs font-semibold transition-colors ${
+                editModalStep === 1 ? 'text-foreground' : 'text-muted-foreground'
+              }`}>
+                Araç Bilgileri
+              </span>
+              <span className={`text-xs font-semibold transition-colors ${
+                editModalStep === 2 ? 'text-foreground' : 'text-muted-foreground'
+              }`}>
+                Satış ve Durum
+              </span>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpenEdit(false)}>İptal</Button>
-            <Button onClick={handleEditVehicle}>Kaydet</Button>
-          </DialogFooter>
+          
+          <div className="transition-all duration-300 ease-in-out">
+          {editModalStep === 1 ? (
+            // Adım 1: Araç Bilgileri
+            <div className="mt-4 animate-in fade-in slide-in-from-right-4">
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Araç No</label>
+                  <Input
+                    type="number"
+                    value={vehicleForm.vehicle_number}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, vehicle_number: e.target.value })}
+                    placeholder="Otomatik"
+                    className="h-8"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Marka</label>
+                  <Input
+                    value={vehicleForm.maker}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, maker: e.target.value })}
+                    placeholder="Örn: Toyota"
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Model</label>
+                  <Input
+                    value={vehicleForm.model}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, model: e.target.value })}
+                    placeholder="Örn: Corolla"
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Üretim Yılı</label>
+                  <Input
+                    type="number"
+                    value={vehicleForm.production_year}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, production_year: e.target.value })}
+                    placeholder="Örn: 2023"
+                    min="1900"
+                    max={new Date().getFullYear() + 1}
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Bayiye Geliş Tarihi</label>
+                  <Input
+                    type="date"
+                    value={vehicleForm.arrival_date}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, arrival_date: e.target.value })}
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Vites</label>
+                  <Input
+                    value={vehicleForm.transmission}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, transmission: e.target.value })}
+                    placeholder="Örn: Otomatik"
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Şasi No</label>
+                  <Input
+                    value={vehicleForm.chassis_no}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, chassis_no: e.target.value })}
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Plaka</label>
+                  <Input
+                    value={vehicleForm.plate_number}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, plate_number: e.target.value })}
+                    placeholder="Örn: 34ABC123"
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Km</label>
+                  <Input
+                    type="number"
+                    value={vehicleForm.km}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, km: e.target.value })}
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Yakıt</label>
+                  <Input
+                    value={vehicleForm.fuel}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, fuel: e.target.value })}
+                    placeholder="Örn: Benzin"
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Sınıf</label>
+                  <Input
+                    value={vehicleForm.grade}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, grade: e.target.value })}
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">CC</label>
+                  <Input
+                    type="number"
+                    value={vehicleForm.cc}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, cc: e.target.value })}
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Renk</label>
+                  <Input
+                    value={vehicleForm.color}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, color: e.target.value })}
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Diğer</label>
+                  <Input
+                    value={vehicleForm.other}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, other: e.target.value })}
+                    className="h-8"
+                  />
+                </div>
+              </div>
+              <DialogFooter className="mt-4">
+                <Button onClick={() => setEditModalStep(2)}>İleri</Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            // Adım 2: Satış ve Durum Bilgileri
+            <div className="mt-4 animate-in fade-in slide-in-from-left-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Önerilen Satış Fiyatı</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={vehicleForm.sale_price}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, sale_price: e.target.value })}
+                    placeholder="Önerilen satış fiyatı (opsiyonel)"
+                    className="h-8"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Alış Fiyatı</label>
+                  <CurrencyInput
+                    value={vehicleForm.paid}
+                    currency={vehicleForm.purchase_currency}
+                    onValueChange={(value) => setVehicleForm({ ...vehicleForm, paid: value })}
+                    onCurrencyChange={(value) => setVehicleForm({ ...vehicleForm, purchase_currency: value })}
+                    className="h-8"
+                    currencies={currencies.map(c => ({ value: c.value, label: c.label }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Teslimat Tarihi</label>
+                  <Input
+                    type="date"
+                    value={vehicleForm.delivery_date}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, delivery_date: e.target.value })}
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Teslimat Saati</label>
+                  <Input
+                    type="time"
+                    value={vehicleForm.delivery_time}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, delivery_time: e.target.value })}
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Araç Durumu</label>
+                  <Select
+                    value={vehicleForm.status || "used"}
+                    onValueChange={(value) => setVehicleForm({ ...vehicleForm, status: value })}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Araç durumu seçin" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new">Sıfır</SelectItem>
+                      <SelectItem value="used">İkinci El</SelectItem>
+                      <SelectItem value="damaged">Hasarlı</SelectItem>
+                      <SelectItem value="repaired">Onarılmış</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Stok Durumu</label>
+                  <Select
+                    value={vehicleForm.stock_status || "in_stock"}
+                    onValueChange={(value) => setVehicleForm({ ...vehicleForm, stock_status: value })}
+                  >
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="Stok durumu seçin" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="in_stock">Stokta</SelectItem>
+                      <SelectItem value="on_sale">Satışta</SelectItem>
+                      <SelectItem value="reserved">Rezerve</SelectItem>
+                      <SelectItem value="sold">Satıldı</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Lokasyon</label>
+                  <Input
+                    value={vehicleForm.location}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, location: e.target.value })}
+                    placeholder="Örn: Şube A, Park Yeri 5"
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Hedef Kar (Opsiyonel)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={vehicleForm.target_profit}
+                    onChange={(e) => setVehicleForm({ ...vehicleForm, target_profit: e.target.value })}
+                    placeholder="Hedef kar tutarı"
+                    className="h-8"
+                  />
+                </div>
+              </div>
+              <DialogFooter className="mt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setEditModalStep(1);
+                    setFormErrors({});
+                  }}
+                  disabled={isSubmitting}
+                >
+                  Geri
+                </Button>
+                <Button 
+                  onClick={handleEditVehicle}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <span className="mr-2">Yükleniyor...</span>
+                    </>
+                  ) : (
+                    "Kaydet"
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -3666,8 +3920,170 @@ const VehiclesPage = () => {
           </Card>
         </TabsContent>
 
-      </Tabs>
+        </Tabs>
       </div>
+
+      {/* Bulk Import Dialog */}
+      <BulkImportDialog
+        open={openBulkImport}
+        onOpenChange={setOpenBulkImport}
+        importType={bulkImportType}
+        onSuccess={() => {
+          fetchVehicles();
+        }}
+      />
+
+      {/* Quote Dialog */}
+      <Dialog open={openQuote} onOpenChange={setOpenQuote}>
+        <DialogContent className="max-w-2xl bg-white rounded-xl border border-[#e2e8f0]">
+          <DialogHeader>
+            <DialogTitle className="text-[#2d3748]">Yeni Teklif Oluştur</DialogTitle>
+            <DialogDescription className="text-[#2d3748]/70">
+              {selectedVehicle && `${selectedVehicle.maker} ${selectedVehicle.model} ${selectedVehicle.production_year}`} için teklif oluşturun
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-[#2d3748] mb-2 block">
+                  Araç <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  value={selectedVehicle ? `${selectedVehicle.maker} ${selectedVehicle.model} ${selectedVehicle.production_year} - #${selectedVehicle.vehicle_number}` : ""}
+                  disabled
+                  className="rounded-xl bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-[#2d3748] mb-2 block">Müşteri</label>
+                <Select
+                  value={quoteForm.customer_id || "none"}
+                  onValueChange={(value) => setQuoteForm({ ...quoteForm, customer_id: value === "none" ? "" : value })}
+                >
+                  <SelectTrigger className="rounded-xl">
+                    <SelectValue placeholder="Müşteri seçin (opsiyonel)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Müşteri seçilmedi</SelectItem>
+                    {customers.map((customer) => (
+                      <SelectItem key={customer.id} value={customer.id.toString()}>
+                        {customer.name} {customer.phone && `- ${customer.phone}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-[#2d3748] mb-2 block">
+                  Teklif Tarihi <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="date"
+                  value={quoteForm.quote_date}
+                  onChange={(e) => setQuoteForm({ ...quoteForm, quote_date: e.target.value })}
+                  className="rounded-xl"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-[#2d3748] mb-2 block">
+                  Geçerlilik Tarihi <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="date"
+                  value={quoteForm.valid_until}
+                  onChange={(e) => setQuoteForm({ ...quoteForm, valid_until: e.target.value })}
+                  className="rounded-xl"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-[#2d3748] mb-2 block">
+                  Satış Fiyatı <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="number"
+                  value={quoteForm.sale_price}
+                  onChange={(e) => setQuoteForm({ ...quoteForm, sale_price: e.target.value })}
+                  placeholder="0.00"
+                  className="rounded-xl"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-[#2d3748] mb-2 block">Para Birimi</label>
+                <Select
+                  value={quoteForm.currency}
+                  onValueChange={(value) => setQuoteForm({ ...quoteForm, currency: value })}
+                >
+                  <SelectTrigger className="rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="TRY">TRY</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
+                    <SelectItem value="GBP">GBP</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="text-sm font-medium text-[#2d3748] mb-2 block">Peşinat</label>
+                <Input
+                  type="number"
+                  value={quoteForm.down_payment}
+                  onChange={(e) => setQuoteForm({ ...quoteForm, down_payment: e.target.value })}
+                  placeholder="0.00"
+                  className="rounded-xl"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-[#2d3748] mb-2 block">Taksit Sayısı</label>
+                <Input
+                  type="number"
+                  value={quoteForm.installment_count}
+                  onChange={(e) => setQuoteForm({ ...quoteForm, installment_count: e.target.value })}
+                  placeholder="0"
+                  className="rounded-xl"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-[#2d3748] mb-2 block">Taksit Tutarı</label>
+                <Input
+                  type="number"
+                  value={quoteForm.installment_amount}
+                  onChange={(e) => setQuoteForm({ ...quoteForm, installment_amount: e.target.value })}
+                  placeholder="0.00"
+                  className="rounded-xl"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-[#2d3748] mb-2 block">Notlar</label>
+              <Input
+                value={quoteForm.notes}
+                onChange={(e) => setQuoteForm({ ...quoteForm, notes: e.target.value })}
+                placeholder="Ek notlar..."
+                className="rounded-xl"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenQuote(false)} className="rounded-xl">
+              İptal
+            </Button>
+            <Button
+              onClick={handleCreateQuote}
+              className="bg-[#003d82] hover:bg-[#0052a3] text-white rounded-xl"
+            >
+              Oluştur
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
