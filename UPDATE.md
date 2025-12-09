@@ -213,20 +213,46 @@ LIMIT 20;"
 
 ## Sorun Giderme
 
-### Backend Başlamıyor
+### Backend Başlamıyor veya "Connection Refused" Hatası
+
+Eğer Nginx loglarında "Connection refused" hatası görüyorsanız (port 5005'e bağlanamıyor):
 
 ```bash
-# PM2 loglarını kontrol et
-pm2 logs otogaleri-backend
+# 1. PM2'de backend çalışıyor mu kontrol et
+pm2 list
 
-# Port'un kullanılabilir olduğunu kontrol et
+# 2. Eğer çalışmıyorsa, PM2 loglarını kontrol et
+pm2 logs otogaleri-backend --lines 50
+
+# 3. Port'un kullanılabilir olduğunu kontrol et
 netstat -tulpn | grep 5005
+# veya
+sudo lsof -i :5005
 
-# .env dosyasını kontrol et
+# 4. Backend'i başlat (eğer PM2'de yoksa)
+cd /home/cloudpanel/htdocs/otogaleri/backend
+pm2 start dist/server.js --name otogaleri-backend
+
+# 5. Eğer PM2'de varsa ama çalışmıyorsa, restart et
+pm2 restart otogaleri-backend
+
+# 6. .env dosyasını kontrol et
 cat backend/.env
 
-# Backend'i manuel restart et
+# 7. Backend'in manuel olarak çalıştığını test et
 cd /home/cloudpanel/htdocs/otogaleri/backend
+node dist/server.js
+# (Ctrl+C ile çıkın, sonra PM2 ile başlatın)
+
+# 8. PM2'yi sistem başlangıcında başlat (eğer yapmadıysanız)
+pm2 startup
+pm2 save
+```
+
+**ÖNEMLİ:** Build sonrası mutlaka backend'i restart edin:
+```bash
+cd /home/cloudpanel/htdocs/otogaleri/backend
+npm run build
 pm2 restart otogaleri-backend
 ```
 
@@ -430,7 +456,14 @@ npm run build
 # 6. Backend restart
 cd ../backend
 echo "Backend restart ediliyor..."
-pm2 restart otogaleri-backend
+# Önce backend'in çalışıp çalışmadığını kontrol et
+if pm2 list | grep -q "otogaleri-backend"; then
+  pm2 restart otogaleri-backend
+else
+  echo "Backend PM2'de bulunamadı, başlatılıyor..."
+  pm2 start dist/server.js --name otogaleri-backend
+  pm2 save
+fi
 
 echo "=== Update Tamamlandı ==="
 pm2 logs otogaleri-backend --lines 10
