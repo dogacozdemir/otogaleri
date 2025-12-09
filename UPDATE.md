@@ -289,6 +289,25 @@ mysql -u root -p otogaleri -e "DELETE FROM schema_migrations WHERE migration_nam
 npm run migrate
 ```
 
+### add_vehicle_number Migration Hatası
+
+Eğer `add_vehicle_number` migration'ı "Table 'temp_vehicle_numbers' doesn't exist" hatası veriyorsa:
+
+```bash
+# 1. Migration kaydını sil (tekrar çalıştırmak için)
+mysql -u root -p otogaleri -e "DELETE FROM schema_migrations WHERE migration_name = 'add_vehicle_number';"
+
+# 2. Git'ten güncellenmiş migration'ı çek
+cd /home/cloudpanel/htdocs/otogaleri
+git pull origin main
+
+# 3. Migration'ı tekrar çalıştır
+cd backend
+npm run migrate
+```
+
+**Not:** Migration artık güvenli hale getirildi ve `IF EXISTS` kontrolleri eklendi. Eğer kolon veya index zaten varsa, migration atlayacaktır.
+
 ### Backend 500 Hataları ve SQL Syntax Hataları
 
 Eğer endpoint'ler 500 hatası veriyorsa:
