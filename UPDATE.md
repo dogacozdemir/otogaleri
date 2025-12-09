@@ -145,12 +145,19 @@ pm2 startup
 pm2 save
 ```
 
-### 7. Nginx'i Restart Edin (Gerekirse)
+### 7. Nginx'i Restart Edin ve Cache'i Temizleyin
 
 ```bash
-sudo nginx -t  # Config'i test et
+# Nginx config'i test et
+sudo nginx -t
+
+# Nginx'i restart et (ÖNEMLİ: Build sonrası mutlaka yapın!)
 sudo systemctl restart nginx
+
+# Veya CloudPanel üzerinden restart edin
 ```
+
+**ÖNEMLİ:** Frontend build sonrası mutlaka Nginx'i restart edin, aksi halde eski dosyalar cache'lenmiş olabilir.
 
 ### 8. Test Edin
 
@@ -472,13 +479,54 @@ chmod +x update.sh
 - StaffPage'de branches API hatası düzeltildi
 - Vehicle cost düzenlemede kur yönetimi düzeltildi
 
+### Frontend Güncellenmiyor / Eski Versiyon Görünüyor
+
+Eğer frontend build yaptınız ama site hala eski versiyonu gösteriyorsa:
+
+```bash
+# 1. Build dosyalarının doğru yerde olduğunu kontrol et
+ls -la /home/cloudpanel/htdocs/otogaleri/frontend/dist/
+
+# 2. index.html dosyasının tarihini kontrol et (yeni build'den mi?)
+ls -l /home/cloudpanel/htdocs/otogaleri/frontend/dist/index.html
+
+# 3. Nginx'i mutlaka restart edin (ÖNEMLİ!)
+sudo systemctl restart nginx
+
+# 4. Nginx cache'ini temizle (eğer varsa)
+sudo rm -rf /var/cache/nginx/*
+
+# 5. Browser cache'ini temizle
+# - Chrome/Edge: Ctrl+Shift+Delete veya Ctrl+F5 (hard refresh)
+# - Firefox: Ctrl+Shift+Delete veya Ctrl+F5
+# - Safari: Cmd+Option+E
+
+# 6. Dosya izinlerini kontrol et
+sudo chown -R cloudpanel:cloudpanel /home/cloudpanel/htdocs/otogaleri/frontend/dist
+sudo chmod -R 755 /home/cloudpanel/htdocs/otogaleri/frontend/dist
+
+# 7. Nginx error loglarını kontrol et
+sudo tail -f /home/cloudpanel/logs/nginx/error.log
+
+# 8. Nginx config'in doğru olduğunu kontrol et
+# root /home/cloudpanel/htdocs/otogaleri/frontend/dist; olmalı
+sudo nginx -t
+```
+
+**En Yaygın Sorunlar:**
+1. **Nginx restart edilmemiş** - Build sonrası mutlaka `sudo systemctl restart nginx` çalıştırın
+2. **Browser cache** - Hard refresh yapın (Ctrl+F5 veya Cmd+Shift+R)
+3. **Yanlış build dizini** - `dist` klasörü doğru yerde mi kontrol edin
+4. **Dosya izinleri** - Nginx kullanıcısı dosyaları okuyabilmeli
+
 ## Önemli Notlar
 
 1. **Her zaman backup alın** migration çalıştırmadan önce
 2. **Migration'ları test ortamında test edin** production'a almadan önce
 3. **PM2 loglarını kontrol edin** restart sonrası
 4. **Migration durumunu kontrol edin** her update sonrası
-5. **Yeni endpoint'ler:**
+5. **Frontend build sonrası mutlaka Nginx'i restart edin** - Aksi halde eski dosyalar cache'lenebilir
+6. **Yeni endpoint'ler:**
    - `/api/quotes` - Teklif yönetimi
    - `/api/acl` - Yetki yönetimi
    - `/api/documents/vehicles/expiring` - Süresi dolacak belgeler
