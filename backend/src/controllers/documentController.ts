@@ -215,3 +215,25 @@ export async function getExpiringVehicleDocuments(req: AuthRequest, res: Respons
     res.status(500).json({ error: "Failed to fetch expiring documents" });
   }
 }
+
+export async function getVehicleDocuments(req: AuthRequest, res: Response) {
+  const { vehicle_id } = req.params;
+
+  if (!vehicle_id) {
+    return res.status(400).json({ error: "Vehicle ID is required" });
+  }
+
+  try {
+    const [documents] = await dbPool.query(
+      `SELECT * FROM vehicle_documents 
+       WHERE vehicle_id = ? AND tenant_id = ? 
+       ORDER BY id DESC`,
+      [vehicle_id, req.tenantId]
+    );
+
+    res.json(documents);
+  } catch (error) {
+    console.error("[document] Get vehicle documents error:", error);
+    res.status(500).json({ error: "Failed to fetch vehicle documents" });
+  }
+}

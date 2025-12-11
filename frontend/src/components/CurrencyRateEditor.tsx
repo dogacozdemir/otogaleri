@@ -58,6 +58,7 @@ export function CurrencyRateEditor({
 
     setIsLoading(true)
     try {
+      // ISO 4217 standardı: JPY kullanılır
       const from = fromCurrency === "YEN" ? "JPY" : fromCurrency
       const to = toCurrency === "YEN" ? "JPY" : toCurrency
 

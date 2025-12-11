@@ -1,3 +1,4 @@
+
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/api";
 import { Button } from "@/components/ui/button";
@@ -27,7 +28,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Plus,
   Package,
@@ -36,12 +36,17 @@ import {
   Trash2,
   Search,
   AlertTriangle,
-  Activity,
   ShoppingCart,
   Wrench,
+  TrendingUp,
+  Minus,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrency } from "@/hooks/useCurrency";
+import { useTenant } from "@/contexts/TenantContext";
+import { cn } from "@/lib/utils";
+import { Card, CardContent } from "@/components/ui/card";
+import { CurrencyInput, CURRENCIES } from "@/components/ui/currency-input";
 
 type Product = {
   id: number;
@@ -52,7 +57,9 @@ type Product = {
   current_stock: number;
   min_stock: number;
   cost_price: number | null;
+  cost_currency?: string | null;
   sale_price: number | null;
+  sale_currency?: string | null;
   sales_count: number;
   is_for_sale: boolean;
   is_for_service: boolean;
@@ -75,16 +82,20 @@ interface AnalyticsData {
 }
 
 const InventoryPage = () => {
-  const { formatCurrency: currency } = useCurrency();
+  const { formatCurrency: currency, formatCurrencyWithCurrency } = useCurrency();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
-  const [activeTab, setActiveTab] = useState("products");
+  const [activeFilter, setActiveFilter] = useState<"all" | "sale" | "service">("all");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Product | null;
     direction: "asc" | "desc";
   }>({ key: null, direction: "asc" });
+
+  const { tenant } = useTenant();
+  const baseCurrency = tenant?.default_currency || "TRY";
 
   // Add Modal state
   const [openAdd, setOpenAdd] = useState(false);
@@ -94,7 +105,9 @@ const InventoryPage = () => {
     category: "",
     unit: "adet",
     cost_price: "",
+    cost_currency: baseCurrency,
     sale_price: "",
+    sale_currency: baseCurrency,
     min_stock: "0",
     initial_stock: "0",
     is_for_sale: false,
@@ -107,6 +120,7 @@ const InventoryPage = () => {
   const [entryTarget, setEntryTarget] = useState<Product | null>(null);
   const [entryForm, setEntryForm] = useState({
     cost_price: "",
+    cost_currency: baseCurrency,
     quantity: "1",
   });
 
@@ -118,6 +132,7 @@ const InventoryPage = () => {
     quantity: "1",
     customer_id: "",
     sale_price: "",
+    sale_currency: baseCurrency,
     staff_id: "",
   });
 
@@ -201,12 +216,36 @@ const InventoryPage = () => {
     fetchStaff();
   }, []);
 
+  // Get unique categories
+  const categories = useMemo(() => {
+    const cats = Array.from(new Set(products.map(p => p.category).filter(Boolean))) as string[];
+    return ["all", ...cats];
+  }, [products]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let filteredProducts = products;
 
+    // Filter by type
+    if (activeFilter !== "all") {
+      filteredProducts = filteredProducts.filter((p) => {
+        if (activeFilter === "sale") {
+          return p.is_for_sale || (p.is_for_sale && p.is_for_service);
+        } else if (activeFilter === "service") {
+          return p.is_for_service || (p.is_for_sale && p.is_for_service);
+        }
+        return true;
+      });
+    }
+
+    // Filter by category
+    if (selectedCategory !== "all") {
+      filteredProducts = filteredProducts.filter((p) => p.category === selectedCategory);
+    }
+
+    // Filter by search query
     if (q) {
-      filteredProducts = products.filter(
+      filteredProducts = filteredProducts.filter(
         (p) =>
           p.name?.toLowerCase().includes(q) ||
           p.sku?.toLowerCase().includes(q) ||
@@ -253,7 +292,7 @@ const InventoryPage = () => {
     }
 
     return filteredProducts;
-  }, [products, query, sortConfig]);
+  }, [products, query, activeFilter, selectedCategory, sortConfig]);
 
   const handleSort = (key: keyof Product) => {
     setSortConfig((prev) => ({
@@ -269,7 +308,9 @@ const InventoryPage = () => {
       category: "",
       unit: "adet",
       cost_price: "",
+      cost_currency: baseCurrency,
       sale_price: "",
+      sale_currency: baseCurrency,
       min_stock: "0",
       initial_stock: "0",
       is_for_sale: false,
@@ -289,7 +330,9 @@ const InventoryPage = () => {
         category: addForm.category.trim(),
         unit: addForm.unit,
         cost_price: addForm.cost_price ? Number(addForm.cost_price) : null,
+        cost_currency: addForm.cost_currency || baseCurrency,
         sale_price: addForm.sale_price ? Number(addForm.sale_price) : null,
+        sale_currency: addForm.sale_currency || baseCurrency,
         min_stock: addForm.track_stock ? Number(addForm.min_stock || 0) : 0,
         initial_stock: addForm.track_stock ? Number(addForm.initial_stock || 0) : 0,
         is_for_sale: addForm.is_for_sale,
@@ -312,6 +355,7 @@ const InventoryPage = () => {
     setEntryTarget(p);
     setEntryForm({
       cost_price: p.cost_price ? String(p.cost_price) : "",
+      cost_currency: p.cost_currency || baseCurrency,
       quantity: "1",
     });
     setOpenEntry(true);
@@ -324,6 +368,7 @@ const InventoryPage = () => {
       quantity: "1",
       customer_id: "",
       sale_price: p.sale_price ? String(p.sale_price) : "",
+      sale_currency: p.sale_currency || baseCurrency,
       staff_id: "",
     });
     setOpenExit(true);
@@ -343,6 +388,7 @@ const InventoryPage = () => {
       await api.post(`/inventory/${entryTarget.id}/entry`, {
         quantity: qty,
         cost_price: costPrice,
+        cost_currency: entryForm.cost_currency || baseCurrency,
       });
       toast({ title: "Başarılı", description: "Stok girişi yapıldı." });
       setOpenEntry(false);
@@ -387,6 +433,7 @@ const InventoryPage = () => {
       if (exitForm.type === "sale") {
         payload.customer_id = Number(exitForm.customer_id);
         payload.sale_price = Number(exitForm.sale_price);
+        payload.sale_currency = exitForm.sale_currency || baseCurrency;
       }
 
       await api.post(`/inventory/${exitTarget.id}/exit`, payload);
@@ -419,635 +466,528 @@ const InventoryPage = () => {
   const getProductTypeBadge = (product: Product) => {
     if (product.is_for_sale && product.is_for_service) {
       return (
-        <Badge variant="secondary" className="status-info">
-          Satış + Servis
+        <Badge variant="secondary" className="bg-indigo-100 text-indigo-800 hover:bg-indigo-100">
+          İkisi
         </Badge>
       );
     } else if (product.is_for_sale) {
       return (
-        <Badge variant="secondary" className="status-success">
-          Sadece Satış
+        <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+          Satış
         </Badge>
       );
     } else {
       return (
-        <Badge variant="secondary" className="status-info">
-          Sadece Servis
+        <Badge variant="secondary" className="bg-purple-100 text-purple-800 hover:bg-purple-100">
+          Servis
         </Badge>
       );
     }
   };
 
+  const getStockBadge = (current: number, min: number) => {
+    const percentage = (current / min) * 100;
+    if (percentage < 50) {
+      return (
+        <Badge variant="destructive" className="gap-1">
+          <AlertTriangle className="h-3 w-3" />
+          {current}
+        </Badge>
+      );
+    } else if (percentage < 100) {
+      return (
+        <Badge variant="secondary" className="gap-1 bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+          <Minus className="h-3 w-3" />
+          {current}
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="secondary" className="gap-1 bg-green-100 text-green-800 hover:bg-green-100">
+        <TrendingUp className="h-3 w-3" />
+        {current}
+      </Badge>
+    );
+  };
+
+  const getFlowTypeBadge = (type: string) => {
+    const styles: Record<string, string> = {
+      sale: "bg-green-100 text-green-800",
+      in: "bg-blue-100 text-blue-800",
+      purchase: "bg-blue-100 text-blue-800",
+      return: "bg-red-100 text-red-800",
+      service_usage: "bg-purple-100 text-purple-800",
+      service: "bg-purple-100 text-purple-800",
+      correction: "bg-orange-100 text-orange-800",
+      out: "bg-gray-100 text-gray-800",
+    };
+    const labels: Record<string, string> = {
+      sale: "Satış",
+      in: "Alım",
+      purchase: "Alım",
+      return: "İade",
+      service_usage: "Servis",
+      service: "Servis",
+      correction: "Düzeltme",
+      out: "Çıkış",
+    };
+    return (
+      <Badge variant="secondary" className={cn("hover:bg-inherit", styles[type] || "bg-gray-100 text-gray-800")}>
+        {labels[type] || type}
+      </Badge>
+    );
+  };
+
+  const saleProducts = products.filter((p) => p.is_for_sale || (p.is_for_sale && p.is_for_service)).length;
+  const serviceProducts = products.filter((p) => p.is_for_service || (p.is_for_sale && p.is_for_service)).length;
+
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 pt-4">
-        <div className="card-professional p-6 animate-slide-up">
+    <div className="space-y-6">
+      {/* KPI Cards */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card className="p-6 rounded-2xl shadow-sm border-0">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-small text-muted-foreground font-medium mb-2">Toplam Ürün</p>
-              <p className="text-2xl font-bold">{analytics?.totalProducts || 0}</p>
-              <div className="flex items-center mt-2">
-                <Package className="w-4 h-4 text-primary mr-1" />
-                <span className="text-sm text-primary">Stokta</span>
+              <p className="text-sm font-medium text-muted-foreground">Toplam Ürün</p>
+              <h3 className="text-3xl font-bold mt-2">{analytics?.totalProducts || 0}</h3>
               </div>
+            <div className="h-12 w-12 rounded-xl bg-blue-100 flex items-center justify-center">
+              <Package className="h-6 w-6 text-blue-600" />
             </div>
-            <div className="w-14 h-14 bg-gradient-to-br from-primary/10 to-primary/20 rounded-xl flex items-center justify-center">
-              <Package className="w-7 h-7 text-primary" />
             </div>
-          </div>
-        </div>
+        </Card>
 
-        <div className="card-professional p-6 animate-slide-up">
+        <Card className="p-6 rounded-2xl shadow-sm border-0">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-small text-muted-foreground font-medium mb-2">Kritik Stok</p>
-              <p className="text-2xl font-bold">{analytics?.lowStockCount || 0}</p>
-              <div className="flex items-center mt-2">
-                <AlertTriangle className="w-4 h-4 text-destructive mr-1" />
-                <span className="text-sm text-destructive">Düşük Stok</span>
+              <p className="text-sm font-medium text-muted-foreground">Kritik Stok</p>
+              <h3 className="text-3xl font-bold mt-2 text-red-600">{analytics?.lowStockCount || 0}</h3>
               </div>
+            <div className="h-12 w-12 rounded-xl bg-red-100 flex items-center justify-center">
+              <AlertTriangle className="h-6 w-6 text-red-600" />
             </div>
-            <div className="w-14 h-14 bg-gradient-to-br from-destructive/10 to-destructive/20 rounded-xl flex items-center justify-center">
-              <AlertTriangle className="w-7 h-7 text-destructive" />
             </div>
-          </div>
-        </div>
+        </Card>
 
-        <div className="card-professional p-6 animate-slide-up">
+        <Card className="p-6 rounded-2xl shadow-sm border-0">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-small text-muted-foreground font-medium mb-2">Satış Ürünleri</p>
-              <p className="text-2xl font-bold">{analytics?.usageStats?.for_sale_count || 0}</p>
-              <div className="flex items-center mt-2">
-                <ShoppingCart className="w-4 h-4 text-success mr-1" />
-                <span className="text-sm text-success">Aktif</span>
+              <p className="text-sm font-medium text-muted-foreground">Satış Ürünleri</p>
+              <h3 className="text-3xl font-bold mt-2">{saleProducts}</h3>
               </div>
+            <div className="h-12 w-12 rounded-xl bg-green-100 flex items-center justify-center">
+              <ShoppingCart className="h-6 w-6 text-green-600" />
             </div>
-            <div className="w-14 h-14 bg-gradient-to-br from-success/10 to-success/20 rounded-xl flex items-center justify-center">
-              <ShoppingCart className="w-7 h-7 text-success" />
             </div>
-          </div>
-        </div>
+        </Card>
 
-        <div className="card-professional p-6 animate-slide-up">
+        <Card className="p-6 rounded-2xl shadow-sm border-0">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-small text-muted-foreground font-medium mb-2">Servis Ürünleri</p>
-              <p className="text-2xl font-bold">{analytics?.usageStats?.for_service_count || 0}</p>
-              <div className="flex items-center mt-2">
-                <Wrench className="w-4 h-4 text-info mr-1" />
-                <span className="text-sm text-info">Aktif</span>
+              <p className="text-sm font-medium text-muted-foreground">Servis Ürünleri</p>
+              <h3 className="text-3xl font-bold mt-2">{serviceProducts}</h3>
               </div>
+            <div className="h-12 w-12 rounded-xl bg-purple-100 flex items-center justify-center">
+              <Wrench className="h-6 w-6 text-purple-600" />
             </div>
-            <div className="w-14 h-14 bg-gradient-to-br from-info/10 to-info/20 rounded-xl flex items-center justify-center">
-              <Wrench className="w-7 h-7 text-info" />
             </div>
-          </div>
-        </div>
+        </Card>
       </div>
 
-      {/* Tabs Section */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-professional-lg">
-        <TabsList className="grid w-full grid-cols-3 bg-card border border-border rounded-xl p-1.5 shadow-sm h-auto mb-6">
-          <TabsTrigger
-            value="products"
-            className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-colors duration-200 ease-in-out min-h-[3.5rem] data-[state=active]:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 hover:bg-muted/70"
-          >
-            <Package className="w-4 h-4 mr-2" />
-            Ürünler
-          </TabsTrigger>
-          <TabsTrigger
-            value="sales"
-            className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-colors duration-200 ease-in-out min-h-[3.5rem] data-[state=active]:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 hover:bg-muted/70"
-          >
-            <ShoppingCart className="w-4 h-4 mr-2" />
-            Satış
-          </TabsTrigger>
-          <TabsTrigger
-            value="service"
-            className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-colors duration-200 ease-in-out min-h-[3.5rem] data-[state=active]:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 hover:bg-muted/70"
-          >
-            <Wrench className="w-4 h-4 mr-2" />
-            Servis
-          </TabsTrigger>
-        </TabsList>
+      {/* Filter and Action Bar */}
+      <Card className="p-4 rounded-2xl shadow-sm border-0">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center relative">
+          {/* Search Input - En Sol */}
+          <div className="relative w-full lg:w-[280px]">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="SKU, İsim, Kategori Ara..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="pl-10 rounded-xl border-0 bg-muted"
+            />
+          </div>
 
-        {/* Products Tab */}
-        <TabsContent value="products" className="space-y-6">
-          <div className="card-professional p-6">
-            <div className="pb-4 border-b border-border flex flex-row items-center justify-between">
-              <h3 className="text-heading text-primary flex items-center gap-2">
-                <Package className="h-5 w-5" /> Tüm Ürünler
-              </h3>
+          {/* Category Filter */}
+          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <SelectTrigger className="rounded-xl border-0 bg-muted w-[140px]">
+              <SelectValue placeholder="Kategori" />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map((cat) => (
+                <SelectItem key={cat} value={cat}>
+                  {cat === "all" ? "Tüm Kategoriler" : cat}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          {/* Type Filter Segments - Tam Ortada Sabit */}
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden lg:block">
+            <div className="inline-flex items-center rounded-xl bg-muted p-1">
+              <Button
+                variant={activeFilter === "all" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setActiveFilter("all")}
+                className={cn(
+                  "rounded-lg px-4",
+                  activeFilter === "all" && "bg-[#003d82] text-white shadow-sm hover:bg-[#003d82]",
+                  activeFilter !== "all" && "hover:bg-transparent text-muted-foreground",
+                )}
+              >
+                Tüm Ürünler
+              </Button>
+              <Button
+                variant={activeFilter === "sale" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setActiveFilter("sale")}
+                className={cn(
+                  "rounded-lg px-4",
+                  activeFilter === "sale" && "bg-[#003d82] text-white shadow-sm hover:bg-[#003d82]",
+                  activeFilter !== "sale" && "hover:bg-transparent text-muted-foreground",
+                )}
+              >
+                Sadece Satış
+              </Button>
+              <Button
+                variant={activeFilter === "service" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setActiveFilter("service")}
+                className={cn(
+                  "rounded-lg px-4",
+                  activeFilter === "service" && "bg-[#003d82] text-white shadow-sm hover:bg-[#003d82]",
+                  activeFilter !== "service" && "hover:bg-transparent text-muted-foreground",
+                )}
+              >
+                Sadece Servis
+              </Button>
+            </div>
+          </div>
+
+          {/* Mobile Type Filter Segments */}
+          <div className="lg:hidden">
+            <div className="inline-flex items-center rounded-xl bg-muted p-1">
+              <Button
+                variant={activeFilter === "all" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setActiveFilter("all")}
+                className={cn(
+                  "rounded-lg px-4",
+                  activeFilter === "all" && "bg-[#003d82] text-white shadow-sm hover:bg-[#003d82]",
+                  activeFilter !== "all" && "hover:bg-transparent text-muted-foreground",
+                )}
+              >
+                Tüm Ürünler
+              </Button>
+              <Button
+                variant={activeFilter === "sale" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setActiveFilter("sale")}
+                className={cn(
+                  "rounded-lg px-4",
+                  activeFilter === "sale" && "bg-[#003d82] text-white shadow-sm hover:bg-[#003d82]",
+                  activeFilter !== "sale" && "hover:bg-transparent text-muted-foreground",
+                )}
+              >
+                Sadece Satış
+              </Button>
+              <Button
+                variant={activeFilter === "service" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setActiveFilter("service")}
+                className={cn(
+                  "rounded-lg px-4",
+                  activeFilter === "service" && "bg-[#003d82] text-white shadow-sm hover:bg-[#003d82]",
+                  activeFilter !== "service" && "hover:bg-transparent text-muted-foreground",
+                )}
+              >
+                Sadece Servis
+              </Button>
+            </div>
+          </div>
+
+          {/* Add Button - Sağda */}
+          <Dialog open={openAdd} onOpenChange={setOpenAdd}>
+            <DialogTrigger asChild>
+              <Button className="gap-2 rounded-xl ml-auto" style={{ backgroundColor: "#003d82" }}>
+                <Plus className="h-4 w-4" />
+                Yeni Ürün Ekle
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-card text-card-foreground border border-border shadow-professional-xl animate-scale-in">
+              <DialogHeader>
+                <DialogTitle>Ürün Ekle</DialogTitle>
+                <DialogDescription>Stoğa yeni ürün ekleyin.</DialogDescription>
+              </DialogHeader>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="text-sm text-muted-foreground">Ürün Adı *</label>
                   <Input
-                    className="pl-8 w-56 bg-background border-border text-foreground"
-                    placeholder="Ara (isim, SKU, kategori)"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
+                    value={addForm.name}
+                    onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
+                    className="bg-background border-border text-foreground"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground">SKU (opsiyonel)</label>
+                  <Input
+                    value={addForm.sku}
+                    onChange={(e) => setAddForm({ ...addForm, sku: e.target.value })}
+                    className="bg-background border-border text-foreground"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground">Kategori</label>
+                  <Input
+                    value={addForm.category}
+                    onChange={(e) => setAddForm({ ...addForm, category: e.target.value })}
+                    className="bg-background border-border text-foreground"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground">Birim</label>
+                  <Select
+                    value={addForm.unit}
+                    onValueChange={(v) => setAddForm({ ...addForm, unit: v })}
+                  >
+                    <SelectTrigger className="bg-background border-border text-foreground">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-popover border-border">
+                      <SelectItem value="adet" className="text-foreground">
+                        adet
+                      </SelectItem>
+                      <SelectItem value="kutu" className="text-foreground">
+                        kutu
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {addForm.track_stock && (
+                  <>
+                    <div>
+                      <label className="text-sm text-muted-foreground">Min Stok</label>
+                      <Input
+                        type="number"
+                        value={addForm.min_stock}
+                        onChange={(e) => setAddForm({ ...addForm, min_stock: e.target.value })}
+                        className="bg-background border-border text-foreground"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-muted-foreground">Başlangıç Stoku</label>
+                      <Input
+                        type="number"
+                        value={addForm.initial_stock}
+                        onChange={(e) => setAddForm({ ...addForm, initial_stock: e.target.value })}
+                        className="bg-background border-border text-foreground"
+                      />
+                    </div>
+                  </>
+                )}
+                <div>
+                  <label className="text-sm text-muted-foreground">Alış Fiyatı</label>
+                  <CurrencyInput
+                    value={addForm.cost_price}
+                    currency={addForm.cost_currency || baseCurrency}
+                    onValueChange={(value) => setAddForm({ ...addForm, cost_price: value })}
+                    onCurrencyChange={(currency) => setAddForm({ ...addForm, cost_currency: currency })}
+                    currencies={CURRENCIES}
+                    className="bg-background border-border text-foreground"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground">Satış Fiyatı</label>
+                  <CurrencyInput
+                    value={addForm.sale_price}
+                    currency={addForm.sale_currency || baseCurrency}
+                    onValueChange={(value) => setAddForm({ ...addForm, sale_price: value })}
+                    onCurrencyChange={(currency) => setAddForm({ ...addForm, sale_currency: currency })}
+                    currencies={CURRENCIES}
+                    className="bg-background border-border text-foreground"
                   />
                 </div>
 
-                <Dialog open={openAdd} onOpenChange={setOpenAdd}>
-                  <DialogTrigger asChild>
-                    <Button className="flex items-center gap-2 btn-primary">
-                      <Plus className="h-4 w-4" />
-                      Ürün Ekle
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="bg-card text-card-foreground border border-border shadow-professional-xl animate-scale-in">
-                    <DialogHeader>
-                      <DialogTitle>Ürün Ekle</DialogTitle>
-                      <DialogDescription>Stoğa yeni ürün ekleyin.</DialogDescription>
-                    </DialogHeader>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="col-span-2">
-                        <label className="text-sm text-muted-foreground">Ürün Adı *</label>
-                        <Input
-                          value={addForm.name}
-                          onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
-                          className="bg-background border-border text-foreground"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-sm text-muted-foreground">SKU (opsiyonel)</label>
-                        <Input
-                          value={addForm.sku}
-                          onChange={(e) => setAddForm({ ...addForm, sku: e.target.value })}
-                          className="bg-background border-border text-foreground"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-sm text-muted-foreground">Kategori</label>
-                        <Input
-                          value={addForm.category}
-                          onChange={(e) => setAddForm({ ...addForm, category: e.target.value })}
-                          className="bg-background border-border text-foreground"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-sm text-muted-foreground">Birim</label>
-                        <Select
-                          value={addForm.unit}
-                          onValueChange={(v) => setAddForm({ ...addForm, unit: v })}
-                        >
-                          <SelectTrigger className="bg-background border-border text-foreground">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="bg-popover border-border">
-                            <SelectItem value="adet" className="text-foreground">
-                              adet
-                            </SelectItem>
-                            <SelectItem value="kutu" className="text-foreground">
-                              kutu
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {addForm.track_stock && (
-                        <>
-                          <div>
-                            <label className="text-sm text-muted-foreground">Min Stok</label>
-                            <Input
-                              type="number"
-                              value={addForm.min_stock}
-                              onChange={(e) => setAddForm({ ...addForm, min_stock: e.target.value })}
-                              className="bg-background border-border text-foreground"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-sm text-muted-foreground">Başlangıç Stoku</label>
-                            <Input
-                              type="number"
-                              value={addForm.initial_stock}
-                              onChange={(e) => setAddForm({ ...addForm, initial_stock: e.target.value })}
-                              className="bg-background border-border text-foreground"
-                            />
-                          </div>
-                        </>
-                      )}
-                      <div>
-                        <label className="text-sm text-muted-foreground">Alış Fiyatı</label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={addForm.cost_price}
-                          onChange={(e) => setAddForm({ ...addForm, cost_price: e.target.value })}
-                          className="bg-background border-border text-foreground"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-sm text-muted-foreground">Satış Fiyatı</label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={addForm.sale_price}
-                          onChange={(e) => setAddForm({ ...addForm, sale_price: e.target.value })}
-                          className="bg-background border-border text-foreground"
-                        />
-                      </div>
-
-                      <div className="col-span-2 flex flex-col gap-3">
-                        <div className="flex gap-4">
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              id="is_for_sale"
-                              checked={addForm.is_for_sale}
-                              onChange={(e) => setAddForm({ ...addForm, is_for_sale: e.target.checked })}
-                              className="rounded"
-                            />
-                            <label htmlFor="is_for_sale" className="text-sm text-muted-foreground">
-                              Satış için
-                            </label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              id="is_for_service"
-                              checked={addForm.is_for_service}
-                              onChange={(e) =>
-                                setAddForm({ ...addForm, is_for_service: e.target.checked })
-                              }
-                              className="rounded"
-                            />
-                            <label htmlFor="is_for_service" className="text-sm text-muted-foreground">
-                              Servis için
-                            </label>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-2 p-3 bg-muted/50 rounded-lg border border-border">
-                          <input
-                            type="checkbox"
-                            id="track_stock"
-                            checked={!addForm.track_stock}
-                            onChange={(e) => setAddForm({ ...addForm, track_stock: !e.target.checked })}
-                            className="rounded"
-                          />
-                          <label htmlFor="track_stock" className="text-sm font-medium text-foreground">
-                            Stok takibi yapılmasın
-                          </label>
-                          <span className="text-xs text-muted-foreground ml-2">
-                            (Servis gibi stok takibi gerektirmeyen ürünler için)
-                          </span>
-                        </div>
-                      </div>
+                <div className="col-span-2 flex flex-col gap-3">
+                  <div className="flex gap-4">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="is_for_sale"
+                        checked={addForm.is_for_sale}
+                        onChange={(e) => setAddForm({ ...addForm, is_for_sale: e.target.checked })}
+                        className="rounded"
+                      />
+                      <label htmlFor="is_for_sale" className="text-sm text-muted-foreground">
+                        Satış için
+                      </label>
                     </div>
-
-                    <DialogFooter>
-                      <Button
-                        variant="outline"
-                        onClick={() => setOpenAdd(false)}
-                        className="border-gray-600 text-muted-foreground"
-                      >
-                        İptal
-                      </Button>
-                      <Button onClick={handleAdd} className="btn-primary">
-                        Ekle
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="is_for_service"
+                        checked={addForm.is_for_service}
+                        onChange={(e) =>
+                          setAddForm({ ...addForm, is_for_service: e.target.checked })
+                        }
+                        className="rounded"
+                      />
+                      <label htmlFor="is_for_service" className="text-sm text-muted-foreground">
+                        Servis için
+                      </label>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2 p-3 bg-muted/50 rounded-lg border border-border">
+                    <input
+                      type="checkbox"
+                      id="track_stock"
+                      checked={!addForm.track_stock}
+                      onChange={(e) => setAddForm({ ...addForm, track_stock: !e.target.checked })}
+                      className="rounded"
+                    />
+                    <label htmlFor="track_stock" className="text-sm font-medium text-foreground">
+                      Stok takibi yapılmasın
+                    </label>
+                    <span className="text-xs text-muted-foreground ml-2">
+                      (Servis gibi stok takibi gerektirmeyen ürünler için)
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div className="pt-4">
-              <div className="rounded-lg border border-border">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-border">
-                      <TableHead
-                        className="text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
-                        onClick={() => handleSort("sku")}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span>SKU</span>
-                          <span className="ml-2 text-xs">
-                            {sortConfig.key === "sku" ? (sortConfig.direction === "asc" ? "↑" : "↓") : "↕"}
-                          </span>
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
-                        onClick={() => handleSort("name")}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span>Ürün</span>
-                          <span className="ml-2 text-xs">
-                            {sortConfig.key === "name" ? (sortConfig.direction === "asc" ? "↑" : "↓") : "↕"}
-                          </span>
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
-                        onClick={() => handleSort("category")}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span>Kategori</span>
-                          <span className="ml-2 text-xs">
-                            {sortConfig.key === "category"
-                              ? sortConfig.direction === "asc"
-                                ? "↑"
-                                : "↓"
-                              : "↕"}
-                          </span>
-                        </div>
-                      </TableHead>
-                      <TableHead className="text-muted-foreground">Tür</TableHead>
-                      <TableHead
-                        className="text-muted-foreground text-right cursor-pointer hover:text-foreground transition-colors"
-                        onClick={() => handleSort("current_stock")}
-                      >
-                        <div className="flex items-center justify-end">
-                          <span>Stok</span>
-                          <span className="ml-2 text-xs">
-                            {sortConfig.key === "current_stock"
-                              ? sortConfig.direction === "asc"
-                                ? "↑"
-                                : "↓"
-                              : "↕"}
-                          </span>
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="text-muted-foreground text-right cursor-pointer hover:text-foreground transition-colors"
-                        onClick={() => handleSort("min_stock")}
-                      >
-                        <div className="flex items-center justify-end">
-                          <span>Min</span>
-                          <span className="ml-2 text-xs">
-                            {sortConfig.key === "min_stock"
-                              ? sortConfig.direction === "asc"
-                                ? "↑"
-                                : "↓"
-                              : "↕"}
-                          </span>
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="text-muted-foreground text-right cursor-pointer hover:text-foreground transition-colors"
-                        onClick={() => handleSort("sales_count")}
-                      >
-                        <div className="flex items-center justify-end">
-                          <span>Satış (Toplam)</span>
-                          <span className="ml-2 text-xs">
-                            {sortConfig.key === "sales_count"
-                              ? sortConfig.direction === "asc"
-                                ? "↑"
-                                : "↓"
-                              : "↕"}
-                          </span>
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="text-muted-foreground text-right cursor-pointer hover:text-foreground transition-colors"
-                        onClick={() => handleSort("cost_price")}
-                      >
-                        <div className="flex items-center justify-end">
-                          <span>Alış</span>
-                          <span className="ml-2 text-xs">
-                            {sortConfig.key === "cost_price"
-                              ? sortConfig.direction === "asc"
-                                ? "↑"
-                                : "↓"
-                              : "↕"}
-                          </span>
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="text-muted-foreground text-right cursor-pointer hover:text-foreground transition-colors"
-                        onClick={() => handleSort("sale_price")}
-                      >
-                        <div className="flex items-center justify-end">
-                          <span>Satış</span>
-                          <span className="ml-2 text-xs">
-                            {sortConfig.key === "sale_price"
-                              ? sortConfig.direction === "asc"
-                                ? "↑"
-                                : "↓"
-                              : "↕"}
-                          </span>
-                        </div>
-                      </TableHead>
-                      <TableHead className="text-muted-foreground text-right">İşlemler</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {!loading && filtered.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                          Kayıt bulunamadı.
-                        </TableCell>
-                      </TableRow>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setOpenAdd(false)}
+                  className="border-gray-600 text-muted-foreground"
+                >
+                  İptal
+                </Button>
+                <Button onClick={handleAdd} className="btn-primary">
+                  Ekle
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </Card>
+
+      {/* Data Table */}
+      <Card className="rounded-2xl shadow-sm border-0 overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/50">
+              <TableHead className="font-semibold">Ürün Adı</TableHead>
+              <TableHead className="font-semibold">Kategori</TableHead>
+              <TableHead className="font-semibold">Türü</TableHead>
+              <TableHead className="font-semibold">SKU</TableHead>
+              <TableHead className="font-semibold">Mevcut Stok</TableHead>
+              <TableHead className="font-semibold">Min. Stok</TableHead>
+              <TableHead className="font-semibold text-right">Alış Fiyatı</TableHead>
+              <TableHead className="font-semibold text-right">Satış Fiyatı</TableHead>
+              <TableHead className="font-semibold text-right">Toplam Satış</TableHead>
+              <TableHead className="font-semibold text-center">İşlemler</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {!loading && filtered.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                  Kayıt bulunamadı.
+                </TableCell>
+              </TableRow>
+            )}
+
+            {filtered.map((p) => {
+              const trackStock = p.track_stock === true || (p.track_stock as any) === 1;
+              const low = trackStock && p.current_stock <= p.min_stock;
+              return (
+                <TableRow
+                  key={p.id}
+                  className={`${
+                    low ? "bg-red-900/20" : ""
+                  } hover:bg-muted/30 cursor-pointer transition-colors`}
+                  onClick={() => {
+                    setHistoryTarget(p);
+                    setOpenHistory(true);
+                    fetchProductHistory(p.id);
+                  }}
+                >
+                  <TableCell>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setHistoryTarget(p);
+                        setOpenHistory(true);
+                        fetchProductHistory(p.id);
+                      }}
+                      className="font-medium hover:underline text-left"
+                      style={{ color: "#003d82" }}
+                    >
+                      {p.name}
+                    </button>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{p.category || "-"}</TableCell>
+                  <TableCell>{getProductTypeBadge(p)}</TableCell>
+                  <TableCell className="font-mono text-sm text-muted-foreground">{p.sku || "-"}</TableCell>
+                  <TableCell>
+                    {(p.track_stock === true || (p.track_stock as any) === 1) ? (
+                      getStockBadge(p.current_stock, p.min_stock)
+                    ) : (
+                      <span className="text-2xl font-bold text-primary">∞</span>
                     )}
-
-                    {filtered.map((p) => {
-                      const trackStock = p.track_stock === true || (p.track_stock as any) === 1;
-                      const low = trackStock && p.current_stock <= p.min_stock;
-                      return (
-                        <TableRow
-                          key={p.id}
-                          className={`${
-                            low ? "bg-red-900/20" : "border-border hover:bg-gray-100"
-                          } cursor-pointer transition-colors`}
-                          onClick={() => {
-                            setHistoryTarget(p);
-                            setOpenHistory(true);
-                            fetchProductHistory(p.id);
-                          }}
-                        >
-                          <TableCell className="font-mono text-muted-foreground">
-                            {p.sku || "-"}
-                          </TableCell>
-                          <TableCell className="font-medium flex items-center gap-2">
-                            <span className="text-foreground">{p.name}</span>
-                            {low && <Badge variant="destructive">Düşük Stok</Badge>}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">{p.category || "-"}</TableCell>
-                          <TableCell>{getProductTypeBadge(p)}</TableCell>
-                          <TableCell className="text-right text-foreground">
-                            {(p.track_stock === true || (p.track_stock as any) === 1) ? (
-                              `${p.current_stock} ${p.unit}`
-                            ) : (
-                              <span className="text-2xl font-bold text-primary">∞</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right text-muted-foreground">
-                            {(p.track_stock === true || (p.track_stock as any) === 1) ? p.min_stock : "-"}
-                          </TableCell>
-                          <TableCell className="text-right text-muted-foreground">
-                            {p.sales_count}
-                          </TableCell>
-                          <TableCell className="text-right text-muted-foreground">
-                            {currency(p.cost_price)}
-                          </TableCell>
-                          <TableCell className="text-right text-muted-foreground">
-                            {currency(p.sale_price)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openEntryModal(p);
-                                }}
-                                className="flex items-center gap-1 bg-success/10 border-success/30 text-success hover:bg-success/20"
-                              >
-                                <PackagePlus className="h-4 w-4" /> Giriş
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openExitModal(p);
-                                }}
-                                className="flex items-center gap-1 bg-info/10 border-info/30 text-info hover:bg-info/20"
-                              >
-                                <PackageMinus className="h-4 w-4" /> Çıkış
-                              </Button>
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDelete(p.id);
-                                }}
-                                className="flex items-center gap-1"
-                              >
-                                <Trash2 className="h-4 w-4" /> Sil
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* Sales Products Tab */}
-        <TabsContent value="sales" className="space-y-6">
-          <div className="card-professional p-6">
-            <div className="pb-4 border-b border-border">
-              <h3 className="text-heading text-primary flex items-center gap-2">
-                <ShoppingCart className="h-5 w-5" /> Satış Ürünleri
-              </h3>
-            </div>
-            <div className="pt-4">
-              <div className="rounded-lg border border-border">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-border">
-                      <TableHead className="text-muted-foreground">Ürün</TableHead>
-                      <TableHead className="text-muted-foreground">Kategori</TableHead>
-                      <TableHead className="text-muted-foreground text-right">Stok</TableHead>
-                      <TableHead className="text-muted-foreground text-right">Satış Fiyatı</TableHead>
-                      <TableHead className="text-muted-foreground text-right">Toplam Satış</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {products
-                      .filter((p) => p.is_for_sale)
-                      .map((p) => (
-                        <TableRow
-                          key={p.id}
-                          className="border-border hover:bg-gray-100 cursor-pointer transition-colors"
-                          onClick={() => {
-                            setHistoryTarget(p);
-                            setOpenHistory(true);
-                            fetchProductHistory(p.id);
-                          }}
-                        >
-                          <TableCell className="font-medium text-foreground">{p.name}</TableCell>
-                          <TableCell className="text-muted-foreground">{p.category || "-"}</TableCell>
-                          <TableCell className="text-right text-foreground">
-                            {(p.track_stock === true || (p.track_stock as any) === 1) ? (
-                              `${p.current_stock} ${p.unit}`
-                            ) : (
-                              <span className="text-2xl font-bold text-primary">∞</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right text-success">{currency(p.sale_price)}</TableCell>
-                          <TableCell className="text-right text-muted-foreground">
-                            {p.sales_count}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* Service Products Tab */}
-        <TabsContent value="service" className="space-y-6">
-          <div className="card-professional p-6">
-            <div className="pb-4 border-b border-border">
-              <h3 className="text-heading text-primary flex items-center gap-2">
-                <Wrench className="h-5 w-5" /> Servis Ürünleri
-              </h3>
-            </div>
-            <div className="pt-4">
-              <div className="rounded-lg border border-border">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-border">
-                      <TableHead className="text-muted-foreground">Ürün</TableHead>
-                      <TableHead className="text-muted-foreground">Kategori</TableHead>
-                      <TableHead className="text-muted-foreground text-right">Stok</TableHead>
-                      <TableHead className="text-muted-foreground text-right">Min Stok</TableHead>
-                      <TableHead className="text-muted-foreground text-right">Alış Fiyatı</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {products
-                      .filter((p) => p.is_for_service)
-                      .map((p) => (
-                        <TableRow
-                          key={p.id}
-                          className="border-border hover:bg-gray-100 cursor-pointer transition-colors"
-                          onClick={() => {
-                            setHistoryTarget(p);
-                            setOpenHistory(true);
-                            fetchProductHistory(p.id);
-                          }}
-                        >
-                          <TableCell className="font-medium text-foreground">{p.name}</TableCell>
-                          <TableCell className="text-muted-foreground">{p.category || "-"}</TableCell>
-                          <TableCell className="text-right text-foreground">
-                            {(p.track_stock === true || (p.track_stock as any) === 1) ? (
-                              `${p.current_stock} ${p.unit}`
-                            ) : (
-                              <span className="text-2xl font-bold text-primary">∞</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right text-muted-foreground">
-                            {(p.track_stock === true || (p.track_stock as any) === 1) ? p.min_stock : "-"}
-                          </TableCell>
-                          <TableCell className="text-right text-muted-foreground">
-                            {currency(p.cost_price)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          </div>
-        </TabsContent>
-      </Tabs>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {(p.track_stock === true || (p.track_stock as any) === 1) ? p.min_stock : "-"}
+                  </TableCell>
+                  <TableCell className="text-right font-medium">{currency(p.cost_price)}</TableCell>
+                  <TableCell className="text-right font-medium">{formatCurrencyWithCurrency(p.sale_price, p.sale_currency)}</TableCell>
+                  <TableCell className="text-right font-medium">{p.sales_count}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center justify-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-9 px-3 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 font-medium border border-green-200"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEntryModal(p);
+                        }}
+                      >
+                        <PackagePlus className="h-4 w-4 mr-1.5" />
+                        Giriş
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-9 px-3 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 hover:text-purple-800 font-medium border border-purple-200"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openExitModal(p);
+                        }}
+                      >
+                        <PackageMinus className="h-4 w-4 mr-1.5" />
+                        Çıkış
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 rounded-lg hover:bg-red-100 hover:text-red-600"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(p.id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </Card>
 
       {/* Entry Modal */}
       <Dialog open={openEntry} onOpenChange={setOpenEntry}>
@@ -1066,12 +1006,12 @@ const InventoryPage = () => {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Alış Fiyatı</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder={`Mevcut: ₺${entryTarget?.cost_price || 0}`}
+                <CurrencyInput
                   value={entryForm.cost_price}
-                  onChange={(e) => setEntryForm({ ...entryForm, cost_price: e.target.value })}
+                  currency={entryForm.cost_currency || baseCurrency}
+                  onValueChange={(value) => setEntryForm({ ...entryForm, cost_price: value })}
+                  onCurrencyChange={(currency) => setEntryForm({ ...entryForm, cost_currency: currency })}
+                  currencies={CURRENCIES}
                   className="bg-background border-border text-foreground"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
@@ -1110,88 +1050,132 @@ const InventoryPage = () => {
 
       {/* Product History Modal */}
       <Dialog open={openHistory} onOpenChange={setOpenHistory}>
-        <DialogContent className="bg-card text-card-foreground border border-border shadow-professional-xl animate-scale-in max-w-4xl">
+        <DialogContent className="bg-card text-card-foreground border border-border shadow-professional-xl animate-scale-in max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Package className="w-5 h-5 text-primary" />
-              Ürün Geçmişi — {historyTarget?.name}
-            </DialogTitle>
-            <DialogDescription>
-              {historyTarget?.name} ürününün tüm stok hareketleri ve satış geçmişi.
-            </DialogDescription>
+            <DialogTitle className="text-2xl">Ürün Akışı</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4">
-            {loadingHistory ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                <p className="text-muted-foreground mt-2">Geçmiş yükleniyor...</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {productHistory.length === 0 ? (
+          {historyTarget && (
+            <div className="mt-6 space-y-6">
+              {/* Product Info */}
+              <Card className="p-4 rounded-xl bg-muted/50 border-0">
+                <h3 className="font-semibold text-lg mb-2">{historyTarget.name}</h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">SKU:</span>
+                    <span className="ml-2 font-mono font-medium">{historyTarget.sku || "-"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Kategori:</span>
+                    <span className="ml-2 font-medium">{historyTarget.category || "-"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Mevcut Stok:</span>
+                    <span className="ml-2 font-medium">
+                      {(historyTarget.track_stock === true || (historyTarget.track_stock as any) === 1) 
+                        ? `${historyTarget.current_stock} ${historyTarget.unit}` 
+                        : "∞"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Toplam Satış:</span>
+                    <span className="ml-2 font-medium">{historyTarget.sales_count}</span>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Flow Timeline */}
+              <div>
+                <h4 className="font-semibold mb-4">İşlem Geçmişi</h4>
+                {loadingHistory ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                    <p className="text-muted-foreground mt-2">Geçmiş yükleniyor...</p>
+                  </div>
+                ) : productHistory.length === 0 ? (
                   <div className="text-center py-8">
                     <Package className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                     <p className="text-muted-foreground">Bu ürün için henüz hareket kaydı bulunmuyor.</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {productHistory.map((movement, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between p-3 bg-accent rounded-lg border border-border"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-3 h-3 rounded-full ${
-                              movement.type === "in"
-                                ? "bg-success"
-                                : movement.type === "sale"
-                                ? "bg-primary"
-                                : "bg-info"
-                            }`}
-                          />
-                          <div>
+                    {productHistory.map((flow, idx) => {
+                      const movementDate = new Date(flow.movement_date);
+                      const dateStr = movementDate.toLocaleDateString("tr-TR");
+                      const timeStr = movementDate.toLocaleTimeString("tr-TR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      });
+                      
+                      // Calculate price based on type
+                      let price = 0;
+                      if (flow.type === "sale" && flow.sale_price) {
+                        price = flow.sale_price * flow.quantity;
+                      } else if (flow.type === "in" && flow.cost_price) {
+                        price = flow.cost_price * flow.quantity;
+                      }
+
+                      return (
+                        <Card key={idx} className="p-4 rounded-xl border hover:shadow-md transition-shadow">
+                          <div className="flex items-start justify-between mb-2">
                             <div className="flex items-center gap-2">
-                              <span className="font-medium">
-                                {movement.type === "in"
-                                  ? "Stok Girişi"
-                                  : movement.type === "sale"
-                                  ? "Satış"
-                                  : movement.type === "service_usage"
-                                  ? "Servis Kullanımı"
-                                  : movement.type === "correction"
-                                  ? "Düzeltme"
-                                  : "Diğer"}
+                              {getFlowTypeBadge(flow.type)}
+                              <span className="text-sm text-muted-foreground">
+                                {dateStr} • {timeStr}
                               </span>
-                              <Badge variant="outline" className="text-xs">
-                                {movement.quantity} {historyTarget?.unit}
-                              </Badge>
                             </div>
-                            <div className="text-sm text-muted-foreground">
-                              {movement.note}
-                              {movement.staff_name && ` • ${movement.staff_name}`}
+                            {price > 0 && (
+                              <span className={cn("font-semibold", price < 0 ? "text-red-600" : "text-green-600")}>
+                                {price < 0 ? "" : "+"}{currency(price)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            {flow.customer_name && (
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">Müşteri:</span>
+                                <span className="font-medium">{flow.customer_name}</span>
+                                {flow.customer_phone && (
+                                  <span className="text-xs text-muted-foreground ml-2">({flow.customer_phone})</span>
+                                )}
+                              </div>
+                            )}
+                            {flow.staff_name && (
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">Personel:</span>
+                                <span className="font-medium">{flow.staff_name}</span>
+                              </div>
+                            )}
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Miktar:</span>
+                              <span className="font-medium">{flow.quantity} {historyTarget?.unit || "adet"}</span>
                             </div>
+                            {flow.sale_price && flow.type === "sale" && (
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">Birim Fiyat:</span>
+                                <span className="font-medium">{currency(flow.sale_price)}</span>
+                              </div>
+                            )}
+                            {flow.cost_price && flow.type === "in" && (
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">Alış Fiyatı:</span>
+                                <span className="font-medium">{currency(flow.cost_price)}</span>
+                              </div>
+                            )}
+                            {flow.note && (
+                              <div className="mt-2 text-sm text-muted-foreground border-t pt-2">
+                                <span className="italic">{flow.note}</span>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm text-muted-foreground">
-                            {new Date(movement.movement_date).toLocaleDateString("tr-TR")}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {new Date(movement.movement_date).toLocaleTimeString("tr-TR", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                        </Card>
+                      );
+                    })}
                   </div>
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           <DialogFooter>
             <Button
@@ -1308,12 +1292,12 @@ const InventoryPage = () => {
                 </div>
                 <div>
                   <label className="text-sm font-medium text-primary">Satış Fiyatı (Birim)</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder={`Önerilen: ₺${exitTarget?.sale_price || 0}`}
+                  <CurrencyInput
                     value={exitForm.sale_price}
-                    onChange={(e) => setExitForm({ ...exitForm, sale_price: e.target.value })}
+                    currency={exitForm.sale_currency || baseCurrency}
+                    onValueChange={(value) => setExitForm({ ...exitForm, sale_price: value })}
+                    onCurrencyChange={(currency) => setExitForm({ ...exitForm, sale_currency: currency })}
+                    currencies={CURRENCIES}
                     className="bg-popover border-border text-foreground"
                   />
                 </div>

@@ -10,6 +10,8 @@ import {
   deleteExpense,
   updateIncome,
   deleteIncome,
+  convertIncomesToCurrency,
+  convertExpensesToCurrency,
 } from "../controllers/accountingController";
 import { authMiddleware } from "../middleware/auth";
 import { tenantGuard } from "../middleware/tenantGuard";
@@ -35,6 +37,8 @@ router.delete("/income/:id", deleteIncome);
 // Raporlar
 router.get("/yearly-income-expense", getYearlyIncomeExpense);
 router.get("/date-range-income-expense", getDateRangeIncomeExpense);
+router.post("/convert-incomes", convertIncomesToCurrency);
+router.post("/convert-expenses", convertExpensesToCurrency);
 
 export default router;
 

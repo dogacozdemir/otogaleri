@@ -12,7 +12,8 @@ const CURRENCY_ICONS: Record<string, string> = {
   USD: "$",
   EUR: "€",
   GBP: "£",
-  YEN: "¥",
+  JPY: "¥",
+  YEN: "¥", // Backward compatibility - maps to JPY
 }
 
 const CURRENCIES = [
@@ -20,7 +21,7 @@ const CURRENCIES = [
   { value: "USD", label: "Amerikan Doları", icon: "$" },
   { value: "EUR", label: "Euro", icon: "€" },
   { value: "GBP", label: "İngiliz Sterlini", icon: "£" },
-  { value: "YEN", label: "Japon Yeni", icon: "¥" },
+  { value: "JPY", label: "Japon Yeni", icon: "¥" },
 ]
 
 interface CurrencyInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> {

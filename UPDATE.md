@@ -43,14 +43,46 @@ cd /home/cloudpanel/htdocs/otogaleri
 git pull origin main
 ```
 
-### 2. Backend Dependencies Güncelleyin
+### 2. Backend .env Dosyasını Kontrol Edin
+
+Backend'in çalışması için `.env` dosyasında database bilgileri olmalı:
+
+```bash
+cd /home/cloudpanel/htdocs/otogaleri/backend
+
+# .env dosyasını kontrol et veya oluştur
+nano .env
+```
+
+**.env dosyası örneği:**
+```env
+# Database Configuration
+OTG_DB_HOST=127.0.0.1
+OTG_DB_PORT=3306
+OTG_DB_USER=root
+OTG_DB_PASSWORD=GP92pIfTAHRlwIRv
+OTG_DB_NAME=otogaleri
+
+# JWT Secret (mevcut değeri koruyun veya yeni oluşturun)
+JWT_SECRET=your_jwt_secret_here
+
+# Server Port
+PORT=5005
+
+# Node Environment
+NODE_ENV=production
+```
+
+**ÖNEMLİ:** `.env` dosyasında `OTG_DB_PASSWORD` mutlaka olmalı, aksi halde migration ve backend bağlantı hatası verir.
+
+### 3. Backend Dependencies Güncelleyin
 
 ```bash
 cd backend
 npm install
 ```
 
-### 3. Database Migrations Çalıştırın
+### 4. Database Migrations Çalıştırın
 
 **ÖNEMLİ:** Migration'ları çalıştırmadan önce database backup'ı aldığınızdan emin olun!
 
@@ -79,7 +111,7 @@ Migration sistemi otomatik olarak atlayacaktır. Ancak emin olmak için:
 mysql -u root -p otogaleri -e "SELECT migration_name FROM schema_migrations WHERE migration_name IN ('add_vehicle_quotes', 'add_acl_permissions', 'add_installment_reminder_tracking');"
 ```
 
-### 4. Backend Build
+### 5. Backend Build
 
 ```bash
 cd /home/cloudpanel/htdocs/otogaleri/backend
@@ -99,7 +131,7 @@ sudo mkswap /swapfile
 sudo swapon /swapfile
 ```
 
-### 5. Frontend Dependencies ve Build
+### 6. Frontend Dependencies ve Build
 
 ```bash
 cd /home/cloudpanel/htdocs/otogaleri/frontend
@@ -113,7 +145,7 @@ export NODE_OPTIONS="--max-old-space-size=4096"
 npm run build
 ```
 
-### 6. Backend'i Restart Edin
+### 7. Backend'i Restart Edin
 
 ```bash
 # PM2 process'lerini kontrol et
@@ -145,7 +177,7 @@ pm2 startup
 pm2 save
 ```
 
-### 7. Nginx'i Restart Edin ve Cache'i Temizleyin
+### 8. Nginx'i Restart Edin ve Cache'i Temizleyin
 
 ```bash
 # Nginx config'i test et
@@ -220,9 +252,24 @@ Eğer Nginx loglarında "Connection refused" hatası görüyorsanız (port 5005'
 ```bash
 # 1. PM2'de backend çalışıyor mu kontrol et
 pm2 list
+# Backend "online" görünüyorsa ama hala connection refused alıyorsanız:
 
-# 2. Eğer çalışmıyorsa, PM2 loglarını kontrol et
+# 2. PM2 loglarını kontrol et (hata var mı?)
 pm2 logs otogaleri-backend --lines 50
+
+# 3. Backend'in port 5005'te dinlediğini kontrol et
+sudo lsof -i :5005
+# veya
+netstat -tulpn | grep 5005
+
+# 4. Backend'in health endpoint'ini test et
+curl http://localhost:5005/health
+
+# 5. Eğer curl başarısız olursa, backend'i restart et
+pm2 restart otogaleri-backend
+
+# 6. Restart sonrası logları tekrar kontrol et
+pm2 logs otogaleri-backend --lines 20
 
 # 3. Port'un kullanılabilir olduğunu kontrol et
 netstat -tulpn | grep 5005
@@ -324,7 +371,7 @@ npm run migrate
 
 ### add_vehicle_number Migration Hatası
 
-Eğer `add_vehicle_number` migration'ı "Table 'temp_vehicle_numbers' doesn't exist" hatası veriyorsa:
+Eğer `add_vehicle_number` migration'ı SQL syntax hatası veriyorsa:
 
 ```bash
 # 1. Migration kaydını sil (tekrar çalıştırmak için)
@@ -340,6 +387,56 @@ npm run migrate
 ```
 
 **Not:** Migration artık güvenli hale getirildi ve `IF EXISTS` kontrolleri eklendi. Eğer kolon veya index zaten varsa, migration atlayacaktır.
+
+### Database Connection Hatası (Access denied)
+
+Eğer migration veya backend çalıştırırken "Access denied for user 'root'@'localhost' (using password: NO)" hatası alıyorsanız:
+
+```bash
+# 1. .env dosyasının var olduğunu kontrol edin
+cd /home/cloudpanel/htdocs/otogaleri/backend
+ls -la .env
+
+# 2. .env dosyasını oluşturun veya düzenleyin
+nano .env
+```
+
+**.env dosyası içeriği (MySQL bilgilerinize göre güncelleyin):**
+```env
+OTG_DB_HOST=127.0.0.1
+OTG_DB_PORT=3306
+OTG_DB_USER=root
+OTG_DB_PASSWORD=GP92pIfTAHRlwIRv
+OTG_DB_NAME=otogaleri
+JWT_SECRET=your_jwt_secret_here
+PORT=5005
+NODE_ENV=production
+```
+
+**ÖNEMLİ:** `OTG_DB_PASSWORD` mutlaka olmalı, aksi halde migration ve backend bağlantı hatası verir.
+
+```bash
+# 3. .env dosyasını kaydedin ve migration'ı tekrar çalıştırın
+npm run migrate
+```
+
+### Backend SQL Hataları (Unknown column 'v.year')
+
+Eğer backend loglarında "Unknown column 'v.year' in 'field list'" hatası görüyorsanız:
+
+```bash
+# 1. Backend'i rebuild et (ÖNEMLİ: Source kodda düzeltme yapıldıysa)
+cd /home/cloudpanel/htdocs/otogaleri/backend
+npm run build
+
+# 2. Backend'i restart et
+pm2 restart otogaleri-backend
+
+# 3. Logları kontrol et
+pm2 logs otogaleri-backend --lines 20
+```
+
+**Not:** Bu hata genellikle build edilmiş dosyalarda eski kod kaldığında oluşur. Source kodda `v.production_year as year` olarak düzeltildi, rebuild sonrası sorun çözülecektir.
 
 ### Backend 500 Hataları ve SQL Syntax Hataları
 

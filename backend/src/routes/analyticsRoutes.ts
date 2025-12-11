@@ -14,6 +14,8 @@ import {
   getRecentActivities,
   getWeeklySales,
   getWeeklyInventory,
+  getRecentSales,
+  getWeeklyRevenue,
 } from "../controllers/analyticsController";
 
 const router = Router();
@@ -31,7 +33,9 @@ router.get("/active-installment-count", getActiveInstallmentCount);
 router.get("/monthly-sales", getMonthlySales);
 router.get("/weekly-sales", getWeeklySales);
 router.get("/weekly-inventory", getWeeklyInventory);
+router.get("/weekly-revenue", getWeeklyRevenue);
 router.get("/old-stock", getOldStock);
 router.get("/recent-activities", getRecentActivities);
+router.get("/recent-sales", getRecentSales);
 
 export default router;

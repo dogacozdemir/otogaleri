@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Search, Phone, UserPlus, Filter, List, Table, X } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Search, Phone, UserPlus, Filter, List, Table, X, Grid3x3 } from "lucide-react";
 import { api } from "@/api";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrency } from "@/hooks/useCurrency";
+import { cn } from "@/lib/utils";
 
 interface CustomerSegment {
   id: number;
@@ -26,24 +27,22 @@ interface CustomerSegment {
   chassis_numbers?: string | null;
 }
 
-interface CustomerSegments {
-  vip: CustomerSegment[];
-  regular: CustomerSegment[];
-  new: CustomerSegment[];
-}
-
 const CustomerList = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { formatCurrency } = useCurrency();
-  const [segments, setSegments] = useState<CustomerSegments | null>(null);
   const [allCustomers, setAllCustomers] = useState<CustomerSegment[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("all");
   const [viewMode, setViewMode] = useState<"list" | "table">("table");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
+  
+  // KPI States
+  const [totalCustomers, setTotalCustomers] = useState(0);
+  const [newCustomers, setNewCustomers] = useState(0);
+  const [activeInstallmentCustomers, setActiveInstallmentCustomers] = useState(0);
+
   const [filters, setFilters] = useState({
     minSpent: "",
     maxSpent: "",
@@ -63,23 +62,58 @@ const CustomerList = () => {
   });
 
   useEffect(() => {
-    fetchCustomerSegments();
     fetchAllCustomers();
+    fetchKPIs();
   }, []);
 
-  const fetchCustomerSegments = async () => {
+  const fetchKPIs = async () => {
     try {
-      const response = await api.get("/customers/segments");
-      setSegments(response.data || null);
+      // Tüm müşteriler - pagination ile tümünü çek
+      let allCustomersData: CustomerSegment[] = [];
+      let page = 1;
+      let hasMore = true;
+      
+      while (hasMore) {
+        const customersRes = await api.get(`/customers?limit=100&page=${page}`);
+        const customers = customersRes.data?.customers || [];
+        allCustomersData = [...allCustomersData, ...customers];
+        
+        const pagination = customersRes.data?.pagination;
+        if (!pagination || page >= pagination.totalPages || customers.length === 0) {
+          hasMore = false;
+        } else {
+          page++;
+        }
+      }
+      
+      setTotalCustomers(allCustomersData.length);
+
+      // Yeni müşteriler (son 1 ay)
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+      const newCustomersCount = allCustomersData.filter((c: CustomerSegment) => {
+        const createdDate = new Date(c.created_at);
+        return createdDate >= oneMonthAgo;
+      }).length;
+      setNewCustomers(newCustomersCount);
+
+      // Taksidi devam eden müşteriler
+      const activeInstallmentsRes = await api.get("/installments/active").catch(() => ({ data: [] }));
+      const activeInstallments = activeInstallmentsRes.data || [];
+      const uniqueCustomerIds = new Set(
+        activeInstallments
+          .map((inst: any) => inst.customer_id)
+          .filter((id: any) => id !== null && id !== undefined)
+      );
+      setActiveInstallmentCustomers(uniqueCustomerIds.size);
     } catch (error) {
-      console.error("Customer segments error:", error);
+      console.error("KPI fetch error:", error);
     }
   };
 
   const fetchAllCustomers = async () => {
     try {
       const response = await api.get("/customers");
-      // Backend returns { customers: [...], pagination: {...} }
       const customers = response.data?.customers || [];
       setAllCustomers(customers);
       setLoading(false);
@@ -155,35 +189,9 @@ const CustomerList = () => {
     return filteredCustomers;
   };
 
-  const renderCustomerCard = (customer: CustomerSegment, segmentType: string, keyPrefix?: string) => {
-    const getSegmentStyle = (type: string) => {
-      switch (type) {
-        case "vip":
-          return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400";
-        case "regular":
-          return "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400";
-        case "new":
-          return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400";
-        default:
-          return "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400";
-      }
-    };
-
-    const getSegmentLabel = (type: string) => {
-      switch (type) {
-        case "vip":
-          return "VIP";
-        case "regular":
-          return "Düzenli";
-        case "new":
-          return "Yeni";
-        default:
-          return "Müşteri";
-      }
-    };
-
+  const renderCustomerCard = (customer: CustomerSegment) => {
     return (
-      <Card key={keyPrefix ? `${keyPrefix}-${customer.id}` : customer.id}>
+      <Card key={customer.id} className="rounded-xl shadow-sm hover:shadow-md transition-shadow">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
@@ -195,9 +203,6 @@ const CustomerList = () => {
                 <p className="text-sm text-muted-foreground">{customer.phone || "-"}</p>
               </div>
             </div>
-            <Badge className={getSegmentStyle(segmentType)}>
-              {getSegmentLabel(segmentType)}
-            </Badge>
           </div>
 
           <div className="grid grid-cols-2 gap-4 mb-4">
@@ -236,9 +241,10 @@ const CustomerList = () => {
 
   const renderCustomerTable = (customers: CustomerSegment[]) => {
     return (
+      <Card className="rounded-xl shadow-sm border border-gray-200">
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-muted/50 border-b">
+            <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="text-left p-4 font-medium text-muted-foreground">
                 <div className="flex items-center space-x-2">
@@ -317,8 +323,6 @@ const CustomerList = () => {
                   </Button>
                 </div>
               </th>
-              <th className="text-left p-4 font-medium text-muted-foreground">Satılan Araba</th>
-              <th className="text-left p-4 font-medium text-muted-foreground">Şasi Numarası</th>
               <th className="text-left p-4 font-medium text-muted-foreground">Aksiyonlar</th>
             </tr>
           </thead>
@@ -326,7 +330,7 @@ const CustomerList = () => {
             {customers.map((customer, index) => (
               <tr
                 key={customer.id}
-                className={`border-b hover:bg-muted/30 transition-colors ${index % 2 === 0 ? "bg-background" : "bg-muted/10"}`}
+                  className={`border-b hover:bg-gray-50/80 transition-colors duration-150 ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
               >
                 <td className="p-4">
                   <p className="font-medium text-foreground">{customer.name}</p>
@@ -351,28 +355,6 @@ const CustomerList = () => {
                   </span>
                 </td>
                 <td className="p-4">
-                  <span className="text-sm text-foreground">
-                    {customer.vehicles_purchased ? (
-                      <span className="max-w-xs truncate block" title={customer.vehicles_purchased}>
-                        {customer.vehicles_purchased}
-                      </span>
-                    ) : (
-                      "-"
-                    )}
-                  </span>
-                </td>
-                <td className="p-4">
-                  <span className="text-sm text-foreground">
-                    {customer.chassis_numbers ? (
-                      <span className="max-w-xs truncate block" title={customer.chassis_numbers}>
-                        {customer.chassis_numbers}
-                      </span>
-                    ) : (
-                      "-"
-                    )}
-                  </span>
-                </td>
-                <td className="p-4">
                   <div className="flex items-center space-x-2">
                     <Button
                       size="sm"
@@ -394,6 +376,7 @@ const CustomerList = () => {
           </tbody>
         </table>
       </div>
+      </Card>
     );
   };
 
@@ -409,7 +392,7 @@ const CustomerList = () => {
     try {
       await api.post("/customers", newCustomer);
       await fetchAllCustomers();
-      await fetchCustomerSegments();
+      await fetchKPIs();
       setShowNewCustomer(false);
       setNewCustomer({ name: "", phone: "", email: "", address: "", notes: "" });
       toast({
@@ -426,6 +409,21 @@ const CustomerList = () => {
     }
   };
 
+  const clearAllFilters = () => {
+    setSearchTerm("");
+    setFilters({
+      minSpent: "",
+      maxSpent: "",
+      minSales: "",
+      maxSales: "",
+      lastSaleDays: "all",
+      sortBy: "name",
+      sortOrder: "asc",
+    });
+  };
+
+  const hasActiveFilters = searchTerm || filters.minSpent || filters.maxSpent || filters.minSales || filters.maxSales || filters.lastSaleDays !== "all" || filters.sortBy !== "name" || filters.sortOrder !== "asc";
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -436,279 +434,187 @@ const CustomerList = () => {
     );
   }
 
+  const filteredCustomers = filterCustomers(allCustomers);
+
   return (
     <>
       <div className="space-y-6">
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
-          <Card>
-            <CardContent className="p-6">
+          <Card className="rounded-xl shadow-sm">
+            <CardContent className="p-8">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="flex items-center space-x-3 mb-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-primary/10 to-primary/20 rounded-xl flex items-center justify-center">
-                      <List className="w-5 h-5 text-primary" />
+                  <p className="text-sm font-medium text-muted-foreground">Tüm Müşteriler</p>
+                  <p className="text-3xl font-bold mt-3">{totalCustomers}</p>
+                  <p className="text-sm text-green-600 mt-2">Toplam müşteri sayısı</p>
                     </div>
-                    <span className="text-lg font-semibold text-primary">Tüm Müşteriler</span>
-                  </div>
-                  <p className="text-3xl font-bold text-primary">{allCustomers.length}</p>
-                  <p className="text-sm text-muted-foreground mt-1">Toplam müşteri sayısı</p>
+                <div className="rounded-xl p-4 bg-blue-100">
+                  <UserPlus className="h-6 w-6 text-blue-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="p-6">
+          <Card className="rounded-xl shadow-sm">
+            <CardContent className="p-8">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="flex items-center space-x-3 mb-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-green-500/10 to-green-500/20 rounded-xl flex items-center justify-center">
-                      <UserPlus className="w-5 h-5 text-green-600" />
+                  <p className="text-sm font-medium text-muted-foreground">Yeni Müşteriler</p>
+                  <p className="text-3xl font-bold mt-3">{newCustomers}</p>
+                  <p className="text-sm text-green-600 mt-2">Son 1 ayda sisteme eklenen müşteriler</p>
                     </div>
-                    <span className="text-lg font-semibold text-primary">Yeni Müşteriler</span>
-                  </div>
-                  <p className="text-3xl font-bold text-primary">{segments?.new?.length || 0}</p>
-                  <p className="text-sm text-muted-foreground mt-1">Son 1 ayda sisteme eklenen müşteriler</p>
+                <div className="rounded-xl p-4 bg-green-100">
+                  <UserPlus className="h-6 w-6 text-green-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardContent className="p-6">
+          <Card className="rounded-xl shadow-sm">
+            <CardContent className="p-8">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="flex items-center space-x-3 mb-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-yellow-500/10 to-yellow-500/20 rounded-xl flex items-center justify-center">
-                      <Phone className="w-5 h-5 text-yellow-600" />
+                  <p className="text-sm font-medium text-muted-foreground">Taksidi Devam Eden Müşteriler</p>
+                  <p className="text-3xl font-bold mt-3">{activeInstallmentCustomers}</p>
+                  <p className="text-sm text-green-600 mt-2">
+                    {activeInstallmentCustomers > 0 ? `${activeInstallmentCustomers} aktif` : "Taksit yok"}
+                  </p>
                     </div>
-                    <span className="text-lg font-semibold text-primary">VIP Müşteriler</span>
-                  </div>
-                  <p className="text-3xl font-bold text-primary">{segments?.vip?.length || 0}</p>
-                  <p className="text-sm text-muted-foreground mt-1">VIP müşteri sayısı</p>
+                <div className="rounded-xl p-4 bg-orange-100">
+                  <Phone className="h-6 w-6 text-orange-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 bg-card border border-border rounded-xl p-1.5 shadow-sm h-auto mb-6">
-            <TabsTrigger
-              value="all"
-              className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-colors duration-200 ease-in-out min-h-[3.5rem] data-[state=active]:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 hover:bg-muted/70"
-            >
-              <UserPlus className="w-4 h-4 mr-2" />
-              Tümü ({allCustomers.length})
-            </TabsTrigger>
-            <TabsTrigger
-              value="segments"
-              className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-colors duration-200 ease-in-out min-h-[3.5rem] data-[state=active]:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 hover:bg-muted/70"
-            >
-              <Filter className="w-4 h-4 mr-2" />
-              Segment
-            </TabsTrigger>
-          </TabsList>
-
-          {/* All Customers */}
-          <TabsContent value="all" className="space-y-4">
-            <div className="flex items-center justify-between space-x-4 bg-card rounded-lg border p-4">
-              <div className="flex items-center space-x-4 flex-1">
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+        {/* Filters and Search */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
+          <div className="flex flex-col lg:flex-row gap-4">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <Input
                     placeholder="Müşteri ara..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                className="pl-12 h-12 rounded-xl border-gray-200 hover:border-gray-300 focus-visible:ring-[#003d82] focus-visible:border-[#003d82] transition-colors"
                   />
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setShowAdvancedFilters(true)} className="flex items-center space-x-2">
-                  <Filter className="w-4 h-4" />
-                  <span>Gelişmiş Filtre</span>
+
+            {/* Filter Button */}
+            <Button 
+              variant="outline" 
+              className="h-12 rounded-xl border-gray-200 hover:border-gray-300 transition-colors"
+              onClick={() => setShowAdvancedFilters(true)}
+            >
+              <Filter className="h-4 w-4 mr-2" />
+              Gelişmiş Filtre
                 </Button>
 
-                {(searchTerm ||
-                  filters.minSpent ||
-                  filters.maxSpent ||
-                  filters.minSales ||
-                  filters.maxSales ||
-                  filters.lastSaleDays !== "all" ||
-                  filters.sortBy !== "name" ||
-                  filters.sortOrder !== "asc") && (
+            {/* Clear Filters */}
+            {hasActiveFilters && (
                   <Button
                     variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSearchTerm("");
-                      setFilters({
-                        minSpent: "",
-                        maxSpent: "",
-                        minSales: "",
-                        maxSales: "",
-                        lastSaleDays: "all",
-                        sortBy: "name",
-                        sortOrder: "asc",
-                      });
-                    }}
-                    className="flex items-center space-x-2 text-orange-600 hover:text-orange-700 border-orange-200 hover:border-orange-300 bg-orange-50 hover:bg-orange-100 dark:bg-orange-950 dark:text-orange-400"
+                className="h-12 rounded-xl text-orange-600 hover:text-orange-700 border-orange-200 hover:border-orange-300 bg-orange-50 hover:bg-orange-100"
+                onClick={clearAllFilters}
                   >
-                    <X className="w-4 h-4" />
-                    <span>Temizle</span>
+                <X className="w-4 h-4 mr-2" />
+                Temizle
                   </Button>
                 )}
               </div>
 
-              <div className="flex items-center space-x-3">
-                <Button onClick={() => setShowNewCustomer(true)}>
-                  <UserPlus className="w-4 h-4 mr-2" />
+          {/* Action Bar */}
+          <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-gray-200 min-h-[60px]">
+            {/* Left Section */}
+            <div className="flex gap-2 flex-wrap items-center sm:flex-1 sm:justify-start">
+              <Button onClick={() => setShowNewCustomer(true)} className="gap-2 rounded-xl h-11">
+                <UserPlus className="h-4 w-4" />
                   Yeni Müşteri
                 </Button>
-                <div className="flex items-center space-x-2">
+            </div>
+
+            {/* Right Section - View Mode Switch */}
+            <div className="flex items-center gap-3">
                   <span className="text-sm text-muted-foreground">Görünüm:</span>
-                  <div className="flex bg-muted rounded-lg p-1">
-                    <Button
-                      variant={viewMode === "list" ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setViewMode("list")}
-                      className="h-8 px-3"
-                    >
-                      <List className="w-4 h-4 mr-2" />
-                      Liste
-                    </Button>
+              <div className="flex bg-gray-100 rounded-xl p-1 gap-1">
                     <Button
                       variant={viewMode === "table" ? "default" : "ghost"}
                       size="sm"
                       onClick={() => setViewMode("table")}
-                      className="h-8 px-3"
+                  className={cn(
+                    "h-9 px-4 rounded-lg transition-all",
+                    viewMode === "table" 
+                      ? "bg-[#003d82] text-white shadow-sm" 
+                      : "text-gray-600 hover:bg-gray-200"
+                  )}
                     >
                       <Table className="w-4 h-4 mr-2" />
                       Tablo
                     </Button>
+                <Button
+                  variant={viewMode === "list" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("list")}
+                  className={cn(
+                    "h-9 px-4 rounded-lg transition-all",
+                    viewMode === "list" 
+                      ? "bg-[#003d82] text-white shadow-sm" 
+                      : "text-gray-600 hover:bg-gray-200"
+                  )}
+                >
+                  <Grid3x3 className="w-4 h-4 mr-2" />
+                  Liste
+                </Button>
                   </div>
                 </div>
               </div>
             </div>
 
+        {/* Customer List/Table */}
             {viewMode === "table" ? (
-              <Card>
-                <CardContent className="p-0">
-                  {renderCustomerTable(filterCustomers(allCustomers))}
-                </CardContent>
-              </Card>
+          filteredCustomers.length > 0 ? (
+            renderCustomerTable(filteredCustomers)
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filterCustomers(allCustomers).map((c) => renderCustomerCard(c, "all"))}
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Segments */}
-          <TabsContent value="segments" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {segments?.vip && segments.vip.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      <span>VIP Müşteriler</span>
-                      <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
-                        {segments.vip.length}
-                      </Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {segments.vip.slice(0, 5).map((c) => (
-                        <div key={c.id} className="flex items-center justify-between p-2 hover:bg-muted rounded">
-                          <div>
-                            <p className="font-medium">{c.name}</p>
-                            <p className="text-sm text-muted-foreground">{formatCurrency(c.total_spent_base)}</p>
-                          </div>
-                          <Button size="sm" variant="ghost" onClick={() => navigate(`/customers/${c.id}`)}>
-                            Detay
+            <Card className="rounded-xl shadow-sm border border-gray-200">
+              <CardContent className="py-16 text-center">
+                <Search className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <p className="text-lg font-semibold text-gray-600 mb-2">Müşteri bulunamadı</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {hasActiveFilters ? "Filtreleri temizleyip tekrar deneyin" : "Henüz müşteri eklenmemiş"}
+                </p>
+                {hasActiveFilters && (
+                  <Button variant="outline" onClick={clearAllFilters}>
+                    Filtreleri Temizle
                           </Button>
-                        </div>
-                      ))}
-                      {segments.vip.length > 5 && (
-                        <p className="text-sm text-muted-foreground text-center pt-2">
-                          +{segments.vip.length - 5} daha fazla
-                        </p>
                       )}
-                    </div>
                   </CardContent>
                 </Card>
-              )}
-
-              {segments?.regular && segments.regular.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      <span>Düzenli Müşteriler</span>
-                      <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
-                        {segments.regular.length}
-                      </Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {segments.regular.slice(0, 5).map((c) => (
-                        <div key={c.id} className="flex items-center justify-between p-2 hover:bg-muted rounded">
-                          <div>
-                            <p className="font-medium">{c.name}</p>
-                            <p className="text-sm text-muted-foreground">{formatCurrency(c.total_spent_base)}</p>
+          )
+        ) : (
+          filteredCustomers.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredCustomers.map((c) => renderCustomerCard(c))}
                           </div>
-                          <Button size="sm" variant="ghost" onClick={() => navigate(`/customers/${c.id}`)}>
-                            Detay
-                          </Button>
-                        </div>
-                      ))}
-                      {segments.regular.length > 5 && (
-                        <p className="text-sm text-muted-foreground text-center pt-2">
-                          +{segments.regular.length - 5} daha fazla
-                        </p>
+          ) : (
+            <Card className="rounded-xl shadow-sm border border-gray-200">
+              <CardContent className="py-16 text-center">
+                <Search className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <p className="text-lg font-semibold text-gray-600 mb-2">Müşteri bulunamadı</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {hasActiveFilters ? "Filtreleri temizleyip tekrar deneyin" : "Henüz müşteri eklenmemiş"}
+                </p>
+                {hasActiveFilters && (
+                  <Button variant="outline" onClick={clearAllFilters}>
+                    Filtreleri Temizle
+                  </Button>
                       )}
-                    </div>
                   </CardContent>
                 </Card>
+          )
               )}
-
-              {segments?.new && segments.new.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      <span>Yeni Müşteriler</span>
-                      <Badge className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
-                        {segments.new.length}
-                      </Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {segments.new.slice(0, 5).map((c) => (
-                        <div key={c.id} className="flex items-center justify-between p-2 hover:bg-muted rounded">
-                          <div>
-                            <p className="font-medium">{c.name}</p>
-                            <p className="text-sm text-muted-foreground">{formatDate(c.created_at)}</p>
-                          </div>
-                          <Button size="sm" variant="ghost" onClick={() => navigate(`/customers/${c.id}`)}>
-                            Detay
-                          </Button>
-                        </div>
-                      ))}
-                      {segments.new.length > 5 && (
-                        <p className="text-sm text-muted-foreground text-center pt-2">
-                          +{segments.new.length - 5} daha fazla
-                        </p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </TabsContent>
-        </Tabs>
       </div>
 
       {/* New Customer Modal */}
@@ -914,4 +820,3 @@ const CustomerList = () => {
 };
 
 export default CustomerList;
-

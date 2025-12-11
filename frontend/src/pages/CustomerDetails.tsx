@@ -34,6 +34,7 @@ import { tr } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { getApiBaseUrl } from "@/lib/utils";
 import { useCurrency } from "@/hooks/useCurrency";
+import { useTenant } from "@/contexts/TenantContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface Customer {
@@ -96,7 +97,10 @@ const CustomerDetails: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { formatCurrency } = useCurrency();
+  const { tenant } = useTenant();
+  const targetCurrency = tenant?.default_currency || "TRY";
   const [customer, setCustomer] = useState<Customer | null>(null);
+  const [convertedTotalSpent, setConvertedTotalSpent] = useState<number | null>(null);
   const [sales, setSales] = useState<VehicleSale[]>([]);
   const [quotes, setQuotes] = useState<any[]>([]);
   const [notFound, setNotFound] = useState(false);
@@ -144,6 +148,41 @@ const CustomerDetails: React.FC = () => {
           sale_count: Number(apiCustomer.sale_count) || 0,
         } as Customer);
         setSales(apiSales);
+        
+        // Convert customer's total spent to target currency
+        if (apiSales && apiSales.length > 0) {
+          try {
+            // Get all sale dates for conversion
+            const saleDates = apiSales
+              .map((sale: any) => sale.sale_date)
+              .filter(Boolean);
+            
+            if (saleDates.length > 0) {
+              const minDate = saleDates.reduce((a: string, b: string) => a < b ? a : b);
+              const maxDate = saleDates.reduce((a: string, b: string) => a > b ? a : b);
+              
+              // Convert all customer's sales to target currency
+              const convertRes = await api.post("/accounting/convert-incomes", {
+                target_currency: targetCurrency,
+                startDate: minDate,
+                endDate: maxDate,
+              });
+              
+              // Filter conversion details for this customer's sales (vehicle_sales.id matches)
+              const customerSaleIds = apiSales.map((s: any) => s.id).filter((id: any) => id !== null && id !== undefined);
+              const customerConvertedTotal = convertRes.data.conversion_details
+                .filter((detail: any) => detail.type === 'vehicle_sale' && customerSaleIds.includes(detail.id))
+                .reduce((sum: number, detail: any) => sum + (Number(detail.converted_amount) || 0), 0);
+              
+              setConvertedTotalSpent(customerConvertedTotal);
+            }
+          } catch (convertError) {
+            console.error("Failed to convert customer total spent:", convertError);
+            setConvertedTotalSpent(null);
+          }
+        } else {
+          setConvertedTotalSpent(null);
+        }
         setEditForm({
           name: apiCustomer.name || "",
           phone: apiCustomer.phone || "",
@@ -316,8 +355,9 @@ const CustomerDetails: React.FC = () => {
     );
   }
 
-  const segment = getCustomerSegment(customer.total_spent_base, customer.sale_count);
-  const averageSaleAmount = customer.sale_count > 0 ? customer.total_spent_base / customer.sale_count : 0;
+  const displayTotalSpent = convertedTotalSpent !== null ? convertedTotalSpent : customer.total_spent_base;
+  const segment = getCustomerSegment(displayTotalSpent, customer.sale_count);
+  const averageSaleAmount = customer.sale_count > 0 ? displayTotalSpent / customer.sale_count : 0;
 
   return (
     <div className="p-6 space-y-6 bg-background min-h-screen">
@@ -348,7 +388,9 @@ const CustomerDetails: React.FC = () => {
           <CardContent className="p-6">
             <div>
               <p className="text-sm text-muted-foreground font-medium mb-2">Toplam Harcama</p>
-              <p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(customer.total_spent_base)}</p>
+              <p className="text-2xl font-bold text-green-600 dark:text-green-400">
+                {formatCurrency(convertedTotalSpent !== null ? convertedTotalSpent : customer.total_spent_base)}
+              </p>
             </div>
           </CardContent>
         </Card>

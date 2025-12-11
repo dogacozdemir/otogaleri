@@ -18,7 +18,7 @@ import {
   deleteVehicleCost,
 } from "../controllers/vehicleCostController";
 import { markVehicleAsSold } from "../controllers/vehicleSaleController";
-import { calculateVehicleProfit } from "../controllers/profitController";
+import { calculateVehicleProfit, convertCostsToCurrency } from "../controllers/profitController";
 import { listVehicleImages, uploadVehicleImage, deleteVehicleImage, setPrimaryImage, upload } from "../controllers/vehicleImageController";
 import { bulkImportVehicles, bulkImportCosts, upload as bulkUpload } from "../controllers/bulkImportController";
 import {
@@ -57,6 +57,7 @@ router.put("/:id/costs/:cost_id", updateVehicleCost);
 router.delete("/:id/costs/:cost_id", deleteVehicleCost);
 router.get("/:id/calculate-costs", calculateVehicleProfit);
 router.get("/:id/profit", calculateVehicleProfit);
+router.post("/:id/convert-costs", convertCostsToCurrency);
 router.post("/:id/sell", markVehicleAsSold);
 router.get("/:id/images", listVehicleImages);
 router.post("/:id/images", upload.single("image"), uploadVehicleImage);

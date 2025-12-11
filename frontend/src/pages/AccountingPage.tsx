@@ -1,28 +1,37 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { api } from "@/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   DollarSign,
   TrendingUp,
   TrendingDown,
-  BarChart3,
   Plus,
-  Search,
   Calendar,
-  Filter,
+  Download,
+  Receipt,
+  ShoppingCart,
+  Wrench,
+  Building,
+  UsersIcon,
+  Zap,
+  Car,
+  Eye,
   Edit,
   Trash2,
-  Car,
+  MoreHorizontal,
+  Wallet,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrency } from "@/hooks/useCurrency";
+import { useTenant } from "@/contexts/TenantContext";
 import {
   LineChart,
   Line,
@@ -33,11 +42,12 @@ import {
   Tooltip,
   CartesianGrid,
   ResponsiveContainer,
+  Legend,
 } from "recharts";
 
 interface IncomeItem {
   id: number;
-  type: "vehicle_sale" | "manual";
+  type: "vehicle_sale" | "manual" | "inventory_sale" | "service_sale";
   date: string;
   income_date: string;
   amount: number;
@@ -48,6 +58,9 @@ interface IncomeItem {
   staff_name?: string | null;
   branch_name?: string | null;
   currency: string;
+  fx_rate_to_base?: number;
+  transaction_date?: string;
+  custom_rate?: number | null;
 }
 
 interface ExpenseItem {
@@ -63,13 +76,6 @@ interface ExpenseItem {
   currency: string;
 }
 
-interface YearlyData {
-  month: string;
-  income: number;
-  expense: number;
-  profit: number;
-}
-
 interface DateRangeData {
   date: string;
   income: number;
@@ -77,20 +83,76 @@ interface DateRangeData {
   net_income: number;
 }
 
+// Helper functions for category icons and colors
+const getCategoryIcon = (category: string) => {
+  const cat = category.toLowerCase();
+  if (cat.includes("araç") || cat.includes("vehicle") || cat.includes("satış")) {
+    return <Car className="h-4 w-4" />;
+  }
+  if (cat.includes("servis") || cat.includes("service") || cat.includes("bakım")) {
+    return <Wrench className="h-4 w-4" />;
+  }
+  if (cat.includes("parça") || cat.includes("part")) {
+    return <ShoppingCart className="h-4 w-4" />;
+  }
+  if (cat.includes("personel") || cat.includes("salary") || cat.includes("maaş")) {
+    return <UsersIcon className="h-4 w-4" />;
+  }
+  if (cat.includes("kira") || cat.includes("rent")) {
+    return <Building className="h-4 w-4" />;
+  }
+  if (cat.includes("stok") || cat.includes("stock")) {
+    return <Receipt className="h-4 w-4" />;
+  }
+  if (cat.includes("fatura") || cat.includes("utilities")) {
+    return <Zap className="h-4 w-4" />;
+  }
+  return <Receipt className="h-4 w-4" />;
+};
+
+const getCategoryColor = (category: string) => {
+  const cat = category.toLowerCase();
+  if (cat.includes("araç") || cat.includes("vehicle") || cat.includes("satış")) {
+    return "bg-emerald-100 text-emerald-700 border-emerald-200";
+  }
+  if (cat.includes("servis") || cat.includes("service") || cat.includes("bakım")) {
+    return "bg-blue-100 text-blue-700 border-blue-200";
+  }
+  if (cat.includes("parça") || cat.includes("part")) {
+    return "bg-purple-100 text-purple-700 border-purple-200";
+  }
+  if (cat.includes("personel") || cat.includes("salary") || cat.includes("maaş")) {
+    return "bg-orange-100 text-orange-700 border-orange-200";
+  }
+  if (cat.includes("kira") || cat.includes("rent")) {
+    return "bg-red-100 text-red-700 border-red-200";
+  }
+  if (cat.includes("stok") || cat.includes("stock")) {
+    return "bg-amber-100 text-amber-700 border-amber-200";
+  }
+  if (cat.includes("fatura") || cat.includes("utilities")) {
+    return "bg-yellow-100 text-yellow-700 border-yellow-200";
+  }
+  return "bg-gray-100 text-gray-700 border-gray-200";
+};
+
 const AccountingPage = () => {
   const { toast } = useToast();
-  const { formatCurrency } = useCurrency();
-  const [activeTab, setActiveTab] = useState("overview");
+  const { formatCurrency, formatCurrencyWithCurrency } = useCurrency();
+  const { tenant } = useTenant();
+  const targetCurrency = tenant?.default_currency || "TRY";
   const [incomeList, setIncomeList] = useState<IncomeItem[]>([]);
+  const [incomeListConverted, setIncomeListConverted] = useState<Map<number, number>>(new Map());
   const [expensesList, setExpensesList] = useState<ExpenseItem[]>([]);
-  const [yearlyData, setYearlyData] = useState<YearlyData[]>([]);
   const [dateRangeData, setDateRangeData] = useState<DateRangeData[]>([]);
+  const [totalConvertedIncome, setTotalConvertedIncome] = useState<number>(0);
+  const [totalConvertedExpense, setTotalConvertedExpense] = useState<number>(0);
   const [incomePagination, setIncomePagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [expensesPagination, setExpensesPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [incomeSearch, setIncomeSearch] = useState("");
   const [expenseSearch, setExpenseSearch] = useState("");
   const [expenseCategory, setExpenseCategory] = useState("all");
-  const [dateFilterPeriod, setDateFilterPeriod] = useState<"7" | "30" | "90" | "all" | "custom">("30");
+  const [dateFilterPeriod, setDateFilterPeriod] = useState<string>("Son 30 Gün");
   const [selectedDateRange, setSelectedDateRange] = useState({
     startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
     endDate: new Date().toISOString().split("T")[0],
@@ -114,55 +176,120 @@ const AccountingPage = () => {
     expense_date: new Date().toISOString().split("T")[0],
   });
 
+  // Convert date filter period to days
   useEffect(() => {
-    fetchYearlyData();
+    let days = 30;
+    if (dateFilterPeriod === "Son 7 Gün") days = 7;
+    else if (dateFilterPeriod === "Son 30 Gün") days = 30;
+    else if (dateFilterPeriod === "Son 3 Ay") days = 90;
+    else if (dateFilterPeriod === "Son 6 Ay") days = 180;
+    else if (dateFilterPeriod === "Bu Yıl") {
+      const startOfYear = new Date(new Date().getFullYear(), 0, 1);
+      setSelectedDateRange({
+        startDate: startOfYear.toISOString().split("T")[0],
+        endDate: new Date().toISOString().split("T")[0],
+      });
+      return;
+    } else if (dateFilterPeriod === "Özel Tarih") {
+      return; // Don't auto-update for custom dates
+    }
+
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - days);
+    setSelectedDateRange({
+      startDate: startDate.toISOString().split("T")[0],
+      endDate: endDate.toISOString().split("T")[0],
+    });
+  }, [dateFilterPeriod]);
+
+  useEffect(() => {
     fetchDateRangeData();
-  }, [dateFilterPeriod, selectedDateRange]);
+  }, [selectedDateRange, targetCurrency]);
 
   useEffect(() => {
     fetchIncomeList();
-  }, [incomePagination.page, incomeSearch, dateFilterPeriod, selectedDateRange]);
+  }, [incomePagination.page, incomeSearch, selectedDateRange, targetCurrency]);
 
   useEffect(() => {
     fetchExpensesList();
-  }, [expensesPagination.page, expenseSearch, expenseCategory, dateFilterPeriod, selectedDateRange]);
-
-  useEffect(() => {
-    if (dateFilterPeriod === "all") {
-      setSelectedDateRange({
-        startDate: "2020-01-01",
-        endDate: new Date().toISOString().split("T")[0],
-      });
-    } else if (dateFilterPeriod !== "custom") {
-      const endDate = new Date();
-      const startDate = new Date();
-      const days = parseInt(dateFilterPeriod);
-      startDate.setDate(endDate.getDate() - days);
-      setSelectedDateRange({
-        startDate: startDate.toISOString().split("T")[0],
-        endDate: endDate.toISOString().split("T")[0],
-      });
-    }
-  }, [dateFilterPeriod]);
-
-  const fetchYearlyData = async () => {
-    try {
-      const response = await api.get("/accounting/yearly-income-expense");
-      setYearlyData(response.data || []);
-    } catch (error) {
-      console.error("Yearly data error:", error);
-    }
-  };
+  }, [expensesPagination.page, expenseSearch, expenseCategory, selectedDateRange]);
 
   const fetchDateRangeData = async () => {
     try {
-      const params: any = {};
-      if (dateFilterPeriod !== "all") {
-        params.startDate = selectedDateRange.startDate;
-        params.endDate = selectedDateRange.endDate;
-      }
+      // First get raw date range data
+      const params: any = {
+        startDate: selectedDateRange.startDate,
+        endDate: selectedDateRange.endDate,
+      };
       const response = await api.get("/accounting/date-range-income-expense", { params });
-      setDateRangeData(response.data || []);
+      const rawData = response.data || [];
+      
+      // Then convert incomes to target currency
+      try {
+        const convertResponse = await api.post("/accounting/convert-incomes", {
+          target_currency: targetCurrency,
+          startDate: selectedDateRange.startDate,
+          endDate: selectedDateRange.endDate,
+        });
+        
+        // Group converted amounts by date
+        const convertedByDate = new Map<string, number>();
+        if (convertResponse.data.conversion_details && Array.isArray(convertResponse.data.conversion_details)) {
+          convertResponse.data.conversion_details.forEach((detail: any) => {
+            // Handle different date formats
+            let dateStr = detail.transaction_date;
+            if (dateStr) {
+              // If it's a full datetime string, extract just the date part
+              if (dateStr.includes('T')) {
+                dateStr = dateStr.split('T')[0];
+              }
+              // Normalize date format (YYYY-MM-DD)
+              const date = new Date(dateStr).toISOString().split('T')[0];
+              convertedByDate.set(date, (convertedByDate.get(date) || 0) + (Number(detail.converted_amount) || 0));
+            }
+          });
+        }
+        
+        // Update dateRangeData with converted income values
+        const updatedData = rawData.map((item: DateRangeData) => {
+          // Normalize date format for matching
+          const itemDate = new Date(item.date).toISOString().split('T')[0];
+          const convertedIncome = convertedByDate.get(itemDate) || 0;
+          return {
+            ...item,
+            income: convertedIncome,
+            net_income: convertedIncome - (Number(item.expense) || 0)
+          };
+        });
+        
+        setDateRangeData(updatedData);
+        
+        // Store total_converted for direct use
+        if (convertResponse.data.total_converted !== undefined) {
+          setTotalConvertedIncome(Number(convertResponse.data.total_converted) || 0);
+        }
+      } catch (convertError) {
+        console.error("Convert incomes error:", convertError);
+        // Fallback to original data if conversion fails
+        setDateRangeData(rawData);
+      }
+      
+      // Also convert expenses to target currency
+      try {
+        const convertExpenseResponse = await api.post("/accounting/convert-expenses", {
+          target_currency: targetCurrency,
+          startDate: selectedDateRange.startDate,
+          endDate: selectedDateRange.endDate,
+        });
+        
+        if (convertExpenseResponse.data.total_converted !== undefined) {
+          setTotalConvertedExpense(Number(convertExpenseResponse.data.total_converted) || 0);
+        }
+      } catch (convertExpenseError) {
+        console.error("Convert expenses error:", convertExpenseError);
+        // Fallback: use dateRangeData expense
+      }
     } catch (error) {
       console.error("Date range data error:", error);
     }
@@ -174,14 +301,41 @@ const AccountingPage = () => {
         page: incomePagination.page,
         limit: 10,
         search: incomeSearch,
+        startDate: selectedDateRange.startDate,
+        endDate: selectedDateRange.endDate,
       };
-      if (dateFilterPeriod !== "all") {
-        params.startDate = selectedDateRange.startDate;
-        params.endDate = selectedDateRange.endDate;
-      }
       const response = await api.get("/accounting/income-list", { params });
-      setIncomeList(response.data.incomes || []);
+      const incomes = response.data.incomes || [];
+      setIncomeList(incomes);
       setIncomePagination(response.data.pagination || { page: 1, totalPages: 1, total: 0 });
+      
+      // Convert incomes to target currency for category breakdown
+      if (incomes.length > 0) {
+        try {
+          const convertResponse = await api.post("/accounting/convert-incomes", {
+            target_currency: targetCurrency,
+            startDate: selectedDateRange.startDate,
+            endDate: selectedDateRange.endDate,
+          });
+          
+          // Create a map of income ID to converted amount
+          const convertedMap = new Map<number, number>();
+          if (convertResponse.data.conversion_details && Array.isArray(convertResponse.data.conversion_details)) {
+            convertResponse.data.conversion_details.forEach((detail: any) => {
+              if (detail.id) {
+                convertedMap.set(detail.id, Number(detail.converted_amount) || 0);
+              }
+            });
+          }
+          
+          setIncomeListConverted(convertedMap);
+        } catch (convertError) {
+          console.error("Failed to convert income list for category breakdown:", convertError);
+          setIncomeListConverted(new Map());
+        }
+      } else {
+        setIncomeListConverted(new Map());
+      }
     } catch (error) {
       console.error("Income list error:", error);
       toast({ title: "Hata", description: "Gelir listesi alınamadı", variant: "destructive" });
@@ -195,11 +349,9 @@ const AccountingPage = () => {
         limit: 10,
         search: expenseSearch,
         category: expenseCategory,
+        startDate: selectedDateRange.startDate,
+        endDate: selectedDateRange.endDate,
       };
-      if (dateFilterPeriod !== "all") {
-        params.startDate = selectedDateRange.startDate;
-        params.endDate = selectedDateRange.endDate;
-      }
       const response = await api.get("/accounting/expenses-list", { params });
       setExpensesList(response.data.expenses || []);
       setExpensesPagination(response.data.pagination || { page: 1, totalPages: 1, total: 0 });
@@ -296,322 +448,409 @@ const AccountingPage = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("tr-TR");
+    return new Date(dateString).toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" });
   };
 
-  const totalIncome = dateRangeData.reduce((sum, item) => sum + (Number(item.income) || 0), 0);
-  const totalExpense = dateRangeData.reduce((sum, item) => sum + (Number(item.expense) || 0), 0);
+  // Calculate KPIs
+  // Use totalConvertedIncome if available (from convert-incomes endpoint), otherwise use dateRangeData or incomeList
+  const totalIncome = useMemo(() => {
+    if (totalConvertedIncome > 0) {
+      return totalConvertedIncome;
+    }
+    if (dateRangeData.length > 0) {
+      const sum = dateRangeData.reduce((sum, item) => sum + (Number(item.income) || 0), 0);
+      if (sum > 0) return sum;
+    }
+    // Fallback to incomeList
+    return incomeList.reduce((sum, item) => sum + (Number(item.amount_base) || 0), 0);
+  }, [totalConvertedIncome, dateRangeData, incomeList]);
+  
+  // Calculate total expense - use converted expense if available
+  const totalExpense = useMemo(() => {
+    if (totalConvertedExpense > 0) {
+      return totalConvertedExpense;
+    }
+    // Fallback to dateRangeData
+    return dateRangeData.reduce((sum, item) => sum + (Number(item.expense) || 0), 0);
+  }, [totalConvertedExpense, dateRangeData]);
+  
   const netIncome = totalIncome - totalExpense;
 
-  const todayIncome = dateRangeData.length > 0
-    ? dateRangeData[dateRangeData.length - 1]?.income || 0
-    : 0;
-  const todayExpense = dateRangeData.length > 0
-    ? dateRangeData[dateRangeData.length - 1]?.expense || 0
-    : 0;
+  // Get today's income from converted data
+  const todayIncome = useMemo(() => {
+    const today = new Date().toISOString().split("T")[0];
+    const todayData = dateRangeData.find((item) => {
+      const itemDate = new Date(item.date).toISOString().split("T")[0];
+      return itemDate === today;
+    });
+    return todayData?.income || 0;
+  }, [dateRangeData]);
+
+  // Calculate previous period for comparison
+  const previousPeriodDays = dateFilterPeriod === "Son 7 Gün" ? 7 : dateFilterPeriod === "Son 30 Gün" ? 30 : 90;
+  const previousStartDate = new Date(selectedDateRange.startDate);
+  previousStartDate.setDate(previousStartDate.getDate() - previousPeriodDays);
+  const previousEndDate = new Date(selectedDateRange.startDate);
+  previousEndDate.setDate(previousEndDate.getDate() - 1);
+
+  // For trend calculation, we'll use a simple approach
+  const incomeChange = 0; // Would need to fetch previous period data
+  const expenseChange = 0;
+  const netIncomeChange = 0;
+  const todayIncomeChange = 0;
+
+  // Prepare chart data - format dates for display
+  const trendData = dateRangeData.map((item) => ({
+    date: new Date(item.date).toLocaleDateString("tr-TR", { day: "numeric", month: "short" }),
+    gelir: Number(item.income) || 0,
+    gider: Number(item.expense) || 0,
+  }));
+
+  // Calculate category breakdown from income list (using converted amounts)
+  const categoryData = useMemo(() => {
+    const categoryMap = new Map<string, number>();
+    incomeList.forEach((income) => {
+      const category = income.category || "Diğer";
+      const current = categoryMap.get(category) || 0;
+      // Use converted amount if available, otherwise fallback to amount_base
+      const amount = incomeListConverted.get(income.id) ?? (Number(income.amount_base) || 0);
+      categoryMap.set(category, current + amount);
+    });
+    return Array.from(categoryMap.entries())
+      .map(([category, value]) => ({ category, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+  }, [incomeList, incomeListConverted]);
 
   return (
     <div className="space-y-6">
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground font-medium mb-2">Toplam Gelir</p>
-                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(totalIncome)}</p>
-              </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-green-500/10 to-green-500/20 rounded-xl flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-green-600" />
-              </div>
+      {/* Global Date Filter */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Calendar className="h-5 w-5 text-muted-foreground" />
+          <Select 
+            value={dateFilterPeriod} 
+            onValueChange={setDateFilterPeriod}
+            onOpenChange={(open) => {
+              if (open) {
+                // Prevent page scroll when dropdown opens
+                const scrollY = window.scrollY;
+                document.body.style.position = 'fixed';
+                document.body.style.top = `-${scrollY}px`;
+                document.body.style.width = '100%';
+              } else {
+                // Restore scroll position when dropdown closes
+                const scrollY = document.body.style.top;
+                document.body.style.position = '';
+                document.body.style.top = '';
+                document.body.style.width = '';
+                if (scrollY) {
+                  window.scrollTo(0, parseInt(scrollY || '0') * -1);
+                }
+              }
+            }}
+          >
+            <SelectTrigger className="w-[180px] rounded-xl">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent 
+              position="popper"
+              sideOffset={4}
+            >
+              <SelectItem value="Son 7 Gün">Son 7 Gün</SelectItem>
+              <SelectItem value="Son 30 Gün">Son 30 Gün</SelectItem>
+              <SelectItem value="Son 3 Ay">Son 3 Ay</SelectItem>
+              <SelectItem value="Son 6 Ay">Son 6 Ay</SelectItem>
+              <SelectItem value="Bu Yıl">Bu Yıl</SelectItem>
+              <SelectItem value="Özel Tarih">Özel Tarih</SelectItem>
+            </SelectContent>
+          </Select>
+          {dateFilterPeriod === "Özel Tarih" && (
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={selectedDateRange.startDate}
+                onChange={(e) => setSelectedDateRange((prev) => ({ ...prev, startDate: e.target.value }))}
+                className="w-40 rounded-xl"
+              />
+              <span className="text-sm text-muted-foreground">-</span>
+              <Input
+                type="date"
+                value={selectedDateRange.endDate}
+                onChange={(e) => setSelectedDateRange((prev) => ({ ...prev, endDate: e.target.value }))}
+                className="w-40 rounded-xl"
+              />
+            </div>
+          )}
+        </div>
+
+        <Button variant="outline" className="gap-2 rounded-xl bg-transparent">
+          <Download className="h-4 w-4" />
+          Rapor İndir
+        </Button>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="rounded-2xl border-l-4 border-l-emerald-500 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Toplam Gelir</CardTitle>
+            <div className="rounded-xl bg-emerald-100 p-2">
+              <TrendingUp className="h-5 w-5 text-emerald-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(totalIncome)}</div>
+            <div className="flex items-center gap-1 text-xs text-emerald-600">
+              <TrendingUp className="h-3 w-3" />
+              <span className="font-medium">+{incomeChange.toFixed(1)}%</span>
+              <span className="text-muted-foreground">geçen aya göre</span>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground font-medium mb-2">Toplam Gider</p>
-                <p className="text-2xl font-bold text-red-600 dark:text-red-400">{formatCurrency(totalExpense)}</p>
-              </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-red-500/10 to-red-500/20 rounded-xl flex items-center justify-center">
-                <TrendingDown className="w-6 h-6 text-red-600" />
-              </div>
+        <Card className="rounded-2xl border-l-4 border-l-red-500 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Toplam Gider</CardTitle>
+            <div className="rounded-xl bg-red-100 p-2">
+              <TrendingDown className="h-5 w-5 text-red-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(totalExpense)}</div>
+            <div className="flex items-center gap-1 text-xs text-red-600">
+              <TrendingUp className="h-3 w-3" />
+              <span className="font-medium">+{expenseChange.toFixed(1)}%</span>
+              <span className="text-muted-foreground">geçen aya göre</span>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground font-medium mb-2">Net Gelir</p>
-                <p className={`text-2xl font-bold ${netIncome >= 0 ? "text-green-600" : "text-red-600"}`}>
-                  {formatCurrency(netIncome)}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-primary/10 to-primary/20 rounded-xl flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-primary" />
-              </div>
+        <Card className="rounded-2xl border-l-4 border-l-blue-500 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Net Gelir</CardTitle>
+            <div className="rounded-xl bg-blue-100 p-2">
+              <DollarSign className="h-5 w-5 text-blue-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(netIncome)}</div>
+            <div className="flex items-center gap-1 text-xs text-emerald-600">
+              <TrendingUp className="h-3 w-3" />
+              <span className="font-medium">+{netIncomeChange.toFixed(1)}%</span>
+              <span className="text-muted-foreground">geçen aya göre</span>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground font-medium mb-2">Bugünkü Gelir</p>
-                <p className="text-2xl font-bold text-primary">{formatCurrency(todayIncome)}</p>
-              </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-primary/10 to-primary/20 rounded-xl flex items-center justify-center">
-                <BarChart3 className="w-6 h-6 text-primary" />
-              </div>
+        <Card className="rounded-2xl border-l-4 border-l-amber-500 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Bugünkü Gelir</CardTitle>
+            <div className="rounded-xl bg-amber-100 p-2">
+              <Wallet className="h-5 w-5 text-amber-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(todayIncome)}</div>
+            <div className="flex items-center gap-1 text-xs text-emerald-600">
+              <TrendingUp className="h-3 w-3" />
+              <span className="font-medium">+{todayIncomeChange.toFixed(1)}%</span>
+              <span className="text-muted-foreground">dün'e göre</span>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 bg-card border border-border rounded-xl p-1.5 shadow-sm h-auto mb-6">
-          <TabsTrigger 
-            value="overview"
-            className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-colors duration-200 ease-in-out min-h-[3.5rem] data-[state=active]:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 hover:bg-muted/70"
-          >
-            Genel Bakış
-          </TabsTrigger>
-          <TabsTrigger 
-            value="income"
-            className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-colors duration-200 ease-in-out min-h-[3.5rem] data-[state=active]:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 hover:bg-muted/70"
-          >
-            Gelirler
-          </TabsTrigger>
-          <TabsTrigger 
-            value="expenses"
-            className="flex items-center justify-center px-6 py-4 text-base font-semibold text-muted-foreground data-[state=active]:text-white data-[state=active]:shadow-lg rounded-lg transition-colors duration-200 ease-in-out min-h-[3.5rem] data-[state=active]:bg-primary focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 hover:bg-muted/70"
-          >
-            Giderler
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Tarih Filtreleme */}
-        <Card className="mb-6">
+      {/* Charts - 2 Column Grid */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Income & Expense Trend - 66% width */}
+        <Card className="rounded-2xl shadow-sm lg:col-span-2">
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <Filter className="w-5 h-5 mr-2 text-primary" />
-              Tarih Filtreleme
-            </CardTitle>
+            <CardTitle className="text-base">Gelir ve Gider Trendi</CardTitle>
+            <p className="text-sm text-muted-foreground">Son {dateFilterPeriod.toLowerCase()} gelir ve gider karşılaştırması</p>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center space-x-2 mb-4">
-              {(["7", "30", "90", "all", "custom"] as const).map((period) => (
-                <Button
-                  key={period}
-                  variant={dateFilterPeriod === period ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setDateFilterPeriod(period)}
-                >
-                  {period === "all" ? "Tüm Tarihler" : period === "custom" ? "Özel Tarih" : `Son ${period} Gün`}
-                </Button>
-              ))}
-            </div>
-            {dateFilterPeriod === "custom" && (
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
-                  <Calendar className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Başlangıç:</span>
-                  <Input
-                    type="date"
-                    value={selectedDateRange.startDate}
-                    onChange={(e) => setSelectedDateRange((prev) => ({ ...prev, startDate: e.target.value }))}
-                    className="w-40"
-                  />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Calendar className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Bitiş:</span>
-                  <Input
-                    type="date"
-                    value={selectedDateRange.endDate}
-                    onChange={(e) => setSelectedDateRange((prev) => ({ ...prev, endDate: e.target.value }))}
-                    className="w-40"
-                  />
-                </div>
-              </div>
-            )}
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={trendData}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis dataKey="date" className="text-xs" tick={{ fontSize: 12 }} />
+                <YAxis className="text-xs" tick={{ fontSize: 12 }} />
+                <Tooltip
+                  formatter={(value: any) => formatCurrency(value)}
+                  labelFormatter={(value) => value}
+                />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="gelir"
+                  stroke="hsl(142, 76%, 36%)"
+                  strokeWidth={3}
+                  dot={{ fill: "hsl(142, 76%, 36%)", r: 4 }}
+                  activeDot={{ r: 6 }}
+                  name="Gelir"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="gider"
+                  stroke="hsl(0, 84%, 60%)"
+                  strokeWidth={3}
+                  dot={{ fill: "hsl(0, 84%, 60%)", r: 4 }}
+                  activeDot={{ r: 6 }}
+                  name="Gider"
+                />
+              </LineChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <BarChart3 className="w-5 h-5 mr-2 text-primary" />
-                Gelir ve Gider Trendi
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-80">
-                {dateRangeData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={400} minHeight={400}>
-                    <LineChart data={dateRangeData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis
-                        dataKey="date"
-                        tickFormatter={(value) => new Date(value).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}
+        {/* Category Breakdown - 33% width */}
+        <Card className="rounded-xl shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg">Kategori Analizi</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {categoryData.length > 0 ? (
+                categoryData.map((item, index) => (
+                  <div key={`${item.category}-${index}`} className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#003d82] text-xs text-white">
+                          {index + 1}
+                        </span>
+                        {item.category}
+                      </span>
+                      <span className="font-bold text-green-600">{formatCurrency(item.value)}</span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                      <div
+                        className="h-full bg-[#003d82]"
+                        style={{
+                          width: `${categoryData[0]?.value > 0 ? (item.value / categoryData[0].value) * 100 : 0}%`,
+                        }}
                       />
-                      <YAxis tickFormatter={(value) => `${value}₺`} />
-                      <Tooltip
-                        formatter={(value: any) => formatCurrency(value)}
-                        labelFormatter={(value) => formatDate(value)}
-                      />
-                      <Line type="monotone" dataKey="income" stroke="#22c55e" strokeWidth={2} name="Gelir" />
-                      <Line type="monotone" dataKey="expense" stroke="#ef4444" strokeWidth={2} name="Gider" />
-                      <Line type="monotone" dataKey="net_income" stroke="#3b82f6" strokeWidth={2} name="Net Gelir" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground">
-                    Veri bulunamadı
+                    </div>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">Veri bulunamadı</div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <BarChart3 className="w-5 h-5 mr-2 text-primary" />
-                Yıllık Gelir-Gider Analizi
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-80">
-                {yearlyData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={400} minHeight={400}>
-                    <BarChart data={yearlyData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" tickFormatter={(value) => new Date(value + "-01").toLocaleDateString("tr-TR", { month: "short" })} />
-                      <YAxis tickFormatter={(value) => `${value}₺`} />
-                      <Tooltip formatter={(value: any) => formatCurrency(value)} />
-                      <Bar dataKey="income" fill="#22c55e" name="Gelir" />
-                      <Bar dataKey="expense" fill="#ef4444" name="Gider" />
-                      <Bar dataKey="profit" fill="#3b82f6" name="Kar" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground">
-                    Veri bulunamadı
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Income Tab */}
-        <TabsContent value="income" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center">
-                  <DollarSign className="w-5 h-5 mr-2 text-green-600" />
+      {/* Transaction Lists with Tabs */}
+      <Card className="rounded-2xl shadow-sm">
+        <Tabs defaultValue="income" className="w-full">
+          <CardHeader className="border-b">
+            <div className="flex items-center justify-between">
+              <TabsList className="h-auto gap-2 bg-transparent p-0">
+                <TabsTrigger
+                  value="income"
+                  className="rounded-xl border-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-emerald-50 data-[state=active]:text-emerald-700"
+                >
+                  <TrendingUp className="mr-2 h-4 w-4" />
                   Gelir Listesi
-                </CardTitle>
-                <Button onClick={() => {
+                </TabsTrigger>
+                <TabsTrigger
+                  value="expense"
+                  className="rounded-xl border-2 border-transparent data-[state=active]:border-red-500 data-[state=active]:bg-red-50 data-[state=active]:text-red-700"
+                >
+                  <TrendingDown className="mr-2 h-4 w-4" />
+                  Gider Listesi
+                </TabsTrigger>
+              </TabsList>
+            </div>
+          </CardHeader>
+
+          <TabsContent value="income" className="m-0">
+            <CardContent className="pt-6">
+              <div className="mb-4 flex justify-end">
+                <Button className="gap-2 rounded-xl" style={{ backgroundColor: "#003d82" }} onClick={() => {
                   setEditingIncome(null);
                   setIncomeForm({ description: "", category: "", amount: "", currency: "TRY", income_date: new Date().toISOString().split("T")[0] });
                   setIncomeModalOpen(true);
                 }}>
-                  <Plus className="w-4 h-4 mr-2" />
+                  <Plus className="h-4 w-4" />
                   Gelir Ekle
                 </Button>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-4 flex items-center space-x-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                  <Input
-                    placeholder="Gelir ara..."
-                    value={incomeSearch}
-                    onChange={(e) => {
-                      setIncomeSearch(e.target.value);
-                      setIncomePagination({ ...incomePagination, page: 1 });
-                    }}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-muted/50 border-b">
-                    <tr>
-                      <th className="text-left p-4 font-medium text-muted-foreground">Tarih</th>
-                      <th className="text-left p-4 font-medium text-muted-foreground">Açıklama</th>
-                      <th className="text-left p-4 font-medium text-muted-foreground">Kategori</th>
-                      <th className="text-left p-4 font-medium text-muted-foreground">Müşteri</th>
-                      <th className="text-right p-4 font-medium text-muted-foreground">Tutar</th>
-                      <th className="text-left p-4 font-medium text-muted-foreground">Aksiyonlar</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+
+              <div className="rounded-xl border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tarih</TableHead>
+                      <TableHead>Açıklama</TableHead>
+                      <TableHead>Kategori</TableHead>
+                      <TableHead>Müşteri</TableHead>
+                      <TableHead className="text-right">Tutar</TableHead>
+                      <TableHead className="text-center">İşlemler</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {incomeList.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                           Gelir kaydı bulunamadı
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ) : (
-                      incomeList.map((income) => (
-                        <tr key={income.id} className="border-b hover:bg-muted/30">
-                          <td className="p-4">{formatDate(income.date)}</td>
-                          <td className="p-4">
-                            <div className="flex items-center space-x-2">
-                              {income.type === "vehicle_sale" && <Car className="w-4 h-4 text-primary" />}
-                              <span>{income.description}</span>
-                            </div>
-                          </td>
-                          <td className="p-4">
-                            <Badge variant="secondary">{income.category}</Badge>
-                          </td>
-                          <td className="p-4">{income.customer_name || "-"}</td>
-                          <td className="p-4 text-right font-semibold text-green-600">{formatCurrency(income.amount_base)}</td>
-                          <td className="p-4">
-                            {income.type === "manual" && (
-                              <div className="flex items-center space-x-2">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => {
-                                    setEditingIncome(income);
-                                    setIncomeForm({
-                                      description: income.description,
-                                      category: income.category,
-                                      amount: income.amount.toString(),
-                                      currency: income.currency,
-                                      income_date: income.income_date,
-                                    });
-                                    setIncomeModalOpen(true);
-                                  }}
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </Button>
-                                <Button size="sm" variant="ghost" onClick={() => handleDeleteIncome(income.id)}>
-                                  <Trash2 className="w-4 h-4 text-red-600" />
-                                </Button>
-                              </div>
+                      incomeList.map((transaction, idx) => (
+                        <TableRow key={`${transaction.type}-${transaction.id}-${idx}`}>
+                          <TableCell className="font-medium">{formatDate(transaction.date)}</TableCell>
+                          <TableCell>{transaction.description}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={`gap-1.5 ${getCategoryColor(transaction.category)}`}>
+                              {getCategoryIcon(transaction.category)}
+                              {transaction.category}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{transaction.customer_name || "-"}</TableCell>
+                          <TableCell className="text-right font-semibold text-emerald-600">
+                            {formatCurrencyWithCurrency(transaction.amount, transaction.currency)}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {transaction.type === "manual" ? (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setEditingIncome(transaction);
+                                      setIncomeForm({
+                                        description: transaction.description,
+                                        category: transaction.category,
+                                        amount: transaction.amount.toString(),
+                                        currency: transaction.currency,
+                                        income_date: transaction.income_date,
+                                      });
+                                      setIncomeModalOpen(true);
+                                    }}
+                                  >
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Düzenle
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteIncome(transaction.id)}>
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Sil
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">-</span>
                             )}
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       ))
                     )}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
               {incomePagination.totalPages > 1 && (
                 <div className="flex items-center justify-between mt-4">
@@ -639,120 +878,93 @@ const AccountingPage = () => {
                 </div>
               )}
             </CardContent>
-          </Card>
-        </TabsContent>
+          </TabsContent>
 
-        {/* Expenses Tab */}
-        <TabsContent value="expenses" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center">
-                  <TrendingDown className="w-5 h-5 mr-2 text-red-600" />
-                  Gider Listesi
-                </CardTitle>
-                <Button onClick={() => {
+          <TabsContent value="expense" className="m-0">
+            <CardContent className="pt-6">
+              <div className="mb-4 flex justify-end">
+                <Button className="gap-2 rounded-xl bg-red-600 hover:bg-red-700" onClick={() => {
                   setEditingExpense(null);
                   setExpenseForm({ description: "", category: "", amount: "", currency: "TRY", expense_date: new Date().toISOString().split("T")[0] });
                   setExpenseModalOpen(true);
                 }}>
-                  <Plus className="w-4 h-4 mr-2" />
+                  <Plus className="h-4 w-4" />
                   Gider Ekle
                 </Button>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-4 flex items-center space-x-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                  <Input
-                    placeholder="Gider ara..."
-                    value={expenseSearch}
-                    onChange={(e) => {
-                      setExpenseSearch(e.target.value);
-                      setExpensesPagination({ ...expensesPagination, page: 1 });
-                    }}
-                    className="pl-10"
-                  />
-                </div>
-                <Select value={expenseCategory} onValueChange={(value) => {
-                  setExpenseCategory(value);
-                  setExpensesPagination({ ...expensesPagination, page: 1 });
-                }}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="Kategori" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tüm Kategoriler</SelectItem>
-                    <SelectItem value="Other">Diğer</SelectItem>
-                    <SelectItem value="Rent">Kira</SelectItem>
-                    <SelectItem value="Utilities">Faturalar</SelectItem>
-                    <SelectItem value="Salary">Maaş</SelectItem>
-                    <SelectItem value="Marketing">Pazarlama</SelectItem>
-                    <SelectItem value="Maintenance">Bakım</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-muted/50 border-b">
-                    <tr>
-                      <th className="text-left p-4 font-medium text-muted-foreground">Tarih</th>
-                      <th className="text-left p-4 font-medium text-muted-foreground">Açıklama</th>
-                      <th className="text-left p-4 font-medium text-muted-foreground">Kategori</th>
-                      <th className="text-left p-4 font-medium text-muted-foreground">Araç</th>
-                      <th className="text-right p-4 font-medium text-muted-foreground">Tutar</th>
-                      <th className="text-left p-4 font-medium text-muted-foreground">Aksiyonlar</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+
+              <div className="rounded-xl border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tarih</TableHead>
+                      <TableHead>Açıklama</TableHead>
+                      <TableHead>Kategori</TableHead>
+                      <TableHead>Araç</TableHead>
+                      <TableHead className="text-right">Tutar</TableHead>
+                      <TableHead className="text-center">İşlemler</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {expensesList.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                           Gider kaydı bulunamadı
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ) : (
-                      expensesList.map((expense) => (
-                        <tr key={expense.id} className="border-b hover:bg-muted/30">
-                          <td className="p-4">{formatDate(expense.expense_date)}</td>
-                          <td className="p-4">{expense.description}</td>
-                          <td className="p-4">
-                            <Badge variant="secondary">{expense.category}</Badge>
-                          </td>
-                          <td className="p-4">
-                            {expense.maker && expense.model ? `${expense.maker} ${expense.model}` : "-"}
-                          </td>
-                          <td className="p-4 text-right font-semibold text-red-600">{formatCurrency(expense.amount_base)}</td>
-                          <td className="p-4">
-                            <div className="flex items-center space-x-2">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  setEditingExpense(expense);
-                                  setExpenseForm({
-                                    description: expense.description,
-                                    category: expense.category,
-                                    amount: expense.amount.toString(),
-                                    currency: expense.currency,
-                                    expense_date: expense.expense_date,
-                                  });
-                                  setExpenseModalOpen(true);
-                                }}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={() => handleDeleteExpense(expense.id)}>
-                                <Trash2 className="w-4 h-4 text-red-600" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
+                      expensesList.map((transaction) => (
+                        <TableRow key={transaction.id}>
+                          <TableCell className="font-medium">{formatDate(transaction.expense_date)}</TableCell>
+                          <TableCell>{transaction.description}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={`gap-1.5 ${getCategoryColor(transaction.category)}`}>
+                              {getCategoryIcon(transaction.category)}
+                              {transaction.category}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {transaction.maker && transaction.model ? `${transaction.maker} ${transaction.model}` : "-"}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold text-red-600">
+                            {formatCurrencyWithCurrency(transaction.amount, transaction.currency)}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setEditingExpense(transaction);
+                                    setExpenseForm({
+                                      description: transaction.description,
+                                      category: transaction.category,
+                                      amount: transaction.amount.toString(),
+                                      currency: transaction.currency,
+                                      expense_date: transaction.expense_date,
+                                    });
+                                    setExpenseModalOpen(true);
+                                  }}
+                                >
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Düzenle
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteExpense(transaction.id)}>
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Sil
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
                       ))
                     )}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
               {expensesPagination.totalPages > 1 && (
                 <div className="flex items-center justify-between mt-4">
@@ -780,9 +992,9 @@ const AccountingPage = () => {
                 </div>
               )}
             </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+          </TabsContent>
+        </Tabs>
+      </Card>
 
       {/* Income Modal */}
       <Dialog open={incomeModalOpen} onOpenChange={setIncomeModalOpen}>
@@ -924,4 +1136,3 @@ const AccountingPage = () => {
 };
 
 export default AccountingPage;
-

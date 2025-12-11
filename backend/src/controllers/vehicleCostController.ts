@@ -58,10 +58,13 @@ export async function addVehicleCost(req: AuthRequest, res: Response) {
     }
 
     const amountBase = Number(amount) * fxRate;
+    
+    // Store custom_rate if provided, otherwise store null
+    const storedCustomRate = (custom_rate !== undefined && custom_rate !== null) ? Number(custom_rate) : null;
 
     const [result] = await dbPool.query(
-      "INSERT INTO vehicle_costs (tenant_id, vehicle_id, cost_name, amount, currency, fx_rate_to_base, cost_date, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      [req.tenantId, vehicle_id, cost_name, amount, costCurrency, fxRate, formattedDate, category || "other"]
+      "INSERT INTO vehicle_costs (tenant_id, vehicle_id, cost_name, amount, currency, fx_rate_to_base, cost_date, category, custom_rate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [req.tenantId, vehicle_id, cost_name, amount, costCurrency, fxRate, formattedDate, category || "other", storedCustomRate]
     );
 
     const costId = (result as any).insertId;
@@ -116,10 +119,13 @@ export async function updateVehicleCost(req: AuthRequest, res: Response) {
         );
       }
     }
+    
+    // Store custom_rate if provided, otherwise store null
+    const storedCustomRate = (custom_rate !== undefined && custom_rate !== null) ? Number(custom_rate) : null;
 
     await dbPool.query(
-      "UPDATE vehicle_costs SET cost_name = ?, amount = ?, currency = ?, fx_rate_to_base = ?, cost_date = ?, category = ? WHERE id = ? AND vehicle_id = ? AND tenant_id = ?",
-      [cost_name, amount, costCurrency, fxRate, formattedDate, category, cost_id, vehicle_id, req.tenantId]
+      "UPDATE vehicle_costs SET cost_name = ?, amount = ?, currency = ?, fx_rate_to_base = ?, cost_date = ?, category = ?, custom_rate = ? WHERE id = ? AND vehicle_id = ? AND tenant_id = ?",
+      [cost_name, amount, costCurrency, fxRate, formattedDate, category, storedCustomRate, cost_id, vehicle_id, req.tenantId]
     );
 
     const [rows] = await dbPool.query("SELECT * FROM vehicle_costs WHERE id = ?", [cost_id]);

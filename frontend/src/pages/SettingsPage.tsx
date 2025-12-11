@@ -23,6 +23,7 @@ const currencies = [
   { value: "USD", label: "Amerikan Doları (USD)" },
   { value: "EUR", label: "Euro (EUR)" },
   { value: "GBP", label: "İngiliz Sterlini (GBP)" },
+  { value: "JPY", label: "Japon Yeni (JPY)" },
 ];
 
 const languages = [

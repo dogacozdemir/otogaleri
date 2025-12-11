@@ -31,7 +31,7 @@ const CURRENCIES = [
   { code: "USD", name: "ABD Doları" },
   { code: "EUR", name: "Euro" },
   { code: "GBP", name: "İngiliz Sterlini" },
-  { code: "YEN", name: "Japon Yeni" },
+  { code: "JPY", name: "Japon Yeni" },
 ];
 
 export function CurrencyConverterPopover() {
@@ -59,9 +59,9 @@ export function CurrencyConverterPopover() {
   const fetchLiveRate = async () => {
     setIsLoading(true);
     try {
-      // YEN -> JPY dönüşümü (FreeCurrencyAPI JPY kullanıyor)
-      const from = fromCurrency === "YEN" ? "JPY" : fromCurrency;
-      const to = toCurrency === "YEN" ? "JPY" : toCurrency;
+      // FreeCurrencyAPI JPY kullanıyor (ISO 4217 standardı)
+      const from = fromCurrency;
+      const to = toCurrency;
 
       const response = await api.get("/currency/rate", {
         params: { from, to },

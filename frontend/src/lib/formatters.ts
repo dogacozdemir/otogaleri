@@ -4,10 +4,29 @@
  */
 
 /**
+ * Gets appropriate locale for currency formatting
+ * @param currency - Currency code
+ * @param fallbackLocale - Fallback locale (default: "tr-TR")
+ * @returns Locale string optimized for the currency
+ */
+const getLocaleForCurrency = (currency: string, fallbackLocale: string = "tr-TR"): string => {
+  // Map currencies to their optimal locales for better formatting
+  const currencyLocaleMap: Record<string, string> = {
+    TRY: "tr-TR",
+    USD: "en-US",
+    EUR: "de-DE", // European format (1.234,56 €)
+    GBP: "en-GB",
+    JPY: "ja-JP",
+  };
+  
+  return currencyLocaleMap[currency] || fallbackLocale;
+};
+
+/**
  * Formats a number as currency
  * @param amount - The amount to format (can be number, string, null, or undefined)
  * @param currency - Currency code (default: "TRY")
- * @param locale - Locale string (default: "tr-TR")
+ * @param locale - Locale string (default: "tr-TR", will be auto-adjusted for currency if not specified)
  * @returns Formatted currency string or "-" if invalid
  */
 export const formatCurrency = (
@@ -18,10 +37,36 @@ export const formatCurrency = (
   if (amount == null || amount === undefined || amount === "") return "-";
   const num = typeof amount === "string" ? parseFloat(amount) : amount;
   if (isNaN(num)) return "-";
-  return new Intl.NumberFormat(locale, {
+  
+  // Use currency-optimized locale if default locale is used
+  // This ensures proper formatting for GBP, JPY, EUR, etc.
+  const optimizedLocale = (locale === "tr-TR" || locale === "en-US") 
+    ? getLocaleForCurrency(currency, locale)
+    : locale;
+  
+  return new Intl.NumberFormat(optimizedLocale, {
     style: "currency",
     currency: currency,
   }).format(num);
+};
+
+/**
+ * Formats a number as currency with explicit currency parameter
+ * This is used for multi-currency support where each record has its own currency
+ * @param amount - The amount to format (can be number, string, null, or undefined)
+ * @param recordCurrency - The currency of the record (e.g., "USD", "EUR", "TRY")
+ * @param locale - Locale string (default: "tr-TR")
+ * @param fallbackCurrency - Fallback currency if recordCurrency is null/undefined (default: "TRY")
+ * @returns Formatted currency string or "-" if invalid
+ */
+export const formatCurrencyWithCurrency = (
+  amount: number | null | undefined | string,
+  recordCurrency: string | null | undefined,
+  locale: string = "tr-TR",
+  fallbackCurrency: string = "TRY"
+): string => {
+  const currency = recordCurrency || fallbackCurrency;
+  return formatCurrency(amount, currency, locale);
 };
 
 /**

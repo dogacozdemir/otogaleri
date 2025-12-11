@@ -39,6 +39,7 @@ import { formatCurrency } from "@/lib/formatters";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { useCurrency } from "@/hooks/useCurrency";
+import { useTenant } from "@/contexts/TenantContext";
 
 type Quote = {
   id: number;
@@ -83,6 +84,8 @@ type Customer = {
 
 export default function QuotesPage() {
   const { formatCurrency: currency } = useCurrency();
+  const { tenant } = useTenant();
+  const locale = tenant?.language === "en" ? "en-US" : "tr-TR";
   const navigate = useNavigate();
   const { toast } = useToast();
   const [quotes, setQuotes] = useState<Quote[]>([]);
@@ -636,7 +639,7 @@ export default function QuotesPage() {
                         {quote.customer_name_full || "-"}
                       </TableCell>
                       <TableCell className="text-[#2d3748] font-medium">
-                        {currency(quote.sale_price, quote.currency)}
+                        {formatCurrency(quote.sale_price, quote.currency, locale)}
                       </TableCell>
                       <TableCell className="text-[#2d3748]">
                         {format(new Date(quote.quote_date), "dd MMM yyyy", { locale: tr })}
@@ -910,7 +913,7 @@ export default function QuotesPage() {
                 <strong>Araç:</strong> {selectedQuote.maker} {selectedQuote.model}
               </p>
               <p className="text-sm text-[#2d3748]">
-                <strong>Fiyat:</strong> {currency(selectedQuote.sale_price, selectedQuote.currency)}
+                <strong>Fiyat:</strong> {formatCurrency(selectedQuote.sale_price, selectedQuote.currency, locale)}
               </p>
             </div>
           )}

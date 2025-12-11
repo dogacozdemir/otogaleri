@@ -178,6 +178,9 @@ export async function getTopProfitable(req: AuthRequest, res: Response) {
         v.model,
         v.production_year as year,
         v.chassis_no,
+        vs.id as sale_id,
+        vs.sale_amount,
+        vs.sale_currency,
         vs.sale_amount * vs.sale_fx_rate_to_base as sale_price,
         (v.purchase_amount * COALESCE(v.purchase_fx_rate_to_base, 1) + 
          COALESCE((SELECT SUM(amount * fx_rate_to_base) FROM vehicle_costs WHERE vehicle_id = v.id), 0)) as total_costs,
@@ -477,6 +480,55 @@ export async function getWeeklySales(req: AuthRequest, res: Response) {
   }
 }
 
+// Haftalık gelir ve maliyet verilerini getir (son 6 hafta)
+export async function getWeeklyRevenue(req: AuthRequest, res: Response) {
+  try {
+    const weeks: any[] = [];
+    const today = new Date();
+    
+    for (let i = 5; i >= 0; i--) {
+      const weekDate = new Date(today);
+      weekDate.setDate(today.getDate() - (i * 7));
+      const weekStart = new Date(weekDate);
+      weekStart.setDate(weekDate.getDate() - weekDate.getDay());
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      
+      const weekStartStr = weekStart.toISOString().split('T')[0];
+      const weekEndStr = weekEnd.toISOString().split('T')[0];
+      
+      // Bu hafta içindeki gelir ve maliyetleri hesapla
+      const [revenueRows] = await dbPool.query(
+        `SELECT 
+          COALESCE(SUM(vs.sale_amount * vs.sale_fx_rate_to_base), 0) as revenue,
+          COALESCE(SUM(v.purchase_amount * COALESCE(v.purchase_fx_rate_to_base, 1) + 
+           COALESCE((SELECT SUM(amount * fx_rate_to_base) FROM vehicle_costs WHERE vehicle_id = v.id), 0)), 0) as cost
+         FROM vehicle_sales vs
+         JOIN vehicles v ON vs.vehicle_id = v.id
+         WHERE vs.tenant_id = ?
+           AND DATE(vs.sale_date) >= ?
+           AND DATE(vs.sale_date) <= ?`,
+        [req.tenantId, weekStartStr, weekEndStr]
+      );
+      
+      const revenueRowsArray = revenueRows as any[];
+      const revenue = revenueRowsArray[0] ? parseFloat(revenueRowsArray[0].revenue) : 0;
+      const cost = revenueRowsArray[0] ? parseFloat(revenueRowsArray[0].cost) : 0;
+      
+      weeks.push({
+        week: `Hafta ${6 - i}`,
+        revenue: revenue,
+        cost: cost,
+      });
+    }
+
+    res.json(weeks);
+  } catch (err) {
+    console.error("[analytics] Weekly revenue error", err);
+    res.status(500).json({ error: "Failed to get weekly revenue" });
+  }
+}
+
 // Haftalık stok verilerini getir (son 8 hafta) - Servis ve Satış çıkışlarını ayrı göster
 export async function getWeeklyInventory(req: AuthRequest, res: Response) {
   try {
@@ -651,5 +703,71 @@ export async function getRecentActivities(req: AuthRequest, res: Response) {
   } catch (err) {
     console.error("[analytics] Recent activities error", err);
     res.status(500).json({ error: "Failed to get recent activities" });
+  }
+}
+
+// Son satışları getir (tablo için)
+export async function getRecentSales(req: AuthRequest, res: Response) {
+  try {
+    const { limit = 10 } = req.query;
+
+    const [rows] = await dbPool.query(
+      `SELECT 
+        vs.id,
+        vs.sale_date,
+        vs.customer_name,
+        vs.sale_amount,
+        vs.sale_currency,
+        vs.sale_fx_rate_to_base,
+        v.id as vehicle_id,
+        v.maker,
+        v.model,
+        v.production_year as year,
+        primary_img.image_filename as primary_image_filename,
+        CASE 
+          WHEN vis.id IS NOT NULL THEN 'Taksitli'
+          ELSE 'Peşin'
+        END as payment_type,
+        vis.id as installment_sale_id
+      FROM vehicle_sales vs
+      JOIN vehicles v ON vs.vehicle_id = v.id
+      LEFT JOIN (
+        SELECT 
+          vi.vehicle_id,
+          vi.image_filename,
+          ROW_NUMBER() OVER (
+            PARTITION BY vi.vehicle_id 
+            ORDER BY vi.is_primary DESC, vi.display_order ASC, vi.created_at ASC
+          ) as rn
+        FROM vehicle_images vi
+        WHERE vi.tenant_id = ?
+      ) primary_img ON primary_img.vehicle_id = v.id AND primary_img.rn = 1
+      LEFT JOIN vehicle_installment_sales vis ON vs.id = vis.sale_id AND vis.tenant_id = ?
+      WHERE vs.tenant_id = ?
+      ORDER BY vs.sale_date DESC
+      LIMIT ?`,
+      [req.tenantId, req.tenantId, req.tenantId, Number(limit)]
+    );
+
+    const rowsArray = rows as any[];
+    const formattedRows = rowsArray.map(row => ({
+      id: row.id,
+      vehicle_id: row.vehicle_id,
+      sale_date: row.sale_date,
+      customer_name: row.customer_name,
+      maker: row.maker,
+      model: row.model,
+      year: row.year,
+      image: row.primary_image_filename ? `/uploads/vehicles/${row.primary_image_filename}` : null,
+      price: row.sale_amount,
+      currency: row.sale_currency,
+      payment_type: row.payment_type,
+      installment_sale_id: row.installment_sale_id,
+    }));
+
+    res.json(formattedRows);
+  } catch (err) {
+    console.error("[analytics] Recent sales error", err);
+    res.status(500).json({ error: "Failed to get recent sales" });
   }
 }
