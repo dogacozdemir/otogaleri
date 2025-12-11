@@ -6,24 +6,63 @@ import { generateToken } from "../middleware/auth";
 export async function signup(req: Request, res: Response) {
   const { tenantName, tenantSlug, defaultCurrency, ownerName, ownerEmail, ownerPassword } = req.body;
 
+  // Validation
   if (!tenantName || !tenantSlug || !ownerEmail || !ownerPassword) {
     return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  // Email validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(ownerEmail)) {
+    return res.status(400).json({ error: "Invalid email format" });
+  }
+
+  // Password strength validation
+  if (ownerPassword.length < 8) {
+    return res.status(400).json({ error: "Password must be at least 8 characters long" });
+  }
+
+  // Tenant name validation
+  if (tenantName.trim().length < 2) {
+    return res.status(400).json({ error: "Company name must be at least 2 characters long" });
   }
 
   const conn = await dbPool.getConnection();
   await conn.beginTransaction();
 
   try {
+    // Check if email already exists
+    const [existingUsers] = await conn.query(
+      "SELECT id FROM users WHERE email = ?",
+      [ownerEmail]
+    );
+    if (Array.isArray(existingUsers) && existingUsers.length > 0) {
+      await conn.rollback();
+      conn.release();
+      return res.status(409).json({ error: "Email already exists" });
+    }
+
+    // Check if tenant slug already exists
+    const [existingTenants] = await conn.query(
+      "SELECT id FROM tenants WHERE slug = ?",
+      [tenantSlug]
+    );
+    if (Array.isArray(existingTenants) && existingTenants.length > 0) {
+      await conn.rollback();
+      conn.release();
+      return res.status(409).json({ error: "Company name already exists" });
+    }
+
     const [tenantResult] = await conn.query(
       "INSERT INTO tenants (name, slug, default_currency) VALUES (?, ?, ?)",
-      [tenantName, tenantSlug, defaultCurrency || "TRY"]
+      [tenantName.trim(), tenantSlug, defaultCurrency || "TRY"]
     );
     const tenantId = (tenantResult as any).insertId;
 
     const passwordHash = await bcrypt.hash(ownerPassword, 10);
     await conn.query(
       "INSERT INTO users (tenant_id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)",
-      [tenantId, ownerName || "Owner", ownerEmail, passwordHash, "owner"]
+      [tenantId, ownerName?.trim() || tenantName.trim(), ownerEmail.toLowerCase().trim(), passwordHash, "owner"]
     );
 
     await conn.commit();
@@ -54,10 +93,16 @@ export async function login(req: Request, res: Response) {
     return res.status(400).json({ error: "Email and password required" });
   }
 
+  // Email validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ error: "Invalid email format" });
+  }
+
   try {
     const [rows] = await dbPool.query(
       "SELECT u.id, u.tenant_id, u.name, u.email, u.password_hash, u.role, u.is_active FROM users u WHERE u.email = ?",
-      [email]
+      [email.toLowerCase().trim()]
     );
 
     if (!Array.isArray(rows) || rows.length === 0) {

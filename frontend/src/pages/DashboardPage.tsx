@@ -250,42 +250,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Hızlı Erişim Butonları */}
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
-        <Button
-          variant="outline"
-          className="h-auto py-4 flex flex-col items-center gap-2 hover:bg-primary hover:text-primary-foreground transition-colors"
-          onClick={() => navigate("/vehicles")}
-        >
-          <Plus className="h-5 w-5" />
-          <span className="text-sm font-medium">Yeni Araç</span>
-        </Button>
-        <Button
-          variant="outline"
-          className="h-auto py-4 flex flex-col items-center gap-2 hover:bg-primary hover:text-primary-foreground transition-colors"
-          onClick={() => navigate("/vehicles")}
-        >
-          <Car className="h-5 w-5" />
-          <span className="text-sm font-medium">Araç Sat</span>
-        </Button>
-        <Button
-          variant="outline"
-          className="h-auto py-4 flex flex-col items-center gap-2 hover:bg-primary hover:text-primary-foreground transition-colors"
-          onClick={() => navigate("/customers")}
-        >
-          <Users className="h-5 w-5" />
-          <span className="text-sm font-medium">Müşteri Ekle</span>
-        </Button>
-        <Button
-          variant="outline"
-          className="h-auto py-4 flex flex-col items-center gap-2 hover:bg-primary hover:text-primary-foreground transition-colors"
-          onClick={() => navigate("/inventory")}
-        >
-          <Package className="h-5 w-5" />
-          <span className="text-sm font-medium">Stok</span>
-        </Button>
-      </div>
-
       {/* Grafikler: Sol (Bar Charts) - Sağ (Donut Charts) */}
       <div className="grid gap-6 grid-cols-12">
         {/* İlk Satır: Haftalık Araç Çıkışı (Bar Chart) - Sol */}

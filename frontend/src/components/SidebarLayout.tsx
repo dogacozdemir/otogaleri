@@ -144,15 +144,29 @@ const SidebarLayout = () => {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  // Dropdown için ESC ile kapatma
+  // Dropdown için ESC ile kapatma ve dışına tıklama
   useEffect(() => {
-    if (!dropdownOpen) return;
+    if (!dropdownOpen && !profileDropdownOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setDropdownOpen(false);
+      if (e.key === "Escape") {
+        setDropdownOpen(false);
+        setProfileDropdownOpen(false);
+      }
+    };
+    const onClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.quick-actions-dropdown') && !target.closest('.profile-dropdown')) {
+        setDropdownOpen(false);
+        setProfileDropdownOpen(false);
+      }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [dropdownOpen]);
+    window.addEventListener("click", onClickOutside);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("click", onClickOutside);
+    };
+  }, [dropdownOpen, profileDropdownOpen]);
 
   // Dropdown dışına tıklandığında kapatma
   useEffect(() => {
@@ -327,11 +341,56 @@ const SidebarLayout = () => {
                             className="w-full flex items-center space-x-3 p-3 text-left rounded-lg hover:bg-accent transition-colors duration-200"
                           >
                             <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-                              <Car className="w-4 h-4 text-primary" />
+                              <Plus className="w-4 h-4 text-primary" />
                             </div>
                             <div>
                               <p className="font-medium text-sm">Yeni Araç</p>
                               <p className="text-xs text-muted-foreground">Araç ekle</p>
+                            </div>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setDropdownOpen(false);
+                              navigate('/vehicles');
+                            }}
+                            className="w-full flex items-center space-x-3 p-3 text-left rounded-lg hover:bg-accent transition-colors duration-200"
+                          >
+                            <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+                              <Car className="w-4 h-4 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm">Araç Sat</p>
+                              <p className="text-xs text-muted-foreground">Araç satış işlemi</p>
+                            </div>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setDropdownOpen(false);
+                              navigate('/customers');
+                            }}
+                            className="w-full flex items-center space-x-3 p-3 text-left rounded-lg hover:bg-accent transition-colors duration-200"
+                          >
+                            <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+                              <Users className="w-4 h-4 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm">Müşteri Ekle</p>
+                              <p className="text-xs text-muted-foreground">Yeni müşteri ekle</p>
+                            </div>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setDropdownOpen(false);
+                              navigate('/inventory');
+                            }}
+                            className="w-full flex items-center space-x-3 p-3 text-left rounded-lg hover:bg-accent transition-colors duration-200"
+                          >
+                            <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+                              <Package className="w-4 h-4 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm">Stok</p>
+                              <p className="text-xs text-muted-foreground">Stok yönetimi</p>
                             </div>
                           </button>
                         </div>
