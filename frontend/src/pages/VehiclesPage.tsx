@@ -1014,14 +1014,14 @@ const VehiclesPage = () => {
           vehicles={vehiclesData.activeTab === "vehicles" ? vehiclesData.filteredVehicles : vehiclesData.filteredSoldVehicles}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
-          onBulkImportClick={(type) => {
+          onBulkImportClick={(type: "vehicles" | "costs") => {
             setBulkImportType(type);
                   setOpenBulkImport(true);
                 }}
           onExportClick={() => {
             // Export functionality can be added here
           }}
-          onActiveTabChange={(tab) => vehiclesData.setActiveTab(tab)}
+          onActiveTabChange={(tab: "vehicles" | "sold") => vehiclesData.setActiveTab(tab)}
           activeVehiclesCount={activeVehiclesCount}
           soldVehiclesCount={soldVehiclesCount}
           addVehicleButton={
@@ -1132,7 +1132,7 @@ const VehiclesPage = () => {
       {/* Edit Modal */}
       <VehicleAddEditModal
         open={openEdit}
-        onOpenChange={(open) => {
+        onOpenChange={(open: boolean) => {
         setOpenEdit(open);
         if (!open) {
           setEditModalStep(1);
@@ -1147,7 +1147,7 @@ const VehiclesPage = () => {
         modalStep={editModalStep}
         isSubmitting={isSubmitting}
         currencies={currencies}
-        onFormChange={(field, value) => {
+        onFormChange={(field: keyof VehicleFormData, value: any) => {
           setVehicleForm({ ...vehicleForm, [field]: value });
           if (formErrors[field]) {
             setFormErrors({ ...formErrors, [field]: "" });
@@ -1165,7 +1165,7 @@ const VehiclesPage = () => {
       {/* Cost Modal */}
       <VehicleCostModal
         open={openCost || openEditCost}
-        onOpenChange={(open) => {
+        onOpenChange={(open: boolean) => {
           if (!open) {
             setOpenCost(false);
               setOpenEditCost(false);
@@ -1182,7 +1182,7 @@ const VehiclesPage = () => {
         }}
         mode={openEditCost ? 'edit' : 'add'}
         costForm={costForm}
-        onFormChange={(field, value) => {
+        onFormChange={(field: keyof CostFormData, value: any) => {
           setCostForm({ ...costForm, [field]: value });
         }}
         onSubmit={openEditCost ? handleUpdateCost : handleAddCost}
@@ -1210,7 +1210,7 @@ const VehiclesPage = () => {
         onOpenChange={setOpenSell}
         vehicle={vehiclesData.selectedVehicle}
         sellForm={sellForm}
-        onFormChange={(field, value) => {
+        onFormChange={(field: keyof SellFormData, value: any) => {
           setSellForm({ ...sellForm, [field]: value });
         }}
         onSubmit={handleSell}
@@ -1220,7 +1220,7 @@ const VehiclesPage = () => {
       {/* Payment Modal */}
       <VehiclePaymentModal
         open={openPayment}
-        onOpenChange={(open) => {
+        onOpenChange={(open: boolean) => {
         setOpenPayment(open);
         if (!open) {
           setEditingPaymentId(null);
@@ -1237,7 +1237,7 @@ const VehiclesPage = () => {
         }}
         mode={editingPaymentId ? 'edit' : 'add'}
         paymentForm={paymentForm}
-        onFormChange={(field, value) => {
+        onFormChange={(field: keyof PaymentFormData, value: any) => {
           setPaymentForm({ ...paymentForm, [field]: value });
         }}
         onSubmit={handleAddPayment}
@@ -1264,10 +1264,10 @@ const VehiclesPage = () => {
         vehicle={vehiclesData.selectedVehicle}
         documentForm={documentForm}
         selectedFile={selectedDocumentFile}
-        onFormChange={(field, value) => {
+        onFormChange={(field: keyof DocumentFormData, value: any) => {
           setDocumentForm({ ...documentForm, [field]: value });
         }}
-        onFileChange={(file) => setSelectedDocumentFile(file)}
+        onFileChange={(file: File | null) => setSelectedDocumentFile(file)}
         onSubmit={async () => {
           if (!documentForm.document_name || !selectedDocumentFile || !vehiclesData.selectedVehicle) {
                     toast({
@@ -1341,7 +1341,7 @@ const VehiclesPage = () => {
             viewMode={soldViewMode}
             currency={currency}
             onDetailClick={openDetailModal}
-            onViewModeChange={(mode) => setSoldViewMode(mode)}
+            onViewModeChange={(mode: 'table' | 'grid') => setSoldViewMode(mode)}
           />
         </TabsContent>
         </Tabs>
@@ -1363,7 +1363,7 @@ const VehiclesPage = () => {
         vehicle={vehiclesData.selectedVehicle}
         quoteForm={quoteForm}
         customers={customers}
-        onFormChange={(field, value) => {
+        onFormChange={(field: keyof QuoteFormData, value: any) => {
           setQuoteForm({ ...quoteForm, [field]: value });
         }}
         onSubmit={handleCreateQuote}
