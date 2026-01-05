@@ -1,16 +1,14 @@
 import { Router } from "express";
 import { signup, login, changePassword } from "../controllers/authController";
-import { authLimiter } from "../middleware/rateLimiter";
+import { loginLimiter, signupLimiter } from "../middleware/rateLimiter";
 import { authMiddleware } from "../middleware/auth";
 import { tenantGuard } from "../middleware/tenantGuard";
 
 const router = Router();
 
-// Apply strict rate limiting to authentication endpoints
-router.use(authLimiter);
-
-router.post("/signup", signup);
-router.post("/login", login);
+// Apply different rate limiting to login and signup
+router.post("/signup", signupLimiter, signup);
+router.post("/login", loginLimiter, login);
 
 // Password change requires authentication
 router.post("/change-password", authMiddleware, tenantGuard, changePassword);

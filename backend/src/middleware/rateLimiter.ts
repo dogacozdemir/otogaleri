@@ -24,14 +24,28 @@ export const generalLimiter = rateLimit({
 });
 
 /**
- * Strict rate limiter for authentication endpoints
+ * Strict rate limiter for login endpoint
  * - 5 requests per 15 minutes per IP
  * - Prevents brute force attacks
  */
-export const authLimiter = rateLimit({
+export const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // Limit each IP to 5 login attempts per windowMs
-  message: "Too many authentication attempts, please try again later.",
+  message: "Çok fazla giriş denemesi. Lütfen 15 dakika sonra tekrar deneyin.",
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true, // Don't count successful requests
+});
+
+/**
+ * More lenient rate limiter for signup endpoint
+ * - 10 requests per 15 minutes per IP
+ * - Allows legitimate users to retry registration
+ */
+export const signupLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Limit each IP to 10 signup attempts per windowMs
+  message: "Çok fazla kayıt denemesi. Lütfen 15 dakika sonra tekrar deneyin.",
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true, // Don't count successful requests
