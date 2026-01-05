@@ -8,18 +8,37 @@ import rateLimit from "express-rate-limit";
 
 /**
  * General API rate limiter
- * - 100 requests per 15 minutes per IP
- * - Suitable for most API endpoints
+ * - 500 state-changing requests per 10 minutes per IP
+ * - GET requests are NOT counted (allows rapid page navigation)
+ * - Only POST, PUT, DELETE, PATCH requests are rate limited
+ * - Suitable for normal usage including rapid page navigation
  */
 export const generalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: "Too many requests from this IP, please try again later.",
+  windowMs: 10 * 60 * 1000, // 10 minutes (shorter window for better UX)
+  max: 500, // Limit each IP to 500 state-changing requests per windowMs
+  message: "Çok fazla istek gönderdiniz. Lütfen birkaç dakika sonra tekrar deneyin.",
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   skip: (req) => {
-    // Skip rate limiting for health checks
-    return req.path === "/health";
+    // Skip rate limiting for:
+    // - Health checks
+    // - Static files
+    // - GET requests (allows rapid page navigation)
+    // - OPTIONS requests (CORS preflight)
+    return (
+      req.path === "/health" ||
+      req.path.startsWith("/uploads/") ||
+      req.method === "GET" ||
+      req.method === "OPTIONS"
+    );
+  },
+  // Custom handler to provide better error messages
+  handler: (req, res) => {
+    res.status(429).json({
+      error: "Çok fazla istek gönderdiniz",
+      message: "Lütfen birkaç dakika sonra tekrar deneyin. Sayfa gezintisi (GET istekleri) limitlenmez.",
+      retryAfter: Math.ceil(10 * 60 / 1000), // seconds
+    });
   },
 });
 
