@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { api } from "@/api";
+import { api, getToken } from "@/api";
 
 type Tenant = {
   id: number;
@@ -41,7 +41,7 @@ export const TenantProvider: React.FC<TenantProviderProps> = ({ children }) => {
 
   const fetchTenant = async () => {
     try {
-      const token = localStorage.getItem("otogaleri_token");
+      const token = getToken();
       if (!token) {
         setLoading(false);
         return;

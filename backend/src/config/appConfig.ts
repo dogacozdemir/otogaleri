@@ -81,6 +81,29 @@ export const subdomainConfig = {
 };
 
 /**
+ * CORS Configuration
+ */
+export const corsConfig = {
+  allowedOrigins: process.env.ALLOWED_ORIGINS 
+    ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
+    : process.env.NODE_ENV === 'production' 
+      ? [] // Production'da environment variable zorunlu
+      : [
+          'http://localhost:5173',
+          'http://localhost:5175',
+          'http://127.0.0.1:5173',
+          'http://127.0.0.1:5175',
+        ],
+  
+  get allowed() {
+    if (process.env.NODE_ENV === 'production' && this.allowedOrigins.length === 0) {
+      console.warn('[config] WARNING: ALLOWED_ORIGINS not set in production. CORS will be restrictive.');
+    }
+    return this.allowedOrigins;
+  },
+};
+
+/**
  * Database SSL Configuration
  */
 export const dbSslConfig = {

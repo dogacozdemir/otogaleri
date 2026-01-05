@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../api";
+import { api, setToken } from "../api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,7 +57,7 @@ const AuthPage = () => {
           password: loginPassword,
         });
         
-        localStorage.setItem("otogaleri_token", res.data.token);
+        setToken(res.data.token);
         toast({
           title: "Başarılı",
           description: "Giriş yapıldı",
@@ -121,7 +121,7 @@ const AuthPage = () => {
         };
         
         const res = await api.post("/auth/signup", payload);
-        localStorage.setItem("otogaleri_token", res.data.token);
+        setToken(res.data.token);
         toast({
           title: "Başarılı",
           description: "Hesabınız oluşturuldu",

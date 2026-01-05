@@ -1,8 +1,52 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
+import zxcvbn from "zxcvbn";
 import { dbPool } from "../config/database";
 import { generateToken, AuthRequest } from "../middleware/auth";
 import { loggerService } from "../services/loggerService";
+
+/**
+ * Enhanced password validation
+ * Requirements:
+ * - Minimum 12 characters
+ * - At least one lowercase letter
+ * - At least one uppercase letter
+ * - At least one number
+ * - At least one special character
+ * - zxcvbn score >= 3 (strong password)
+ */
+function validatePassword(password: string): { valid: boolean; error?: string } {
+  if (password.length < 12) {
+    return { valid: false, error: "Password must be at least 12 characters long" };
+  }
+  
+  if (!/[a-z]/.test(password)) {
+    return { valid: false, error: "Password must contain at least one lowercase letter" };
+  }
+  
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, error: "Password must contain at least one uppercase letter" };
+  }
+  
+  if (!/[0-9]/.test(password)) {
+    return { valid: false, error: "Password must contain at least one number" };
+  }
+  
+  if (!/[^a-zA-Z0-9]/.test(password)) {
+    return { valid: false, error: "Password must contain at least one special character" };
+  }
+  
+  // Check password strength using zxcvbn
+  const strength = zxcvbn(password);
+  if (strength.score < 3) {
+    const feedback = strength.feedback.suggestions.length > 0 
+      ? strength.feedback.suggestions[0]
+      : "Please choose a stronger password";
+    return { valid: false, error: `Password is too weak. ${feedback}` };
+  }
+  
+  return { valid: true };
+}
 
 export async function signup(req: Request, res: Response) {
   const { tenantName, tenantSlug, defaultCurrency, ownerName, ownerEmail, ownerPassword } = req.body;
@@ -18,9 +62,10 @@ export async function signup(req: Request, res: Response) {
     return res.status(400).json({ error: "Invalid email format" });
   }
 
-  // Password strength validation
-  if (ownerPassword.length < 8) {
-    return res.status(400).json({ error: "Password must be at least 8 characters long" });
+  // Enhanced password strength validation
+  const passwordValidation = validatePassword(ownerPassword);
+  if (!passwordValidation.valid) {
+    return res.status(400).json({ error: passwordValidation.error });
   }
 
   // Tenant name validation
@@ -165,9 +210,10 @@ export async function changePassword(req: AuthRequest, res: Response) {
     return res.status(400).json({ error: "Current password and new password required" });
   }
 
-  // Password strength validation
-  if (newPassword.length < 8) {
-    return res.status(400).json({ error: "New password must be at least 8 characters long" });
+  // Enhanced password strength validation
+  const passwordValidation = validatePassword(newPassword);
+  if (!passwordValidation.valid) {
+    return res.status(400).json({ error: passwordValidation.error });
   }
 
   if (!req.userId || !req.tenantId) {

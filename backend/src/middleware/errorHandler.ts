@@ -97,7 +97,7 @@ export function errorHandler(
 
   // Prepare response based on environment
   if (isProduction) {
-    // Production: Generic error messages
+    // Production: Generic error messages - NEVER expose stack traces or internal details
     if (isDatabaseError) {
       res.status(statusCode).json({
         error: "Database operation failed",
@@ -106,15 +106,23 @@ export function errorHandler(
         supportMessage: `Error Reference: ${errorId}`,
       });
     } else if (isValidationError) {
-      // Validation errors are safe to show (already sanitized)
+      // Validation errors are safe to show (already sanitized by Zod)
+      // But limit details to prevent information leakage
+      const validationDetails = (err as any).issues 
+        ? (err as any).issues.map((issue: any) => ({
+            path: issue.path?.join('.') || 'unknown',
+            message: issue.message,
+          }))
+        : undefined;
+      
       res.status(statusCode).json({
         error: "Validation failed",
         errorId,
-        message: err.message,
-        ...((err as any).issues ? { details: (err as any).issues } : {}),
+        message: "Please check your input and try again",
+        ...(validationDetails ? { details: validationDetails } : {}),
       });
     } else if (statusCode >= 500) {
-      // Server errors: Generic message
+      // Server errors: Generic message - NO stack trace, NO internal details
       res.status(statusCode).json({
         error: "Internal server error",
         errorId,
@@ -122,14 +130,19 @@ export function errorHandler(
         supportMessage: `Error Reference: ${errorId}`,
       });
     } else {
-      // Client errors (400-499): Show message but no stack trace
+      // Client errors (400-499): Show sanitized message but NO internal details
+      // Sanitize error message to prevent information leakage
+      const sanitizedMessage = err.message 
+        ? err.message.replace(/at\s+.*/g, '').replace(/Error:\s*/g, '').substring(0, 200)
+        : "Request failed";
+      
       res.status(statusCode).json({
-        error: err.message || "Request failed",
+        error: sanitizedMessage,
         errorId,
       });
     }
   } else {
-    // Development: Detailed error messages
+    // Development: Detailed error messages (only in development)
     res.status(statusCode).json({
       error: err.message,
       errorId,

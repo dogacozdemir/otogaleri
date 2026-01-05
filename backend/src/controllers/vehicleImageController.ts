@@ -3,6 +3,7 @@ import { AuthRequest } from "../middleware/auth";
 import { dbPool } from "../config/database";
 import multer from "multer";
 import sharp from "sharp";
+import { fileTypeFromBuffer } from "file-type";
 import { StorageService } from "../services/storage/storageService";
 
 // File upload configuration - use memory storage for S3 compatibility
@@ -136,6 +137,38 @@ export async function uploadVehicleImage(req: AuthRequest, res: Response) {
     return res.status(400).json({ 
       error: `Invalid file type. Only ${ALLOWED_MIME_TYPES.join(', ')} are allowed.` 
     });
+  }
+
+  // Magic number validation - verify actual file content matches declared MIME type
+  try {
+    const detectedType = await fileTypeFromBuffer(req.file.buffer);
+    
+    if (!detectedType) {
+      return res.status(400).json({ 
+        error: "Unable to detect file type. File may be corrupted or invalid." 
+      });
+    }
+
+    // Map detected MIME types to allowed types
+    const mimeTypeMap: Record<string, string[]> = {
+      'image/jpeg': ['image/jpeg', 'image/jpg'],
+      'image/jpg': ['image/jpeg', 'image/jpg'],
+      'image/png': ['image/png'],
+      'image/webp': ['image/webp'],
+    };
+
+    const allowedForDetected = mimeTypeMap[detectedType.mime] || [];
+    
+    if (!allowedForDetected.includes(req.file.mimetype)) {
+      console.warn(`[vehicleImage] MIME type mismatch: declared=${req.file.mimetype}, detected=${detectedType.mime}`);
+      return res.status(400).json({ 
+        error: "File content does not match declared file type. File may be malicious or corrupted." 
+      });
+    }
+  } catch (magicError) {
+    // If magic number detection fails, log but allow (defense in depth - we already have MIME type check)
+    console.warn("[vehicleImage] Magic number validation failed:", magicError);
+    // Continue with upload but log the warning
   }
 
   try {

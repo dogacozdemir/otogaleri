@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { api } from "@/api";
+import { api, getToken } from "@/api";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -291,7 +291,7 @@ const CustomerDetails: React.FC = () => {
 
   const downloadPDF = async (saleId: number, type: "contract" | "invoice") => {
     try {
-      const token = localStorage.getItem("otogaleri_token");
+      const token = getToken();
       const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5005/api";
       const endpoint = type === "contract" ? `/documents/sales-contract/${saleId}` : `/documents/invoice/${saleId}`;
       

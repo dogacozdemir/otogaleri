@@ -2,8 +2,10 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import cookieParser from "cookie-parser";
 import { testConnection } from "./config/database";
 import { generalLimiter } from "./middleware/rateLimiter";
+import { corsConfig } from "./config/appConfig";
 import authRoutes from "./routes/authRoutes";
 import branchRoutes from "./routes/branchRoutes";
 import staffRoutes from "./routes/staffRoutes";
@@ -27,9 +29,33 @@ import path from "path";
 const app = express();
 
 // CORS must be before helmet for static files
+// Security: Only allow whitelisted origins
 app.use(cors({
-  origin: true,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, Postman, curl, etc.)
+    if (!origin) {
+      return callback(null, true);
+    }
+    
+    const allowedOrigins = corsConfig.allowed;
+    
+    // In production, if no origins configured, deny all
+    if (process.env.NODE_ENV === 'production' && allowedOrigins.length === 0) {
+      console.warn('[CORS] No allowed origins configured in production. Denying request from:', origin);
+      return callback(new Error('CORS: Origin not allowed'));
+    }
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn('[CORS] Blocked request from unauthorized origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['X-Request-ID'],
 }));
 
 // Handle OPTIONS requests for static files (before helmet)
@@ -77,6 +103,57 @@ app.use(helmet({
   xssFilter: true, // Enable XSS filter
   referrerPolicy: { policy: "strict-origin-when-cross-origin" }, // Control referrer information
 }));
+
+// Cookie parser (for CSRF protection and session management)
+app.use(cookieParser());
+
+// CSRF Protection Middleware
+// Note: Using Origin header validation + SameSite cookies instead of deprecated csurf
+// This provides CSRF protection with less breaking changes
+app.use((req, res, next) => {
+  // Only protect state-changing methods
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+    // Skip CSRF check for:
+    // - Health checks
+    // - Public endpoints (if any)
+    // - File uploads (handled separately)
+    if (req.path === '/health' || req.path.startsWith('/uploads/')) {
+      return next();
+    }
+
+    const origin = req.headers.origin;
+    const referer = req.headers.referer;
+    
+    // In production, validate Origin header
+    if (process.env.NODE_ENV === 'production') {
+      const allowedOrigins = corsConfig.allowed;
+      
+      if (origin) {
+        if (!allowedOrigins.includes(origin)) {
+          console.warn('[CSRF] Blocked request from unauthorized origin:', origin);
+          return res.status(403).json({ error: 'CSRF protection: Invalid origin' });
+        }
+      } else if (referer) {
+        // Fallback to referer if origin is not present
+        const refererOrigin = new URL(referer).origin;
+        if (!allowedOrigins.includes(refererOrigin)) {
+          console.warn('[CSRF] Blocked request from unauthorized referer:', refererOrigin);
+          return res.status(403).json({ error: 'CSRF protection: Invalid referer' });
+        }
+      } else {
+        // No origin or referer - suspicious for state-changing requests
+        console.warn('[CSRF] Blocked state-changing request without origin/referer');
+        return res.status(403).json({ error: 'CSRF protection: Missing origin header' });
+      }
+    }
+    // Development: Log but allow (for testing with Postman, etc.)
+    else if (origin && !corsConfig.allowed.includes(origin)) {
+      console.warn('[CSRF] Development: Request from unauthorized origin:', origin);
+    }
+  }
+  
+  next();
+});
 
 // Apply general rate limiting to all routes
 app.use(generalLimiter);

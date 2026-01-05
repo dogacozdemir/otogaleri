@@ -1,5 +1,6 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { removeToken } from "@/api";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { t, i18n } = useTranslation();
@@ -7,7 +8,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
 
   const handleLogout = () => {
-    localStorage.removeItem("otogaleri_token");
+    removeToken();
     navigate("/login");
   };
 

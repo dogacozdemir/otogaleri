@@ -21,6 +21,7 @@ import GlobalSearch from "./GlobalSearch";
 import CurrencyConverterPopover from "./CurrencyConverterPopover";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTenant } from "@/contexts/TenantContext";
+import { getToken, removeToken } from "@/api";
 
 const menuItems = [
   { 
@@ -98,7 +99,7 @@ const SidebarLayout = () => {
   // Load user from localStorage
   const loadUser = () => {
     try {
-      const token = localStorage.getItem("otogaleri_token");
+      const token = getToken();
       if (token) {
         // Decode token to get user info (simplified)
         const userData = { name: "Admin" };
@@ -116,7 +117,7 @@ const SidebarLayout = () => {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem("otogaleri_token");
+    removeToken();
     navigate("/login", { replace: true });
   };
 

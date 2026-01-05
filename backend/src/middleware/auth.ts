@@ -5,7 +5,16 @@ import { dbPool } from "../config/database";
 // Validate JWT_SECRET in production
 const JWT_SECRET = process.env.JWT_SECRET || "otogaleri-secret-change-in-production";
 
+// Enhanced JWT_SECRET validation
 if (process.env.NODE_ENV === "production") {
+  // Production: JWT_SECRET is MANDATORY
+  if (!process.env.JWT_SECRET) {
+    console.error("❌ CRITICAL SECURITY ERROR: JWT_SECRET is not set in production!");
+    console.error("Please set a strong JWT_SECRET environment variable.");
+    console.error("Example: JWT_SECRET=$(openssl rand -base64 64)");
+    process.exit(1);
+  }
+  
   // Check if JWT_SECRET is weak or default
   const weakSecrets = [
     "otogaleri-secret-change-in-production",
@@ -14,23 +23,45 @@ if (process.env.NODE_ENV === "production") {
     "default-secret",
     "jwt-secret",
     "your-secret-key",
+    "123456",
+    "password",
+    "admin",
   ];
   
-  if (!process.env.JWT_SECRET || weakSecrets.includes(JWT_SECRET)) {
+  if (weakSecrets.includes(JWT_SECRET)) {
     console.error("❌ CRITICAL SECURITY ERROR: JWT_SECRET is weak or default in production!");
     console.error("Please set a strong JWT_SECRET environment variable.");
-    console.error("Example: JWT_SECRET=$(openssl rand -base64 32)");
+    console.error("Example: JWT_SECRET=$(openssl rand -base64 64)");
     process.exit(1);
   }
   
-  // Check minimum length (at least 32 characters)
-  if (JWT_SECRET.length < 32) {
-    console.error("❌ CRITICAL SECURITY ERROR: JWT_SECRET is too short (minimum 32 characters)!");
+  // Check minimum length (at least 64 characters for production)
+  if (JWT_SECRET.length < 64) {
+    console.error("❌ CRITICAL SECURITY ERROR: JWT_SECRET is too short (minimum 64 characters in production)!");
     console.error(`Current length: ${JWT_SECRET.length}`);
+    console.error("Generate a secure secret: openssl rand -base64 64");
     process.exit(1);
   }
   
-  console.log("✅ JWT_SECRET validation passed");
+  // Check entropy (should contain mix of characters)
+  const hasLower = /[a-z]/.test(JWT_SECRET);
+  const hasUpper = /[A-Z]/.test(JWT_SECRET);
+  const hasNumber = /[0-9]/.test(JWT_SECRET);
+  const hasSpecial = /[^a-zA-Z0-9]/.test(JWT_SECRET);
+  
+  if (!(hasLower || hasUpper || hasNumber || hasSpecial)) {
+    console.error("❌ CRITICAL SECURITY ERROR: JWT_SECRET lacks sufficient entropy!");
+    console.error("Secret should contain a mix of characters.");
+    process.exit(1);
+  }
+  
+  console.log("✅ JWT_SECRET validation passed (length:", JWT_SECRET.length, "characters)");
+} else {
+  // Development: Warn if using default secret
+  if (JWT_SECRET === "otogaleri-secret-change-in-production" || JWT_SECRET.length < 32) {
+    console.warn("⚠️  WARNING: Using weak JWT_SECRET in development. This is unsafe for production!");
+    console.warn("Set a strong JWT_SECRET: JWT_SECRET=$(openssl rand -base64 64)");
+  }
 }
 
 // Simple in-memory cache for user active status
