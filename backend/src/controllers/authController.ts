@@ -8,7 +8,7 @@ import { loggerService } from "../services/loggerService";
 /**
  * Enhanced password validation
  * Requirements:
- * - Minimum 12 characters
+ * - Minimum 8 characters
  * - At least one lowercase letter
  * - At least one uppercase letter
  * - At least one number
@@ -16,8 +16,8 @@ import { loggerService } from "../services/loggerService";
  * - zxcvbn score >= 3 (strong password)
  */
 function validatePassword(password: string): { valid: boolean; error?: string } {
-  if (password.length < 12) {
-    return { valid: false, error: "Password must be at least 12 characters long" };
+  if (password.length < 8) {
+    return { valid: false, error: "Password must be at least 8 characters long" };
   }
   
   if (!/[a-z]/.test(password)) {

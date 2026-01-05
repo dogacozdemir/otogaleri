@@ -18,7 +18,7 @@ interface PasswordRequirement {
 }
 
 const PASSWORD_REQUIREMENTS: PasswordRequirement[] = [
-  { label: "En az 12 karakter", test: (p) => p.length >= 12 },
+  { label: "En az 8 karakter", test: (p) => p.length >= 8 },
   { label: "En az bir küçük harf (a-z)", test: (p) => /[a-z]/.test(p) },
   { label: "En az bir büyük harf (A-Z)", test: (p) => /[A-Z]/.test(p) },
   { label: "En az bir rakam (0-9)", test: (p) => /[0-9]/.test(p) },
@@ -531,48 +531,22 @@ const AuthPage = () => {
                       </div>
                     )}
 
-                    {/* Password Requirements */}
-                    {registerPassword && (
+                    {/* Password Requirements - Only show unmet requirements */}
+                    {registerPassword && passwordRequirements.some((req) => !req.met) && (
                       <div className="space-y-1.5 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900">
                         <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">
                           Şifre Gereksinimleri:
                         </p>
-                        {passwordRequirements.map((req, index) => (
-                          <div key={index} className="flex items-center gap-2">
-                            {req.met ? (
-                              <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400 flex-shrink-0" />
-                            ) : (
+                        {passwordRequirements
+                          .filter((req) => !req.met)
+                          .map((req, index) => (
+                            <div key={index} className="flex items-center gap-2">
                               <XCircle className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 flex-shrink-0" />
-                            )}
-                            <span
-                              className={cn(
-                                "text-xs",
-                                req.met
-                                  ? "text-green-600 dark:text-green-400 font-medium"
-                                  : "text-slate-500 dark:text-slate-400"
-                              )}
-                            >
-                              {req.label}
-                            </span>
-                          </div>
-                        ))}
-                        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
-                          {passwordStrength && passwordStrength.score >= 3 ? (
-                            <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400 flex-shrink-0" />
-                          ) : (
-                            <XCircle className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 flex-shrink-0" />
-                          )}
-                          <span
-                            className={cn(
-                              "text-xs",
-                              passwordStrength && passwordStrength.score >= 3
-                                ? "text-green-600 dark:text-green-400 font-medium"
-                                : "text-slate-500 dark:text-slate-400"
-                            )}
-                          >
-                            Güçlü şifre seviyesi (zxcvbn skoru ≥ 3)
-                          </span>
-                        </div>
+                              <span className="text-xs text-slate-500 dark:text-slate-400">
+                                {req.label}
+                              </span>
+                            </div>
+                          ))}
                       </div>
                     )}
 
