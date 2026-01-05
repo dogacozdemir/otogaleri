@@ -1,5 +1,6 @@
 import { Response } from "express";
 import { AuthRequest } from "../middleware/auth";
+import "../middleware/tenantQuery"; // Import for type augmentation
 import { dbPool } from "../config/database";
 import { getOrFetchRate } from "../services/fxCacheService";
 import { SupportedCurrency } from "../services/currencyService";
@@ -31,7 +32,13 @@ export async function createInstallmentSale(req: AuthRequest, res: Response) {
 
     let fxRate = 1;
     if (currency !== baseCurrency) {
+      if (!req.tenantQuery) {
+        await conn.rollback();
+        conn.release();
+        return res.status(500).json({ error: "Tenant query not available" });
+      }
       fxRate = await getOrFetchRate(
+        req.tenantQuery,
         currency as SupportedCurrency,
         baseCurrency as SupportedCurrency,
         sale_date
@@ -143,7 +150,13 @@ export async function recordPayment(req: AuthRequest, res: Response) {
 
     let fxRate = 1;
     if (currency !== baseCurrency) {
+      if (!req.tenantQuery) {
+        await conn.rollback();
+        conn.release();
+        return res.status(500).json({ error: "Tenant query not available" });
+      }
       fxRate = await getOrFetchRate(
+        req.tenantQuery,
         currency as SupportedCurrency,
         baseCurrency as SupportedCurrency,
         payment_date
@@ -428,7 +441,13 @@ export async function updatePayment(req: AuthRequest, res: Response) {
 
     let fxRate = 1;
     if (currency !== baseCurrency) {
+      if (!req.tenantQuery) {
+        await conn.rollback();
+        conn.release();
+        return res.status(500).json({ error: "Tenant query not available" });
+      }
       fxRate = await getOrFetchRate(
+        req.tenantQuery,
         currency as SupportedCurrency,
         baseCurrency as SupportedCurrency,
         payment_date
@@ -705,9 +724,13 @@ export async function sendReminder(req: AuthRequest, res: Response) {
   }
 
   try {
+    if (!req.tenantQuery) {
+      return res.status(500).json({ error: "Tenant query not available" });
+    }
+    
     const result = await sendReminderForInstallment(
+      req.tenantQuery,
       Number(installment_sale_id),
-      req.tenantId,
       send_email,
       send_sms
     );

@@ -1,14 +1,20 @@
 import { Response } from "express";
 import { AuthRequest } from "../middleware/auth";
-import { dbPool } from "../config/database";
+import "../middleware/tenantQuery"; // Import for type augmentation
+import { TenantAwareQuery } from "../repositories/tenantAwareQuery";
 
 export async function listCustomers(req: AuthRequest, res: Response) {
+  if (!req.tenantQuery) {
+    return res.status(500).json({ error: "Tenant query not available" });
+  }
+
+  const tenantQuery = req.tenantQuery;
   const { search, sort_by = "name", sort_order = "asc", page = "1", limit = "50" } = req.query;
 
   try {
     const offset = (Number(page) - 1) * Number(limit);
     const filters: string[] = ["c.tenant_id = ?"];
-    const params: any[] = [req.tenantId];
+    const params: any[] = [tenantQuery.getTenantId()];
 
     if (search) {
       filters.push("(c.name LIKE ? OR c.phone LIKE ? OR c.email LIKE ?)");
@@ -19,7 +25,7 @@ export async function listCustomers(req: AuthRequest, res: Response) {
     const whereClause = filters.length > 0 ? `WHERE ${filters.join(" AND ")}` : "";
 
     // Müşteri listesi ve toplam harcama, satış sayısı (customer_name ve customer_phone ile eşleştirme)
-    const [rows] = await dbPool.query(
+    const [rows] = await tenantQuery.query(
       `SELECT 
         c.id,
         c.name,
@@ -40,11 +46,11 @@ export async function listCustomers(req: AuthRequest, res: Response) {
       GROUP BY c.id
       ORDER BY ${sort_by === "name" ? "c.name" : sort_by === "total_spent" ? "c.total_spent_base" : sort_by === "sale_count" ? "sale_count" : sort_by === "last_sale" ? "last_sale_date" : "c.name"} ${sort_order === "asc" ? "ASC" : "DESC"}
       LIMIT ? OFFSET ?`,
-      [req.tenantId, ...params, Number(limit), offset]
+      [tenantQuery.getTenantId(), ...params, Number(limit), offset]
     );
 
     // Toplam sayı
-    const [countRows] = await dbPool.query(
+    const [countRows] = await tenantQuery.query(
       `SELECT COUNT(DISTINCT c.id) as total FROM customers c ${whereClause}`,
       params
     );
@@ -61,17 +67,22 @@ export async function listCustomers(req: AuthRequest, res: Response) {
     });
   } catch (err) {
     console.error("[customer] List error", err);
-    res.status(500).json({ error: "Failed to list customers" });
+    throw err; // Let error handler middleware handle it
   }
 }
 
 export async function getCustomerById(req: AuthRequest, res: Response) {
+  if (!req.tenantQuery) {
+    return res.status(500).json({ error: "Tenant query not available" });
+  }
+
+  const tenantQuery = req.tenantQuery;
   const { id } = req.params;
 
   try {
-    const [customerRows] = await dbPool.query(
+    const [customerRows] = await tenantQuery.query(
       "SELECT * FROM customers WHERE id = ? AND tenant_id = ?",
-      [id, req.tenantId]
+      [id, tenantQuery.getTenantId()]
     );
     const customerRowsArray = customerRows as any[];
     if (customerRowsArray.length === 0) {
@@ -81,7 +92,7 @@ export async function getCustomerById(req: AuthRequest, res: Response) {
     const customer = customerRowsArray[0];
 
     // Müşterinin satışlarını getir (customer_name ve customer_phone ile eşleştirme)
-    const [sales] = await dbPool.query(
+    const [sales] = await tenantQuery.query(
       `SELECT 
         vs.*,
         v.maker,
@@ -108,7 +119,7 @@ export async function getCustomerById(req: AuthRequest, res: Response) {
       ) primary_img ON primary_img.vehicle_id = v.id AND primary_img.rn = 1
       WHERE vs.tenant_id = ? AND (vs.customer_name = ? OR (vs.customer_phone IS NOT NULL AND vs.customer_phone = ?))
       ORDER BY vs.sale_date DESC`,
-      [req.tenantId, req.tenantId, customer.name, customer.phone]
+      [tenantQuery.getTenantId(), tenantQuery.getTenantId(), customer.name, customer.phone]
     );
 
     const salesArray = sales as any[];
@@ -123,7 +134,7 @@ export async function getCustomerById(req: AuthRequest, res: Response) {
     
     if (vehicleIds.length > 0) {
       // Installment bilgilerini batch olarak getir (her vehicle için en son installment)
-      const [installmentRows] = await dbPool.query(
+      const [installmentRows] = await tenantQuery.query(
         `SELECT 
           vis_latest.*,
           COALESCE(payment_summary.total_paid, 0) as total_paid,
@@ -146,7 +157,7 @@ export async function getCustomerById(req: AuthRequest, res: Response) {
           GROUP BY installment_sale_id
         ) payment_summary ON payment_summary.installment_sale_id = vis_latest.id
         WHERE vis_latest.rn = 1`,
-        [...vehicleIds, req.tenantId]
+        [...vehicleIds, tenantQuery.getTenantId()]
       );
       
       const installmentsArray = installmentRows as any[];
@@ -154,7 +165,7 @@ export async function getCustomerById(req: AuthRequest, res: Response) {
       
       // Payment'ları batch olarak getir
       if (installmentSaleIds.length > 0) {
-        const [paymentRows] = await dbPool.query(
+        const [paymentRows] = await tenantQuery.query(
           `SELECT * FROM vehicle_installment_payments
            WHERE installment_sale_id IN (${installmentSaleIds.map(() => '?').join(',')})
            ORDER BY installment_sale_id, payment_date ASC, installment_number ASC`,
@@ -204,11 +215,11 @@ export async function getCustomerById(req: AuthRequest, res: Response) {
     });
 
     // Müşterinin gelir kayıtlarını getir
-    const [income] = await dbPool.query(
+    const [income] = await tenantQuery.query(
       `SELECT * FROM income 
       WHERE customer_id = ? AND tenant_id = ?
       ORDER BY income_date DESC`,
-      [id, req.tenantId]
+      [id, tenantQuery.getTenantId()]
     );
 
     // İstatistikler
@@ -230,25 +241,26 @@ export async function getCustomerById(req: AuthRequest, res: Response) {
     });
   } catch (err) {
     console.error("[customer] Get error", err);
-    res.status(500).json({ error: "Failed to get customer" });
+    throw err; // Let error handler middleware handle it
   }
 }
 
 export async function createCustomer(req: AuthRequest, res: Response) {
-  const { name, phone, email, address, notes } = req.body;
-
-  if (!name) {
-    return res.status(400).json({ error: "Customer name required" });
+  if (!req.tenantQuery) {
+    return res.status(500).json({ error: "Tenant query not available" });
   }
 
+  const tenantQuery = req.tenantQuery;
+  const { name, phone, email, address, notes } = req.body;
+
   try {
-    const [result] = await dbPool.query(
+    const [result] = await tenantQuery.query(
       "INSERT INTO customers (tenant_id, name, phone, email, address, notes) VALUES (?, ?, ?, ?, ?, ?)",
-      [req.tenantId, name, phone || null, email || null, address || null, notes || null]
+      [tenantQuery.getTenantId(), name, phone || null, email || null, address || null, notes || null]
     );
 
     const customerId = (result as any).insertId;
-    const [rows] = await dbPool.query("SELECT * FROM customers WHERE id = ?", [customerId]);
+    const [rows] = await tenantQuery.query("SELECT * FROM customers WHERE id = ? AND tenant_id = ?", [customerId, tenantQuery.getTenantId()]);
     const customer = (rows as any[])[0];
     res.status(201).json(customer);
   } catch (err: any) {
@@ -256,21 +268,26 @@ export async function createCustomer(req: AuthRequest, res: Response) {
     if (err.code === "ER_DUP_ENTRY") {
       return res.status(409).json({ error: "Customer with this phone already exists" });
     }
-    res.status(500).json({ error: "Failed to create customer" });
+    throw err; // Let error handler middleware handle it
   }
 }
 
 export async function updateCustomer(req: AuthRequest, res: Response) {
+  if (!req.tenantQuery) {
+    return res.status(500).json({ error: "Tenant query not available" });
+  }
+
+  const tenantQuery = req.tenantQuery;
   const { id } = req.params;
   const { name, phone, email, address, notes } = req.body;
 
   try {
-    await dbPool.query(
+    await tenantQuery.query(
       "UPDATE customers SET name = ?, phone = ?, email = ?, address = ?, notes = ? WHERE id = ? AND tenant_id = ?",
-      [name, phone || null, email || null, address || null, notes || null, id, req.tenantId]
+      [name, phone || null, email || null, address || null, notes || null, id, tenantQuery.getTenantId()]
     );
 
-    const [rows] = await dbPool.query("SELECT * FROM customers WHERE id = ? AND tenant_id = ?", [id, req.tenantId]);
+    const [rows] = await tenantQuery.query("SELECT * FROM customers WHERE id = ? AND tenant_id = ?", [id, tenantQuery.getTenantId()]);
     const customerRowsArray = rows as any[];
     if (customerRowsArray.length === 0) {
       return res.status(404).json({ error: "Customer not found" });
@@ -281,29 +298,40 @@ export async function updateCustomer(req: AuthRequest, res: Response) {
     if (err.code === "ER_DUP_ENTRY") {
       return res.status(409).json({ error: "Customer with this phone already exists" });
     }
-    res.status(500).json({ error: "Failed to update customer" });
+    throw err; // Let error handler middleware handle it
   }
 }
 
 export async function deleteCustomer(req: AuthRequest, res: Response) {
+  if (!req.tenantQuery) {
+    return res.status(500).json({ error: "Tenant query not available" });
+  }
+
+  const tenantQuery = req.tenantQuery;
   const { id } = req.params;
 
   try {
-    const [result] = await dbPool.query("DELETE FROM customers WHERE id = ? AND tenant_id = ?", [id, req.tenantId]);
+    const [result] = await tenantQuery.query("DELETE FROM customers WHERE id = ? AND tenant_id = ?", [id, tenantQuery.getTenantId()]);
     if ((result as any).affectedRows === 0) {
       return res.status(404).json({ error: "Customer not found" });
     }
     res.json({ message: "Customer deleted" });
   } catch (err) {
     console.error("[customer] Delete error", err);
-    res.status(500).json({ error: "Failed to delete customer" });
+    throw err; // Let error handler middleware handle it
   }
 }
 
 // Müşteri segmentlerini getir (VIP, Düzenli, Yeni)
 export async function getCustomerSegments(req: AuthRequest, res: Response) {
+  if (!req.tenantQuery) {
+    return res.status(500).json({ error: "Tenant query not available" });
+  }
+
+  const tenantQuery = req.tenantQuery;
+
   try {
-    const [allCustomers] = await dbPool.query(
+    const [allCustomers] = await tenantQuery.query(
       `SELECT 
         c.id,
         c.name,
@@ -321,7 +349,7 @@ export async function getCustomerSegments(req: AuthRequest, res: Response) {
       LEFT JOIN vehicles v ON vs.vehicle_id = v.id
       WHERE c.tenant_id = ?
       GROUP BY c.id`,
-      [req.tenantId, req.tenantId]
+      [tenantQuery.getTenantId(), tenantQuery.getTenantId()]
     );
 
     const customersArray = allCustomers as any[];
@@ -346,7 +374,7 @@ export async function getCustomerSegments(req: AuthRequest, res: Response) {
     });
   } catch (err) {
     console.error("[customer] Segments error", err);
-    res.status(500).json({ error: "Failed to get customer segments" });
+    throw err; // Let error handler middleware handle it
   }
 }
 

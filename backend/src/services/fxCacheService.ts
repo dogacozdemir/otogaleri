@@ -1,7 +1,13 @@
-import { dbPool } from "../config/database";
+import { TenantAwareQuery } from "../repositories/tenantAwareQuery";
 import { getLatestRate, getHistoricalRate, SupportedCurrency } from "./currencyService";
 
+/**
+ * Get or fetch FX rate from cache or external API
+ * Note: fx_rates table is NOT tenant-aware (global FX rates), so TenantAwareQuery is used
+ * for consistency but tenant_id filtering is not applied
+ */
 export async function getOrFetchRate(
+  tenantQuery: TenantAwareQuery,
   base: SupportedCurrency,
   quote: SupportedCurrency,
   date: string
@@ -12,7 +18,8 @@ export async function getOrFetchRate(
   }
 
   // Check cache first
-  const [cached] = await dbPool.query(
+  // Note: fx_rates is NOT tenant-aware, so we use executeRaw to bypass tenant_id check
+  const [cached] = await tenantQuery.executeRaw(
     "SELECT rate FROM fx_rates WHERE base_currency = ? AND quote_currency = ? AND rate_date = ?",
     [base, quote, date]
   );
@@ -22,7 +29,7 @@ export async function getOrFetchRate(
   }
 
   // Try to find closest date in cache (within 7 days)
-  const [closestCached] = await dbPool.query(
+  const [closestCached] = await tenantQuery.executeRaw(
     `SELECT rate, rate_date FROM fx_rates 
      WHERE base_currency = ? AND quote_currency = ? 
      AND rate_date BETWEEN DATE_SUB(?, INTERVAL 7 DAY) AND DATE_ADD(?, INTERVAL 7 DAY)
@@ -50,7 +57,7 @@ export async function getOrFetchRate(
     }
 
     // Cache the rate
-    await dbPool.query(
+    await tenantQuery.executeRaw(
       "INSERT INTO fx_rates (base_currency, quote_currency, rate, rate_date, source) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE rate = VALUES(rate)",
       [base, quote, rate, date, "freecurrencyapi"]
     );
@@ -61,8 +68,8 @@ export async function getOrFetchRate(
     if (base !== "USD" && quote !== "USD") {
       try {
         console.warn(`[fxCache] Trying USD as intermediate currency for ${base}->${quote}`);
-        const baseToUsd = await getOrFetchRate(base, "USD", date);
-        const usdToQuote = await getOrFetchRate("USD", quote, date);
+        const baseToUsd = await getOrFetchRate(tenantQuery, base, "USD", date);
+        const usdToQuote = await getOrFetchRate(tenantQuery, "USD", quote, date);
         rate = baseToUsd * usdToQuote;
         return rate;
       } catch (usdError) {

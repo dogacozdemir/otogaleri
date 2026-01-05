@@ -1,7 +1,8 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { dbPool } from "../config/database";
-import { generateToken } from "../middleware/auth";
+import { generateToken, AuthRequest } from "../middleware/auth";
+import { loggerService } from "../services/loggerService";
 
 export async function signup(req: Request, res: Response) {
   const { tenantName, tenantSlug, defaultCurrency, ownerName, ownerEmail, ownerPassword } = req.body;
@@ -60,15 +61,17 @@ export async function signup(req: Request, res: Response) {
     const tenantId = (tenantResult as any).insertId;
 
     const passwordHash = await bcrypt.hash(ownerPassword, 10);
-    await conn.query(
-      "INSERT INTO users (tenant_id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)",
-      [tenantId, ownerName?.trim() || tenantName.trim(), ownerEmail.toLowerCase().trim(), passwordHash, "owner"]
+    const [userResult] = await conn.query(
+      "INSERT INTO users (tenant_id, name, email, password_hash, role, token_version) VALUES (?, ?, ?, ?, ?, ?)",
+      [tenantId, ownerName?.trim() || tenantName.trim(), ownerEmail.toLowerCase().trim(), passwordHash, "owner", 0]
     );
+    const userId = (userResult as any).insertId;
 
     await conn.commit();
     conn.release();
 
-    const token = generateToken(tenantId, (tenantResult as any).insertId, "owner");
+    // Include token_version (0 for new users) in token
+    const token = generateToken(tenantId, userId, "owner", 0);
 
     res.status(201).json({
       message: "Tenant created",
@@ -101,25 +104,39 @@ export async function login(req: Request, res: Response) {
 
   try {
     const [rows] = await dbPool.query(
-      "SELECT u.id, u.tenant_id, u.name, u.email, u.password_hash, u.role, u.is_active FROM users u WHERE u.email = ?",
+      "SELECT u.id, u.tenant_id, u.name, u.email, u.password_hash, u.role, u.is_active, COALESCE(u.token_version, 0) as token_version FROM users u WHERE u.email = ?",
       [email.toLowerCase().trim()]
     );
 
     if (!Array.isArray(rows) || rows.length === 0) {
+      // Log failed login attempt (user not found)
+      const ipAddress = req.ip || req.socket.remoteAddress || undefined;
+      const userAgent = req.get("user-agent");
+      loggerService.logFailedLogin(email, ipAddress, userAgent, "User not found");
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
     const user = rows[0] as any;
     if (!user.is_active) {
+      // Log failed login attempt (account disabled)
+      const ipAddress = req.ip || req.socket.remoteAddress || undefined;
+      const userAgent = req.get("user-agent");
+      loggerService.logFailedLogin(email, ipAddress, userAgent, "Account disabled");
       return res.status(403).json({ error: "Account disabled" });
     }
 
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
+      // Log failed login attempt (invalid password)
+      const ipAddress = req.ip || req.socket.remoteAddress || undefined;
+      const userAgent = req.get("user-agent");
+      loggerService.logFailedLogin(email, ipAddress, userAgent, "Invalid password");
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    const token = generateToken(user.tenant_id, user.id, user.role);
+    // Include token_version in token for versioning support
+    const tokenVersion = user.token_version || 0;
+    const token = generateToken(user.tenant_id, user.id, user.role, tokenVersion);
 
     res.json({
       token,
@@ -134,5 +151,87 @@ export async function login(req: Request, res: Response) {
   } catch (err) {
     console.error("[auth] Login error", err);
     res.status(500).json({ error: "Login failed" });
+  }
+}
+
+/**
+ * Change password endpoint
+ * Invalidates all existing tokens by incrementing token_version
+ */
+export async function changePassword(req: AuthRequest, res: Response) {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: "Current password and new password required" });
+  }
+
+  // Password strength validation
+  if (newPassword.length < 8) {
+    return res.status(400).json({ error: "New password must be at least 8 characters long" });
+  }
+
+  if (!req.userId || !req.tenantId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    // Get current user and verify current password
+    const [rows] = await dbPool.query(
+      "SELECT id, password_hash, token_version FROM users WHERE id = ? AND tenant_id = ?",
+      [req.userId, req.tenantId]
+    );
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const user = rows[0] as any;
+    const match = await bcrypt.compare(currentPassword, user.password_hash);
+    
+    if (!match) {
+      return res.status(401).json({ error: "Current password is incorrect" });
+    }
+
+    // Hash new password
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+    
+    // Increment token_version to invalidate all existing tokens
+    const newTokenVersion = (user.token_version || 0) + 1;
+
+    // Update password and token_version
+    await dbPool.query(
+      "UPDATE users SET password_hash = ?, token_version = ? WHERE id = ? AND tenant_id = ?",
+      [newPasswordHash, newTokenVersion, req.userId, req.tenantId]
+    );
+
+    // Log password change security event
+    const ipAddress = req.ip || req.socket.remoteAddress || undefined;
+    const userAgent = req.get("user-agent");
+    loggerService.logPasswordChange(
+      req.tenantId!,
+      req.userId!,
+      req.userRole || "user",
+      ipAddress,
+      userAgent
+    );
+
+    // Log token invalidation (old tokens are now invalid)
+    loggerService.logTokenInvalidation(
+      req.tenantId!,
+      req.userId!,
+      "Password changed - token_version incremented",
+      ipAddress
+    );
+
+    // Generate new token with updated token_version
+    const token = generateToken(req.tenantId, req.userId, req.userRole || "user", newTokenVersion);
+
+    res.json({
+      message: "Password changed successfully",
+      token, // Return new token so user doesn't need to login again
+    });
+  } catch (err) {
+    console.error("[auth] Change password error", err);
+    res.status(500).json({ error: "Failed to change password" });
   }
 }

@@ -67,11 +67,15 @@ export async function markVehicleAsSold(req: AuthRequest, res: Response) {
       if (custom_rate !== undefined && custom_rate !== null) {
         saleFxRate = Number(custom_rate);
       } else {
-      saleFxRate = await getOrFetchRate(
-        finalSaleCurrency as SupportedCurrency,
-        baseCurrency as SupportedCurrency,
-        sale_date
-      );
+        if (!req.tenantQuery) {
+          return res.status(500).json({ error: "Tenant query not available" });
+        }
+        saleFxRate = await getOrFetchRate(
+          req.tenantQuery,
+          finalSaleCurrency as SupportedCurrency,
+          baseCurrency as SupportedCurrency,
+          sale_date
+        );
       }
     }
 

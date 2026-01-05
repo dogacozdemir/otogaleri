@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { readdir, readFile } from "fs/promises";
 import { join } from "path";
-import mysql from "mysql2/promise";
+import * as mysql from "mysql2/promise";
 
 const {
   OTG_DB_HOST,
@@ -16,12 +16,16 @@ if (!OTG_DB_HOST || !OTG_DB_USER || !OTG_DB_NAME) {
   process.exit(1);
 }
 
+import { dbConfig as appDbConfig } from "../config/appConfig";
+
+const dbConfigValues = appDbConfig.required;
+
 const dbConfig = {
-  host: OTG_DB_HOST || "localhost",
-  port: OTG_DB_PORT ? Number(OTG_DB_PORT) : 3306,
-  user: OTG_DB_USER || "root",
-  password: OTG_DB_PASSWORD || "",
-  database: OTG_DB_NAME || "otogaleri",
+  host: dbConfigValues.host,
+  port: dbConfigValues.port,
+  user: dbConfigValues.user,
+  password: dbConfigValues.password,
+  database: dbConfigValues.database,
   multipleStatements: true, // Allow multiple SQL statements
 };
 

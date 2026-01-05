@@ -6,12 +6,22 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Search, Phone, UserPlus, Filter, List, Table, X, Grid3x3 } from "lucide-react";
+import { Search, Phone, UserPlus, Filter, List, Table, X, Grid3x3, Trash2 } from "lucide-react";
 import { api } from "@/api";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrency } from "@/hooks/useCurrency";
 import { cn } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface CustomerSegment {
   id: number;
@@ -37,6 +47,9 @@ const CustomerList = () => {
   const [viewMode, setViewMode] = useState<"list" | "table">("table");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [customerToDelete, setCustomerToDelete] = useState<CustomerSegment | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // KPI States
   const [totalCustomers, setTotalCustomers] = useState(0);
@@ -233,6 +246,14 @@ const CustomerList = () => {
                 <Phone className="w-4 h-4" />
               </Button>
             )}
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={() => handleDeleteClick(customer)}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -369,6 +390,14 @@ const CustomerList = () => {
                         <Phone className="w-4 h-4" />
                       </Button>
                     )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleDeleteClick(customer)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
                 </td>
               </tr>
@@ -406,6 +435,37 @@ const CustomerList = () => {
         description: error?.response?.data?.error || "Müşteri eklenirken bir hata oluştu",
         variant: "destructive"
       });
+    }
+  };
+
+  const handleDeleteClick = (customer: CustomerSegment) => {
+    setCustomerToDelete(customer);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!customerToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      await api.delete(`/customers/${customerToDelete.id}`);
+      await fetchAllCustomers();
+      await fetchKPIs();
+      setDeleteDialogOpen(false);
+      setCustomerToDelete(null);
+      toast({
+        title: "Başarılı",
+        description: "Müşteri silindi"
+      });
+    } catch (error: any) {
+      console.error("Müşteri silme hatası:", error);
+      toast({
+        title: "Hata",
+        description: error?.response?.data?.error || "Müşteri silinirken bir hata oluştu",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -815,6 +875,35 @@ const CustomerList = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Müşteriyi Sil</AlertDialogTitle>
+            <AlertDialogDescription>
+              {customerToDelete && (
+                <>
+                  <strong>{customerToDelete.name}</strong> adlı müşteriyi silmek istediğinizden emin misiniz?
+                  <br />
+                  <br />
+                  Bu işlem geri alınamaz. Müşteri bilgileri ve tüm ilişkili veriler kalıcı olarak silinecektir.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>İptal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {isDeleting ? "Siliniyor..." : "Sil"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

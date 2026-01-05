@@ -1,10 +1,21 @@
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { api } from "@/api";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrency } from "@/hooks/useCurrency";
 import { useCurrencyRates } from "@/contexts/CurrencyRatesContext";
 import { useTenant } from "@/contexts/TenantContext";
+import {
+  useVehiclesQuery,
+  useVehicleDetailQuery,
+  useVehicleCostsQuery,
+  useVehicleCalculationQuery,
+  useVehicleDocumentsQuery,
+  useCreateVehicleMutation,
+  useUpdateVehicleMutation,
+  useDeleteVehicleMutation,
+  vehicleKeys,
+} from "./useVehiclesQuery";
+import { useQueryClient } from "@tanstack/react-query";
 
 export type Vehicle = {
   id: number;
@@ -102,6 +113,12 @@ export type CostCalculation = {
   profitVsTarget?: number | null;
 };
 
+/**
+ * useVehiclesData - Refactored to use TanStack Query
+ * 
+ * This hook now uses TanStack Query for data fetching, caching, and state management.
+ * The API remains the same for backward compatibility.
+ */
 export const useVehiclesData = () => {
   const { formatCurrency: currency } = useCurrency();
   const { getCustomRate } = useCurrencyRates();
@@ -109,11 +126,7 @@ export const useVehiclesData = () => {
   const baseCurrency = tenant?.default_currency || "TRY";
   const location = useLocation();
   const { toast } = useToast();
-
-  // Main data state
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
+  const queryClient = useQueryClient();
 
   // Filter states
   const [query, setQuery] = useState("");
@@ -121,6 +134,7 @@ export const useVehiclesData = () => {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [stockStatusFilter, setStockStatusFilter] = useState<string>("");
   const [soldVehiclesFilter, setSoldVehiclesFilter] = useState<string>("all");
+  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
 
   // View mode states
   const [viewMode, setViewMode] = useState<'table' | 'list'>('table');
@@ -128,100 +142,57 @@ export const useVehiclesData = () => {
   const [activeTab, setActiveTab] = useState<string>("vehicles");
 
   // Selected vehicle state
-  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
-  const [vehicleCosts, setVehicleCosts] = useState<VehicleCost[]>([]);
-  const [costCalculation, setCostCalculation] = useState<CostCalculation | null>(null);
-  const [vehicleDocuments, setVehicleDocuments] = useState<any[]>([]);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(null);
 
-  // API Functions
-  const fetchVehicles = async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: "50"
-      });
-      if (query) params.append('search', query);
-      if (isSoldFilter && isSoldFilter !== "all") params.append('is_sold', isSoldFilter);
-      if (statusFilter && statusFilter !== "all") params.append('status', statusFilter);
-      if (stockStatusFilter && stockStatusFilter !== "all") params.append('stock_status', stockStatusFilter);
+  // TanStack Query hooks
+  const vehiclesQuery = useVehiclesQuery({
+    page: pagination.page,
+    limit: 50,
+    search: query,
+    is_sold: isSoldFilter,
+    status: statusFilter,
+    stock_status: stockStatusFilter,
+  });
 
-      const response = await api.get(`/vehicles?${params}`);
-      setVehicles(response.data.vehicles || []);
-      setPagination(response.data.pagination || { page: 1, totalPages: 1, total: 0 });
-    } catch (e: any) {
-      if (e?.response?.status === 500) {
-        console.error('Backend error:', e?.response?.data);
-        setVehicles([]);
-        setPagination({ page: 1, totalPages: 1, total: 0 });
-        toast({ 
-          title: "Bilgi", 
-          description: "Veritabanı tabloları henüz oluşturulmamış olabilir. Lütfen migration dosyasını çalıştırın.", 
-          variant: "default" 
-        });
-      } else {
-        toast({ 
-          title: "Hata", 
-          description: e?.response?.data?.message || "Araçlar yüklenemedi.", 
-          variant: "destructive" 
-        });
-      }
-    } finally {
-      setLoading(false);
+  const vehicleDetailQuery = useVehicleDetailQuery(selectedVehicleId);
+  const vehicleCostsQuery = useVehicleCostsQuery(selectedVehicleId);
+  const vehicleCalculationQuery = useVehicleCalculationQuery(selectedVehicleId);
+  const vehicleDocumentsQuery = useVehicleDocumentsQuery(selectedVehicleId);
+
+  // Mutations
+  const createVehicleMutation = useCreateVehicleMutation();
+  const updateVehicleMutation = useUpdateVehicleMutation();
+  const deleteVehicleMutation = useDeleteVehicleMutation();
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, page: 1 }));
+  }, [isSoldFilter, statusFilter, stockStatusFilter]);
+
+  // Handle location state for selected vehicle
+  useEffect(() => {
+    const state = location.state as { selectedVehicleId?: number } | null;
+    if (state?.selectedVehicleId) {
+      setSelectedVehicleId(state.selectedVehicleId);
+      window.history.replaceState({}, document.title);
     }
-  };
+  }, [location.state]);
 
-  const fetchVehicleDetail = async (id: number) => {
-    try {
-      const response = await api.get(`/vehicles/${id}`);
-      setSelectedVehicle(response.data);
-      
-      // Fetch related data
-      const [costsRes, calculationRes, documentsRes] = await Promise.all([
-        api.get(`/vehicles/${id}/costs`).catch(() => ({ data: [] })),
-        api.get(`/vehicles/${id}/calculate-costs`).catch(() => ({ data: null })),
-        api.get(`/documents/vehicles/${id}`).catch(() => ({ data: [] }))
-      ]);
-      
-      setVehicleCosts(costsRes.data || []);
-      setCostCalculation(calculationRes.data || null);
-      setVehicleDocuments(documentsRes.data || []);
-    } catch (e: any) {
-      toast({ 
-        title: "Hata", 
-        description: e?.response?.data?.message || "Araç detayları yüklenemedi.", 
-        variant: "destructive" 
-      });
+  // Update pagination when query data changes
+  useEffect(() => {
+    if (vehiclesQuery.data?.pagination) {
+      setPagination(vehiclesQuery.data.pagination);
     }
-  };
-
-  const fetchVehicleDocuments = async (vehicleId: number) => {
-    try {
-      const response = await api.get(`/documents/vehicles/${vehicleId}`);
-      setVehicleDocuments(response.data || []);
-    } catch (e: any) {
-      toast({ 
-        title: "Hata", 
-        description: e?.response?.data?.message || "Belgeler yüklenemedi.", 
-        variant: "destructive" 
-      });
-    }
-  };
-
-  const fetchCostCalculation = async (id: number) => {
-    try {
-      const response = await api.get(`/vehicles/${id}/calculate-costs`);
-      setCostCalculation(response.data);
-    } catch (e: any) {
-      toast({ 
-        title: "Hata", 
-        description: e?.response?.data?.message || "Maliyet hesaplaması yüklenemedi.", 
-        variant: "destructive" 
-      });
-    }
-  };
+  }, [vehiclesQuery.data?.pagination]);
 
   // Computed values
+  const vehicles = vehiclesQuery.data?.vehicles || [];
+  const loading = vehiclesQuery.isLoading || vehiclesQuery.isFetching;
+  const selectedVehicle = vehicleDetailQuery.data || null;
+  const vehicleCosts = vehicleCostsQuery.data || [];
+  const costCalculation = vehicleCalculationQuery.data || null;
+  const vehicleDocuments = vehicleDocumentsQuery.data || [];
+
   const filteredVehicles = useMemo(() => {
     return vehicles;
   }, [vehicles, query]);
@@ -261,26 +232,25 @@ export const useVehiclesData = () => {
     return filtered;
   }, [soldVehicles, soldVehiclesFilter, query]);
 
-  // Effects
-  useEffect(() => {
-    fetchVehicles();
-  }, [pagination.page, isSoldFilter, statusFilter, stockStatusFilter, query]);
+  // API functions (wrappers for backward compatibility)
+  const fetchVehicles = async () => {
+    await vehiclesQuery.refetch();
+  };
 
-  useEffect(() => {
-    setPagination(prev => ({ ...prev, page: 1 }));
-  }, [isSoldFilter, statusFilter, stockStatusFilter]);
+  const fetchVehicleDetail = async (id: number) => {
+    setSelectedVehicleId(id);
+    // Queries will automatically fetch when selectedVehicleId changes
+  };
 
-  useEffect(() => {
-    const state = location.state as { selectedVehicleId?: number } | null;
-    if (state?.selectedVehicleId && vehicles.length > 0) {
-      const vehicle = vehicles.find(v => v.id === Number(state.selectedVehicleId));
-      if (vehicle) {
-        setSelectedVehicle(vehicle);
-        fetchVehicleDetail(vehicle.id);
-        window.history.replaceState({}, document.title);
-      }
-    }
-  }, [location.state, vehicles]);
+  const fetchVehicleDocuments = async (vehicleId: number) => {
+    // Invalidate and refetch documents
+    await queryClient.invalidateQueries({ queryKey: vehicleKeys.documents(vehicleId) });
+  };
+
+  const fetchCostCalculation = async (id: number) => {
+    // Invalidate and refetch calculation
+    await queryClient.invalidateQueries({ queryKey: vehicleKeys.calculation(id) });
+  };
 
   return {
     // Data
@@ -320,17 +290,24 @@ export const useVehiclesData = () => {
     // Pagination
     setPagination,
     
-    // API functions
+    // API functions (backward compatible)
     fetchVehicles,
     fetchVehicleDetail,
     fetchVehicleDocuments,
     fetchCostCalculation,
     
+    // Mutations
+    createVehicle: createVehicleMutation.mutate,
+    updateVehicle: (id: number, data: any) => updateVehicleMutation.mutate({ id, data }),
+    deleteVehicle: deleteVehicleMutation.mutate,
+    
     // Setters
-    setSelectedVehicle,
-    setVehicleCosts,
-    setCostCalculation,
-    setVehicleDocuments,
+    setSelectedVehicle: (vehicle: Vehicle | null) => {
+      setSelectedVehicleId(vehicle?.id || null);
+    },
+    setVehicleCosts: () => {}, // No longer needed, managed by query
+    setCostCalculation: () => {}, // No longer needed, managed by query
+    setVehicleDocuments: () => {}, // No longer needed, managed by query
     
     // Utils
     currency,

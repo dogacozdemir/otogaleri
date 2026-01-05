@@ -34,6 +34,11 @@ interface ConversionResult {
   target_currency: string;
   base_currency: string;
   total_converted: number;
+  sale_price_converted?: number;
+  sale_price_rate?: number;
+  sale_price_rate_source?: 'custom' | 'api';
+  profit_converted?: number;
+  target_profit_converted?: number | null;
   conversion_details: ConversionDetail[];
 }
 
@@ -289,16 +294,30 @@ export const VehicleDetailCalculateTab = ({
                 <div className="flex justify-between text-lg">
                   <span>Satış Fiyatı:</span>
                   <span className="font-bold">
-                    {formatCurrencyWithCurrency(
-                      costCalculation.salePrice,
-                      costCalculation.vehicle?.sale_currency || vehicle.sale_currency
+                    {conversionResult && conversionResult.sale_price_converted !== undefined ? (
+                      formatCurrencyWithCurrency(
+                        conversionResult.sale_price_converted,
+                        conversionResult.target_currency
+                      )
+                    ) : (
+                      formatCurrencyWithCurrency(
+                        costCalculation.salePrice,
+                        costCalculation.vehicle?.sale_currency || vehicle.sale_currency
+                      )
                     )}
                   </span>
                 </div>
                 <div className="flex justify-between text-xl border-t pt-2">
                   <span>Kar:</span>
-                  <span className={`font-bold ${costCalculation.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {currency(costCalculation.profit)}
+                  <span className={`font-bold ${(conversionResult?.profit_converted ?? costCalculation.profit) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {conversionResult && conversionResult.profit_converted !== undefined ? (
+                      formatCurrencyWithCurrency(
+                        conversionResult.profit_converted,
+                        conversionResult.target_currency
+                      )
+                    ) : (
+                      currency(costCalculation.profit)
+                    )}
                   </span>
                 </div>
                 {costCalculation.profitMargin !== undefined && (
@@ -322,14 +341,31 @@ export const VehicleDetailCalculateTab = ({
                     <div className="flex justify-between text-lg border-t pt-2">
                       <span>Hedef Kar:</span>
                       <span className="font-semibold text-blue-600">
-                        {currency(costCalculation.targetProfit)}
+                        {conversionResult && conversionResult.target_profit_converted !== null && conversionResult.target_profit_converted !== undefined ? (
+                          formatCurrencyWithCurrency(
+                            conversionResult.target_profit_converted,
+                            conversionResult.target_currency
+                          )
+                        ) : (
+                          currency(costCalculation.targetProfit)
+                        )}
                       </span>
                     </div>
                     {costCalculation.profitVsTarget !== null && costCalculation.profitVsTarget !== undefined && (
                       <div className="flex justify-between text-lg">
                         <span>Hedef vs Gerçek:</span>
-                        <span className={`font-semibold ${costCalculation.profitVsTarget >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {costCalculation.profitVsTarget >= 0 ? '+' : ''}{currency(costCalculation.profitVsTarget)}
+                        <span className={`font-semibold ${
+                          (conversionResult?.profit_converted !== undefined && conversionResult?.target_profit_converted !== null && conversionResult?.target_profit_converted !== undefined)
+                            ? ((conversionResult.profit_converted - conversionResult.target_profit_converted) >= 0 ? 'text-green-600' : 'text-red-600')
+                            : (costCalculation.profitVsTarget >= 0 ? 'text-green-600' : 'text-red-600')
+                        }`}>
+                          {(() => {
+                            if (conversionResult?.profit_converted !== undefined && conversionResult?.target_profit_converted !== null && conversionResult?.target_profit_converted !== undefined) {
+                              const diff = conversionResult.profit_converted - conversionResult.target_profit_converted;
+                              return `${diff >= 0 ? '+' : ''}${formatCurrencyWithCurrency(diff, conversionResult.target_currency)}`;
+                            }
+                            return `${costCalculation.profitVsTarget >= 0 ? '+' : ''}${currency(costCalculation.profitVsTarget)}`;
+                          })()}
                         </span>
                       </div>
                     )}

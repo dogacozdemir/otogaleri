@@ -12,6 +12,13 @@ import {
   deleteIncome,
   convertIncomesToCurrency,
   convertExpensesToCurrency,
+  validateCreateIncome,
+  validateUpdateIncome,
+  validateCreateExpense,
+  validateUpdateExpense,
+  validateIncomeId,
+  validateExpenseId,
+  validateCurrencyConversion,
 } from "../controllers/accountingController";
 import { authMiddleware } from "../middleware/auth";
 import { tenantGuard } from "../middleware/tenantGuard";
@@ -24,21 +31,21 @@ router.use(tenantGuard);
 
 // Gider işlemleri
 router.get("/expenses-list", getExpensesList);
-router.post("/expenses", addExpense);
-router.put("/expenses/:id", updateExpense);
-router.delete("/expenses/:id", deleteExpense);
+router.post("/expenses", validateCreateExpense, addExpense);
+router.put("/expenses/:id", validateExpenseId, validateUpdateExpense, updateExpense);
+router.delete("/expenses/:id", validateExpenseId, deleteExpense);
 
 // Gelir işlemleri
 router.get("/income-list", getIncomeList);
-router.post("/income", addIncome);
-router.put("/income/:id", updateIncome);
-router.delete("/income/:id", deleteIncome);
+router.post("/income", validateCreateIncome, addIncome);
+router.put("/income/:id", validateIncomeId, validateUpdateIncome, updateIncome);
+router.delete("/income/:id", validateIncomeId, deleteIncome);
 
 // Raporlar
 router.get("/yearly-income-expense", getYearlyIncomeExpense);
 router.get("/date-range-income-expense", getDateRangeIncomeExpense);
-router.post("/convert-incomes", convertIncomesToCurrency);
-router.post("/convert-expenses", convertExpensesToCurrency);
+router.post("/convert-incomes", validateCurrencyConversion, convertIncomesToCurrency);
+router.post("/convert-expenses", validateCurrencyConversion, convertExpensesToCurrency);
 
 export default router;
 

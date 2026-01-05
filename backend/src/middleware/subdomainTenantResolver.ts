@@ -32,7 +32,11 @@ export async function subdomainTenantResolver(
       );
       const tenantArray = rows as any[];
       
-      if (tenantArray.length === 0 && subdomain !== 'localhost' && subdomain !== '127.0.0.1') {
+      // Check against allowed subdomains from config
+      const { subdomainConfig } = await import("../config/appConfig");
+      const allowedSubdomains = subdomainConfig.allowed;
+      
+      if (tenantArray.length === 0 && !allowedSubdomains.includes(subdomain)) {
         // Subdomain doesn't match tenant - but we still allow if JWT is valid
         // This is a warning, not a block (JWT is primary)
         console.warn(`[tenant] Subdomain ${subdomain} does not match tenant ${req.tenantId}`);

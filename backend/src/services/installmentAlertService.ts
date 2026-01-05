@@ -1,4 +1,4 @@
-import { dbPool } from "../config/database";
+import { TenantAwareQuery } from "../repositories/tenantAwareQuery";
 import { sendInstallmentReminderEmail, sendSMSReminder } from "./emailService";
 
 interface OverdueInstallment {
@@ -21,8 +21,10 @@ interface OverdueInstallment {
 
 /**
  * Find all overdue installments that need reminders
+ * Note: This function processes all tenants, so it uses a special approach
+ * For tenant-specific queries, use TenantAwareQuery
  */
-export async function findOverdueInstallments(): Promise<OverdueInstallment[]> {
+export async function findOverdueInstallments(tenantQuery?: TenantAwareQuery): Promise<OverdueInstallment[]> {
   const query = `
     SELECT 
       vis.id,
@@ -76,25 +78,32 @@ export async function findOverdueInstallments(): Promise<OverdueInstallment[]> {
     ORDER BY vis.tenant_id, overdue_days DESC
   `;
 
-  const [rows] = await dbPool.query(query);
-  return rows as OverdueInstallment[];
+  // This query processes all tenants (cron job), so we use executeRaw to bypass tenant_id check
+  // For tenant-specific queries, use TenantAwareQuery.query() with tenant_id filter
+  if (tenantQuery) {
+    const [rows] = await tenantQuery.executeRaw(query);
+    return rows as OverdueInstallment[];
+  } else {
+    // Fallback for backward compatibility (should not be used in production)
+    const { dbPool } = await import("../config/database");
+    const [rows] = await dbPool.query(query);
+    return rows as OverdueInstallment[];
+  }
 }
 
 /**
  * Send reminder for a specific overdue installment
  */
 export async function sendReminderForInstallment(
+  tenantQuery: TenantAwareQuery,
   installmentId: number,
-  tenantId: number,
   sendEmail: boolean = true,
   sendSMS: boolean = false
 ): Promise<{ success: boolean; error?: string }> {
-  const conn = await dbPool.getConnection();
-  await conn.beginTransaction();
-
-  try {
-    // Get installment details
-    const [rows] = await conn.query(
+  return await tenantQuery.transaction(async (conn) => {
+    try {
+      // Get installment details
+      const [rows] = await tenantQuery.query(
       `
       SELECT 
         vis.*,
@@ -119,14 +128,12 @@ export async function sendReminderForInstallment(
       LEFT JOIN customers c ON vs.customer_name = c.name AND (vs.customer_phone IS NULL OR vs.customer_phone = c.phone)
       WHERE vis.id = ? AND vis.tenant_id = ?
     `,
-      [installmentId, tenantId]
+      [installmentId, tenantQuery.getTenantId()]
     );
 
     const installments = rows as any[];
     if (installments.length === 0) {
-      await conn.rollback();
-      conn.release();
-      return { success: false, error: "Installment not found" };
+      throw new Error("Installment not found");
     }
 
     const installment = installments[0];
@@ -175,23 +182,19 @@ export async function sendReminderForInstallment(
     }
 
     // Update last_reminder_sent and increment reminder_count
-    await conn.query(
+    await tenantQuery.query(
       `UPDATE vehicle_installment_sales 
        SET last_reminder_sent = CURDATE(), reminder_count = reminder_count + 1 
-       WHERE id = ?`,
-      [installmentId]
+       WHERE id = ? AND tenant_id = ?`,
+      [installmentId, tenantQuery.getTenantId()]
     );
 
-    await conn.commit();
-    conn.release();
-
     return { success: true };
-  } catch (error: any) {
-    await conn.rollback();
-    conn.release();
-    console.error("[installment-alert] Send reminder error:", error);
-    return { success: false, error: error.message || "Failed to send reminder" };
-  }
+    } catch (error: any) {
+      console.error("[installment-alert] Send reminder error:", error);
+      throw error; // Transaction will be rolled back automatically
+    }
+  });
 }
 
 /**
@@ -215,7 +218,11 @@ export async function processOverdueInstallments(): Promise<void> {
         continue; // Already sent today
       }
 
-      await sendReminderForInstallment(installment.id, installment.tenant_id, true, false);
+      // Create TenantAwareQuery for this tenant
+      const { TenantAwareQuery } = await import("../repositories/tenantAwareQuery");
+      const tenantQuery = new TenantAwareQuery(installment.tenant_id);
+      
+      await sendReminderForInstallment(tenantQuery, installment.id, true, false);
     }
   } catch (error) {
     console.error("[installment-alert] Process overdue installments error:", error);

@@ -143,23 +143,35 @@ export default function AnalyticsPage() {
       setCustomReports(reportsRes.data || []);
       
       // Convert top profitable vehicles to target currency
-      if (topRes.data && topRes.data.length > 0) {
+      if (topRes.data && topRes.data.length > 0 && targetCurrency) {
         try {
           // Get all sale dates for conversion
           const saleDates = topRes.data
-            .map((v: any) => v.sale_date)
-            .filter(Boolean);
+            .map((v: any) => {
+              if (!v.sale_date) return null;
+              // Ensure date is in YYYY-MM-DD format
+              const date = new Date(v.sale_date);
+              if (isNaN(date.getTime())) return null;
+              return date.toISOString().split('T')[0];
+            })
+            .filter(Boolean) as string[];
           
           if (saleDates.length > 0) {
             const minDate = saleDates.reduce((a: string, b: string) => a < b ? a : b);
             const maxDate = saleDates.reduce((a: string, b: string) => a > b ? a : b);
             
-            // Convert all sales to target currency
-            const convertRes = await api.post("/accounting/convert-incomes", {
-              target_currency: targetCurrency,
-              startDate: minDate,
-              endDate: maxDate,
-            });
+            // Validate date format (YYYY-MM-DD)
+            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+            if (!dateRegex.test(minDate) || !dateRegex.test(maxDate)) {
+              console.warn("Invalid date format, skipping currency conversion");
+              setTopProfitableConverted(topRes.data);
+            } else {
+              // Convert all sales to target currency
+              const convertRes = await api.post("/accounting/convert-incomes", {
+                target_currency: targetCurrency,
+                startDate: minDate,
+                endDate: maxDate,
+              });
             
             // Create a map of vehicle sale IDs to converted amounts
             const convertedMap = new Map<number, number>();
@@ -201,11 +213,16 @@ export default function AnalyticsPage() {
             });
             
             setTopProfitableConverted(convertedVehicles);
+            }
           } else {
             setTopProfitableConverted(topRes.data);
           }
-        } catch (convertError) {
+        } catch (convertError: any) {
           console.error("Failed to convert top profitable vehicles:", convertError);
+          // Log more details for debugging
+          if (convertError.response) {
+            console.error("Response error:", convertError.response.data);
+          }
           setTopProfitableConverted(topRes.data);
         }
       } else {

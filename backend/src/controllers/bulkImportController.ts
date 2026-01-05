@@ -109,7 +109,13 @@ export async function bulkImportVehicles(req: AuthRequest, res: Response) {
         let purchaseFxRate = 1;
         const purchaseCurrency = vehicle.purchase_currency || baseCurrency;
         if (vehicle.purchase_amount && vehicle.purchase_date && purchaseCurrency !== baseCurrency) {
+          if (!req.tenantQuery) {
+            await conn.rollback();
+            conn.release();
+            return res.status(500).json({ error: "Tenant query not available" });
+          }
           purchaseFxRate = await getOrFetchRate(
+            req.tenantQuery,
             purchaseCurrency as SupportedCurrency,
             baseCurrency as SupportedCurrency,
             vehicle.purchase_date
@@ -278,7 +284,13 @@ export async function bulkImportCosts(req: AuthRequest, res: Response) {
         let fxRate = 1;
         const costCurrency = cost.currency || baseCurrency;
         if (costCurrency !== baseCurrency) {
+          if (!req.tenantQuery) {
+            await conn.rollback();
+            conn.release();
+            return res.status(500).json({ error: "Tenant query not available" });
+          }
           fxRate = await getOrFetchRate(
+            req.tenantQuery,
             costCurrency as SupportedCurrency,
             baseCurrency as SupportedCurrency,
             cost.cost_date

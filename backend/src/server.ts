@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { testConnection } from "./config/database";
+import { generalLimiter } from "./middleware/rateLimiter";
 import authRoutes from "./routes/authRoutes";
 import branchRoutes from "./routes/branchRoutes";
 import staffRoutes from "./routes/staffRoutes";
@@ -49,18 +50,39 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads"), {
   }
 }));
 
-// Helmet configuration - allow static files (after static serving)
+// Helmet configuration - enhanced security headers
 app.use(helmet({
-  crossOriginResourcePolicy: false, // Disable for static files
-  crossOriginEmbedderPolicy: false,
+  // Allow static files and external resources
+  crossOriginResourcePolicy: { policy: "cross-origin" }, // Allow cross-origin resources
+  crossOriginEmbedderPolicy: false, // Disable for compatibility
   contentSecurityPolicy: {
     directives: {
-      "img-src": ["'self'", "data:", "http:", "https:"],
+      "default-src": ["'self'"],
+      "script-src": ["'self'", "'unsafe-inline'"], // Allow inline scripts (for some frontend frameworks)
+      "style-src": ["'self'", "'unsafe-inline'"], // Allow inline styles
+      "img-src": ["'self'", "data:", "http:", "https:", "blob:"], // Allow images from various sources
+      "font-src": ["'self'", "data:", "https:"],
+      "connect-src": ["'self'"], // API connections
+      "frame-ancestors": ["'none'"], // Prevent clickjacking
     },
   },
+  // Additional security headers
+  hsts: {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true,
+  },
+  frameguard: { action: "deny" }, // Prevent clickjacking
+  noSniff: true, // Prevent MIME type sniffing
+  xssFilter: true, // Enable XSS filter
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" }, // Control referrer information
 }));
 
-app.use(express.json());
+// Apply general rate limiting to all routes
+app.use(generalLimiter);
+
+app.use(express.json({ limit: "10mb" })); // Limit JSON payload size
+app.use(express.urlencoded({ extended: true, limit: "10mb" })); // Limit URL-encoded payload size
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", service: "otogaleri-backend" });
@@ -85,7 +107,17 @@ app.use("/api/currency", currencyRoutes);
 app.use("/api/quotes", quoteRoutes);
 app.use("/api/acl", aclRoutes);
 
-const PORT = process.env.PORT || 5005;
+// 404 Handler - Must be after all routes
+import { notFoundHandler } from "./middleware/errorHandler";
+app.use(notFoundHandler);
+
+// Error Handler - Must be last middleware
+import { errorHandler } from "./middleware/errorHandler";
+app.use(errorHandler);
+
+import { serverConfig } from "./config/appConfig";
+
+const { port: PORT } = serverConfig.required;
 
 async function start() {
   try {
@@ -103,3 +135,4 @@ async function start() {
 start().catch((err) => {
   console.error("[otogaleri] Fatal startup error", err);
 });
+

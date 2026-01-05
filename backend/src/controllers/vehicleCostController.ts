@@ -49,11 +49,15 @@ export async function addVehicleCost(req: AuthRequest, res: Response) {
       if (custom_rate !== undefined && custom_rate !== null) {
         fxRate = Number(custom_rate);
       } else {
-      fxRate = await getOrFetchRate(
-        costCurrency as SupportedCurrency,
-        baseCurrency as SupportedCurrency,
+        if (!req.tenantQuery) {
+          return res.status(500).json({ error: "Tenant query not available" });
+        }
+        fxRate = await getOrFetchRate(
+          req.tenantQuery,
+          costCurrency as SupportedCurrency,
+          baseCurrency as SupportedCurrency,
           formattedDate
-      );
+        );
       }
     }
 
@@ -112,7 +116,11 @@ export async function updateVehicleCost(req: AuthRequest, res: Response) {
       if (custom_rate !== undefined && custom_rate !== null) {
         fxRate = Number(custom_rate);
       } else {
+        if (!req.tenantQuery) {
+          return res.status(500).json({ error: "Tenant query not available" });
+        }
         fxRate = await getOrFetchRate(
+          req.tenantQuery,
           costCurrency as SupportedCurrency,
           baseCurrency as SupportedCurrency,
           originalCostDate

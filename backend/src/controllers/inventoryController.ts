@@ -58,7 +58,11 @@ export async function createProduct(req: AuthRequest, res: Response) {
     let finalCostPrice = cost_price;
     if (cost_price && cost_currency && cost_currency !== baseCurrency) {
       // Farklı currency ile girildiyse base currency'ye çevir
+      if (!req.tenantQuery) {
+        return res.status(500).json({ error: "Tenant query not available" });
+      }
       const fxRate = await getOrFetchRate(
+        req.tenantQuery,
         cost_currency as SupportedCurrency,
         baseCurrency as SupportedCurrency,
         new Date().toISOString().split('T')[0]
@@ -70,7 +74,11 @@ export async function createProduct(req: AuthRequest, res: Response) {
     // Calculate FX rates for sale_price
     let saleFxRate = 1;
     if (sale_price && finalSaleCurrency !== baseCurrency) {
+      if (!req.tenantQuery) {
+        return res.status(500).json({ error: "Tenant query not available" });
+      }
       saleFxRate = await getOrFetchRate(
+        req.tenantQuery,
         finalSaleCurrency as SupportedCurrency,
         baseCurrency as SupportedCurrency,
         new Date().toISOString().split('T')[0]
@@ -116,6 +124,7 @@ export async function createProduct(req: AuthRequest, res: Response) {
       const movementCostPrice = cost_price || finalCostPrice;
       const movementCostFxRate = cost_currency && cost_currency !== baseCurrency 
         ? await getOrFetchRate(
+            req.tenantQuery!,
             cost_currency as SupportedCurrency,
             baseCurrency as SupportedCurrency,
             new Date().toISOString().split('T')[0]
@@ -201,7 +210,11 @@ export async function updateProduct(req: AuthRequest, res: Response) {
     let finalCostPrice = cost_price;
     if (cost_price && cost_currency && cost_currency !== baseCurrency) {
       // Farklı currency ile girildiyse base currency'ye çevir
+      if (!req.tenantQuery) {
+        return res.status(500).json({ error: "Tenant query not available" });
+      }
       const fxRate = await getOrFetchRate(
+        req.tenantQuery,
         cost_currency as SupportedCurrency,
         baseCurrency as SupportedCurrency,
         new Date().toISOString().split('T')[0]
@@ -213,7 +226,11 @@ export async function updateProduct(req: AuthRequest, res: Response) {
     // Calculate FX rates for sale_price
     let saleFxRate = 1;
     if (sale_price && finalSaleCurrency !== baseCurrency) {
+      if (!req.tenantQuery) {
+        return res.status(500).json({ error: "Tenant query not available" });
+      }
       saleFxRate = await getOrFetchRate(
+        req.tenantQuery,
         finalSaleCurrency as SupportedCurrency,
         baseCurrency as SupportedCurrency,
         new Date().toISOString().split('T')[0]
@@ -327,7 +344,11 @@ export async function handleEntry(req: AuthRequest, res: Response) {
     // Calculate FX rate for entry
     let entryCostFxRate = 1;
     if (entryCostPrice && entryCostCurrency !== baseCurrency) {
+      if (!req.tenantQuery) {
+        return res.status(500).json({ error: "Tenant query not available" });
+      }
       entryCostFxRate = await getOrFetchRate(
+        req.tenantQuery,
         entryCostCurrency as SupportedCurrency,
         baseCurrency as SupportedCurrency,
         new Date().toISOString().split('T')[0]
@@ -456,7 +477,11 @@ export async function handleExit(req: AuthRequest, res: Response) {
     // Calculate FX rate for exit
     let exitSaleFxRate = 1;
     if (exitSalePrice && exitSaleCurrency !== baseCurrency) {
+      if (!req.tenantQuery) {
+        return res.status(500).json({ error: "Tenant query not available" });
+      }
       exitSaleFxRate = await getOrFetchRate(
+        req.tenantQuery,
         exitSaleCurrency as SupportedCurrency,
         baseCurrency as SupportedCurrency,
         new Date().toISOString().split('T')[0]

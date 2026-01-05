@@ -202,7 +202,11 @@ export async function createQuote(req: AuthRequest, res: Response) {
     // Calculate FX rate
     let fxRate = 1;
     if (quoteCurrency !== baseCurrency) {
+      if (!req.tenantQuery) {
+        return res.status(500).json({ error: "Tenant query not available" });
+      }
       fxRate = await getOrFetchRate(
+        req.tenantQuery,
         quoteCurrency as SupportedCurrency,
         baseCurrency as SupportedCurrency,
         quote_date
@@ -307,7 +311,11 @@ export async function updateQuote(req: AuthRequest, res: Response) {
     let fxRate = existingQuote.fx_rate_to_base;
     const finalQuoteDate = quote_date || existingQuote.quote_date;
     if (quoteCurrency !== baseCurrency && finalQuoteDate) {
+      if (!req.tenantQuery) {
+        return res.status(500).json({ error: "Tenant query not available" });
+      }
       fxRate = await getOrFetchRate(
+        req.tenantQuery,
         quoteCurrency as SupportedCurrency,
         baseCurrency as SupportedCurrency,
         finalQuoteDate

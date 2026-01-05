@@ -39,7 +39,9 @@ export const VehicleDetailCostsTab = ({
     if (!acc[currency]) {
       acc[currency] = 0;
     }
-    acc[currency] += cost.amount || 0;
+    // Ensure amount is a number (handle both string and number types)
+    const amount = typeof cost.amount === 'string' ? parseFloat(cost.amount) || 0 : (cost.amount || 0);
+    acc[currency] += amount;
     return acc;
   }, {} as Record<string, number>);
 

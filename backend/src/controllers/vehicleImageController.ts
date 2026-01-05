@@ -2,51 +2,67 @@ import { Response } from "express";
 import { AuthRequest } from "../middleware/auth";
 import { dbPool } from "../config/database";
 import multer from "multer";
-import path from "path";
-import fs from "fs";
 import sharp from "sharp";
+import { StorageService } from "../services/storage/storageService";
 
-// Dosya yükleme için multer yapılandırması
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, "../../uploads/vehicles");
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
-    cb(null, `vehicle-${uniqueSuffix}${ext}`);
-  },
-});
+// File upload configuration - use memory storage for S3 compatibility
+const storage = multer.memoryStorage();
+
+// Strict MIME type validation - only allow specific image types
+const ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+];
+
+const ALLOWED_EXTENSIONS = /\.(jpeg|jpg|png|webp)$/i;
+
+// Maximum file size (configurable via env, default 10MB)
+const MAX_FILE_SIZE = process.env.MAX_UPLOAD_SIZE 
+  ? Number(process.env.MAX_UPLOAD_SIZE) 
+  : 10 * 1024 * 1024; // 10MB default
 
 export const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  limits: { 
+    fileSize: MAX_FILE_SIZE,
+    files: 1, // Only allow single file upload
+  },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|webp/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-
-    if (mimetype && extname) {
-      return cb(null, true);
-    } else {
-      cb(new Error("Invalid file type. Only images (JPEG, PNG, WEBP) are allowed."));
+    // Strict MIME type check
+    if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+      return cb(new Error(`Invalid MIME type: ${file.mimetype}. Only ${ALLOWED_MIME_TYPES.join(', ')} are allowed.`));
     }
+
+    // Extension check
+    if (!ALLOWED_EXTENSIONS.test(file.originalname)) {
+      return cb(new Error(`Invalid file extension. Only .jpeg, .jpg, .png, .webp are allowed.`));
+    }
+
+    // Additional security: Check file size before processing
+    if (req.headers['content-length']) {
+      const contentLength = Number(req.headers['content-length']);
+      if (contentLength > MAX_FILE_SIZE) {
+        return cb(new Error(`File size exceeds maximum allowed size of ${MAX_FILE_SIZE / 1024 / 1024}MB`));
+      }
+    }
+
+    cb(null, true);
   },
 });
 
-// Resim optimizasyonu - WebP formatına dönüştür
-async function optimizeImage(inputPath: string, outputPath: string): Promise<void> {
-  await sharp(inputPath)
+/**
+ * Optimize image to WebP format
+ */
+async function optimizeImage(buffer: Buffer): Promise<Buffer> {
+  return await sharp(buffer)
     .resize(1920, 1080, {
       fit: "inside",
       withoutEnlargement: true,
     })
     .webp({ quality: 85, effort: 6 })
-    .toFile(outputPath);
+    .toBuffer();
 }
 
 export async function listVehicleImages(req: AuthRequest, res: Response) {
@@ -73,14 +89,28 @@ export async function listVehicleImages(req: AuthRequest, res: Response) {
         is_primary,
         display_order,
         created_at,
-        CONCAT('/uploads/vehicles/', image_filename) as url
+        image_path as url
       FROM vehicle_images
       WHERE tenant_id = ? AND vehicle_id = ?
       ORDER BY is_primary DESC, display_order ASC, created_at ASC`,
       [req.tenantId, vehicle_id]
     );
 
-    res.json(images);
+    // Get URLs from storage service for each image
+    const imagesArray = images as any[];
+    const imagesWithUrls = await Promise.all(
+      imagesArray.map(async (image) => {
+        // Extract key from image_path (remove /uploads/ prefix if exists)
+        const key = image.image_path.replace(/^\/uploads\//, '');
+        const url = await StorageService.getUrl(key);
+        return {
+          ...image,
+          url,
+        };
+      })
+    );
+
+    res.json(imagesWithUrls);
   } catch (err) {
     console.error("[vehicleImage] List error", err);
     res.status(500).json({ error: "Failed to list images" });
@@ -94,6 +124,20 @@ export async function uploadVehicleImage(req: AuthRequest, res: Response) {
     return res.status(400).json({ error: "Image file is required" });
   }
 
+  // Additional file size validation (defense in depth)
+  if (req.file.size > MAX_FILE_SIZE) {
+    return res.status(400).json({ 
+      error: `File size exceeds maximum allowed size of ${MAX_FILE_SIZE / 1024 / 1024}MB` 
+    });
+  }
+
+  // Validate MIME type again (defense in depth)
+  if (!ALLOWED_MIME_TYPES.includes(req.file.mimetype)) {
+    return res.status(400).json({ 
+      error: `Invalid file type. Only ${ALLOWED_MIME_TYPES.join(', ')} are allowed.` 
+    });
+  }
+
   try {
     // Check if vehicle exists and belongs to tenant
     const [vehicleRows] = await dbPool.query(
@@ -102,38 +146,18 @@ export async function uploadVehicleImage(req: AuthRequest, res: Response) {
     );
     const vehicleRowsArray = vehicleRows as any[];
     if (vehicleRowsArray.length === 0) {
-      // Delete uploaded file if vehicle not found
-      if (req.file.path) {
-        fs.unlinkSync(req.file.path);
-      }
       return res.status(404).json({ error: "Vehicle not found" });
     }
 
-    const originalPath = req.file.path;
-    // Change extension to .webp
-    const originalExt = path.extname(req.file.filename);
-    const baseFilename = path.basename(req.file.filename, originalExt);
-    const optimizedFilename = `optimized-${baseFilename}.webp`;
-    const optimizedPath = path.join(path.dirname(originalPath), optimizedFilename);
-
-    // Optimize image
+    // Optimize image to WebP
+    let optimizedBuffer: Buffer;
     try {
-      await optimizeImage(originalPath, optimizedPath);
-      // Delete original if optimization successful
-      if (fs.existsSync(originalPath)) {
-        fs.unlinkSync(originalPath);
-      }
+      optimizedBuffer = await optimizeImage(req.file.buffer);
     } catch (optimizeError) {
       console.error("[vehicleImage] Optimization error", optimizeError);
-      // Continue with original if optimization fails
+      // Use original buffer if optimization fails
+      optimizedBuffer = req.file.buffer;
     }
-
-    const finalPath = fs.existsSync(optimizedPath) ? optimizedPath : originalPath;
-    const finalFilename = fs.existsSync(optimizedPath) ? optimizedFilename : req.file.filename;
-
-    // Get file stats
-    const stats = fs.statSync(finalPath);
-    const fileSize = stats.size;
 
     // Get display order (next available)
     const [orderRows] = await dbPool.query(
@@ -141,6 +165,13 @@ export async function uploadVehicleImage(req: AuthRequest, res: Response) {
       [vehicle_id]
     );
     const nextOrder = (orderRows as any[])[0]?.next_order || 1;
+
+    // Upload to storage (S3 or local)
+    const uploadResult = await StorageService.upload(optimizedBuffer, {
+      folder: "vehicles",
+      contentType: "image/webp",
+      makePublic: true, // Make images publicly accessible
+    });
 
     // Insert into database
     const [result] = await dbPool.query(
@@ -151,10 +182,10 @@ export async function uploadVehicleImage(req: AuthRequest, res: Response) {
       [
         req.tenantId,
         vehicle_id,
-        `/uploads/vehicles/${finalFilename}`,
-        finalFilename,
-        fileSize,
-        'image/webp', // WebP mime type
+        uploadResult.key, // Store the key/path from storage
+        uploadResult.key.split('/').pop() || uploadResult.key, // Filename is the last part of key
+        uploadResult.size,
+        uploadResult.mimeType,
         nextOrder,
         req.userId || null,
       ]
@@ -170,19 +201,20 @@ export async function uploadVehicleImage(req: AuthRequest, res: Response) {
         mime_type,
         is_primary,
         display_order,
-        created_at,
-        CONCAT('/uploads/vehicles/', image_filename) as url
+        created_at
       FROM vehicle_images WHERE id = ?`,
       [imageId]
     );
 
-    res.status(201).json((rows as any[])[0]);
+    const image = (rows as any[])[0];
+    const url = await StorageService.getUrl(image.image_path);
+
+    res.status(201).json({
+      ...image,
+      url,
+    });
   } catch (err) {
     console.error("[vehicleImage] Upload error", err);
-    // Clean up uploaded file on error
-    if (req.file?.path && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
     res.status(500).json({ error: "Failed to upload image" });
   }
 }
@@ -224,13 +256,18 @@ export async function setPrimaryImage(req: AuthRequest, res: Response) {
         mime_type,
         is_primary,
         display_order,
-        created_at,
-        CONCAT('/uploads/vehicles/', image_filename) as url
+        created_at
       FROM vehicle_images WHERE id = ?`,
       [image_id]
     );
 
-    res.json((updatedRows as any[])[0]);
+    const image = (updatedRows as any[])[0];
+    const url = await StorageService.getUrl(image.image_path);
+
+    res.json({
+      ...image,
+      url,
+    });
   } catch (err) {
     console.error("[vehicleImage] Set primary error", err);
     res.status(500).json({ error: "Failed to set primary image" });
@@ -254,18 +291,16 @@ export async function deleteVehicleImage(req: AuthRequest, res: Response) {
     }
 
     const image = imageRowsArray[0];
-    const filePath = path.join(__dirname, "../../uploads/vehicles", image.image_filename);
+    const storageKey = image.image_path; // Use the stored key/path
+
+    // Delete from storage
+    await StorageService.delete(storageKey);
 
     // Delete from database
     await dbPool.query(
       "DELETE FROM vehicle_images WHERE id = ? AND tenant_id = ?",
       [image_id, req.tenantId]
     );
-
-    // Delete file from filesystem
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
 
     res.json({ message: "Image deleted successfully" });
   } catch (err) {

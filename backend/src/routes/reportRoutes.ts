@@ -10,6 +10,7 @@ import {
 } from "../controllers/reportController";
 import { authMiddleware } from "../middleware/auth";
 import { tenantGuard } from "../middleware/tenantGuard";
+import { reportLimiter } from "../middleware/rateLimiter";
 
 const router = express.Router();
 
@@ -24,7 +25,8 @@ router.get("/:id", getCustomReportById);
 router.post("/", createCustomReport);
 router.put("/:id", updateCustomReport);
 router.delete("/:id", deleteCustomReport);
-router.post("/:id/run", runCustomReport);
+// Apply report rate limiting only for expensive report generation
+router.post("/:id/run", reportLimiter, runCustomReport);
 
 export default router;
 

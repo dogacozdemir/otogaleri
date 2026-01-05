@@ -58,6 +58,8 @@ import { VehicleDocumentModal, DocumentFormData } from "@/components/vehicles/Ve
 import { SoldVehiclesTable } from "@/components/vehicles/SoldVehiclesTable";
 import { getInstallmentStatus as getInstallmentStatusUtil, getInstallmentOverdueDays as getInstallmentOverdueDaysUtil } from "@/utils/vehicleUtils";
 import { VehicleCost, CostCalculation } from "@/hooks/useVehiclesData";
+import { useQueryClient } from "@tanstack/react-query";
+import { vehicleKeys } from "@/hooks/useVehiclesQuery";
 
 // Use Vehicle type from hook - alias to avoid conflicts
 type Vehicle = VehicleType;
@@ -75,6 +77,7 @@ const VehiclesPage = () => {
   const { tenant } = useTenant();
   const baseCurrency = tenant?.default_currency || "TRY";
   const location = useLocation();
+  const queryClient = useQueryClient();
   
   // Use the extracted hook for data management
   const vehiclesData = useVehiclesData();
@@ -319,53 +322,8 @@ const VehiclesPage = () => {
   };
 
   const fetchCostCalculation = async (id: number) => {
-    try {
-      const response = await api.get(`/vehicles/${id}/calculate-costs`);
-      const data = response.data;
-      
-      // Backend response'unu frontend formatına dönüştür
-      const costsArray = Array.isArray(data.costs) ? data.costs : [];
-      const costItems = costsArray.map((cost: any) => ({
-        id: cost.id, // Cost ID for editing
-        name: cost.cost_name || cost.name || 'Harcama',
-        amount: cost.amount || 0, // Orijinal tutar (kendi para biriminde)
-        currency: cost.currency || "TRY", // Para birimi
-        amount_base: cost.amount_base || (cost.amount * (cost.fx_rate_to_base || 1)), // Base currency'deki tutar
-        cost_date: cost.cost_date, // Harcama tarihi
-        custom_rate: cost.custom_rate, // Manuel kur (varsa)
-        fx_rate_to_base: cost.fx_rate_to_base // Base currency'ye çevrim kuru
-      }));
-      
-      const transformedData: CostCalculation = {
-        vehicle: data.vehicle || {
-          id: id,
-          maker: null,
-          model: null,
-          sale_price: null,
-          sale_currency: null,
-          purchase_currency: null,
-          purchase_fx_rate_to_base: null
-        },
-        costItems: costItems,
-        customItems: [], // Backend'de custom items ayrımı yok, şimdilik boş
-        generalTotal: data.totals?.total_costs_base || 0,
-        salePrice: data.totals?.sale_amount_base || data.vehicle?.sale_price || 0,
-        profit: data.totals?.profit_base || 0,
-        profitMargin: data.totals?.profit_margin_percent,
-        roi: data.totals?.roi_percent,
-        targetProfit: data.target_profit,
-        profitVsTarget: data.target_profit ? (data.totals?.profit_base || 0) - data.target_profit : null
-      };
-      
-      vehiclesData.setCostCalculation(transformedData);
-    } catch (e: any) {
-      toast({ 
-        title: "Hata", 
-        description: e?.response?.data?.message || "Maliyet hesaplanamadı.", 
-        variant: "destructive" 
-      });
-      vehiclesData.setCostCalculation(null);
-    }
+    // Use the hook's fetchCostCalculation which invalidates the query
+    await vehiclesData.fetchCostCalculation(id);
   };
 
   const fetchNextVehicleNumber = async () => {
@@ -736,8 +694,9 @@ const VehiclesPage = () => {
         category: "other",
         customRate: null
       });
-      // Always refresh vehicle detail to update costs list in the modal
+      // Invalidate and refetch vehicle costs query to update the list immediately
       if (vehiclesData.selectedVehicle) {
+        await queryClient.invalidateQueries({ queryKey: vehicleKeys.costs(vehiclesData.selectedVehicle.id) });
         await vehiclesData.fetchVehicleDetail(vehiclesData.selectedVehicle.id);
       }
       vehiclesData.fetchVehicles();
@@ -756,6 +715,8 @@ const VehiclesPage = () => {
     try {
       await api.delete(`/vehicles/${vehiclesData.selectedVehicle!.id}/costs/${costId}`);
       toast({ title: "Silindi", description: "Harcama silindi." });
+      // Invalidate and refetch vehicle costs query to update the list immediately
+      await queryClient.invalidateQueries({ queryKey: vehicleKeys.costs(vehiclesData.selectedVehicle.id) });
       await vehiclesData.fetchVehicleDetail(vehiclesData.selectedVehicle.id);
       vehiclesData.fetchVehicles();
     } catch (e: any) {
@@ -815,6 +776,8 @@ const VehiclesPage = () => {
         category: "other",
         customRate: null
       });
+      // Invalidate and refetch vehicle costs query to update the list immediately
+      await queryClient.invalidateQueries({ queryKey: vehicleKeys.costs(vehiclesData.selectedVehicle.id) });
       await vehiclesData.fetchVehicleDetail(vehiclesData.selectedVehicle.id);
       vehiclesData.fetchVehicles();
     } catch (e: any) {
