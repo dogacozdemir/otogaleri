@@ -28,6 +28,9 @@ import path from "path";
 
 const app = express();
 
+// Trust proxy - required for express-rate-limit behind CloudPanel/Nginx
+app.set('trust proxy', 1);
+
 // CORS must be before helmet for static files
 // Security: Only allow whitelisted origins
 app.use(cors({
@@ -45,7 +48,8 @@ app.use(cors({
       return callback(new Error('CORS: Origin not allowed'));
     }
     
-    if (allowedOrigins.includes(origin)) {
+    // Check if origin is allowed (supports wildcard patterns)
+    if (corsConfig.isOriginAllowed(origin)) {
       callback(null, true);
     } else {
       console.warn('[CORS] Blocked request from unauthorized origin:', origin);
@@ -126,17 +130,15 @@ app.use((req, res, next) => {
     
     // In production, validate Origin header
     if (process.env.NODE_ENV === 'production') {
-      const allowedOrigins = corsConfig.allowed;
-      
       if (origin) {
-        if (!allowedOrigins.includes(origin)) {
+        if (!corsConfig.isOriginAllowed(origin)) {
           console.warn('[CSRF] Blocked request from unauthorized origin:', origin);
           return res.status(403).json({ error: 'CSRF protection: Invalid origin' });
         }
       } else if (referer) {
         // Fallback to referer if origin is not present
         const refererOrigin = new URL(referer).origin;
-        if (!allowedOrigins.includes(refererOrigin)) {
+        if (!corsConfig.isOriginAllowed(refererOrigin)) {
           console.warn('[CSRF] Blocked request from unauthorized referer:', refererOrigin);
           return res.status(403).json({ error: 'CSRF protection: Invalid referer' });
         }
@@ -147,7 +149,7 @@ app.use((req, res, next) => {
       }
     }
     // Development: Log but allow (for testing with Postman, etc.)
-    else if (origin && !corsConfig.allowed.includes(origin)) {
+    else if (origin && !corsConfig.isOriginAllowed(origin)) {
       console.warn('[CSRF] Development: Request from unauthorized origin:', origin);
     }
   }

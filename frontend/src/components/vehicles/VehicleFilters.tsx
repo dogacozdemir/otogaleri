@@ -99,7 +99,7 @@ export const VehicleFilters = ({
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
+    <div className="bg-card rounded-2xl shadow-sm border border-border p-6 space-y-4">
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Search */}
         <div className="relative flex-1">
@@ -108,7 +108,7 @@ export const VehicleFilters = ({
             placeholder="Marka, model, şasi no veya araç numarası ara..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="pl-12 h-12 rounded-xl border-gray-200 hover:border-gray-300 focus-visible:ring-[#003d82] focus-visible:border-[#003d82] transition-colors"
+            className="pl-12 h-12 rounded-xl border-border hover:border-primary focus-visible:ring-primary focus-visible:border-primary transition-colors"
           />
         </div>
 
@@ -120,8 +120,8 @@ export const VehicleFilters = ({
                 value={stockStatusFilter || "all"} 
                 onValueChange={(value) => setStockStatusFilter(value === "all" ? "" : value)}
               >
-                <SelectTrigger className="w-full lg:w-[160px] h-12 rounded-xl border-gray-200 hover:border-gray-300 transition-colors">
-                  <Package className="h-4 w-4 mr-2 text-gray-600" />
+                <SelectTrigger className="w-full lg:w-[160px] h-12 rounded-xl border-border hover:border-primary transition-colors">
+                  <Package className="h-4 w-4 mr-2 text-muted-foreground" />
                   <SelectValue placeholder="Durum" />
                 </SelectTrigger>
                 <SelectContent>
@@ -137,8 +137,8 @@ export const VehicleFilters = ({
                 value={statusFilter || "all"} 
                 onValueChange={(value) => setStatusFilter(value === "all" ? "" : value)}
               >
-                <SelectTrigger className="w-full lg:w-[160px] h-12 rounded-xl border-gray-200 hover:border-gray-300 transition-colors">
-                  <Wrench className="h-4 w-4 mr-2 text-gray-600" />
+                <SelectTrigger className="w-full lg:w-[160px] h-12 rounded-xl border-border hover:border-primary transition-colors">
+                  <Wrench className="h-4 w-4 mr-2 text-muted-foreground" />
                   <SelectValue placeholder="Araç Durumu" />
                 </SelectTrigger>
                 <SelectContent>
@@ -162,8 +162,8 @@ export const VehicleFilters = ({
                     }
                   }}
                 >
-                  <SelectTrigger className="w-full lg:w-[160px] h-12 rounded-xl border-gray-200 hover:border-gray-300 transition-colors">
-                    <Award className="h-4 w-4 mr-2 text-gray-600" />
+                  <SelectTrigger className="w-full lg:w-[160px] h-12 rounded-xl border-border hover:border-primary transition-colors">
+                    <Award className="h-4 w-4 mr-2 text-muted-foreground" />
                     <SelectValue placeholder="Marka" />
                   </SelectTrigger>
                   <SelectContent>
@@ -187,8 +187,8 @@ export const VehicleFilters = ({
                     }
                   }}
                 >
-                  <SelectTrigger className="w-full lg:w-[160px] h-12 rounded-xl border-gray-200 hover:border-gray-300 transition-colors">
-                    <Calendar className="h-4 w-4 mr-2 text-gray-600" />
+                  <SelectTrigger className="w-full lg:w-[160px] h-12 rounded-xl border-border hover:border-primary transition-colors">
+                    <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
                     <SelectValue placeholder="Yıl" />
                   </SelectTrigger>
                   <SelectContent>
@@ -204,8 +204,8 @@ export const VehicleFilters = ({
 
           {activeTab === "sold" && (
             <Select value={soldVehiclesFilter || "all"} onValueChange={setSoldVehiclesFilter}>
-              <SelectTrigger className="w-full lg:w-[200px] h-12 rounded-xl border-gray-200 hover:border-gray-300 transition-colors">
-                <Filter className="h-4 w-4 mr-2 text-gray-600" />
+              <SelectTrigger className="w-full lg:w-[200px] h-12 rounded-xl border-border hover:border-primary transition-colors">
+                <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
                 <SelectValue placeholder="Filtrele" />
               </SelectTrigger>
               <SelectContent>
@@ -245,7 +245,7 @@ export const VehicleFilters = ({
 
       {/* Action Bar */}
       {(onBulkImportClick || onViewModeChange || addVehicleButton || onExportClick || onActiveTabChange) && (
-        <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-gray-200 min-h-[60px]">
+        <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-border min-h-[60px]">
           {/* Left Section */}
           <div className="flex gap-2 flex-wrap items-center sm:flex-1 sm:justify-start">
             {activeTab === "vehicles" && onBulkImportClick && (
@@ -253,11 +253,11 @@ export const VehicleFilters = ({
                 <Button 
                   variant="outline" 
                   size="icon"
-                  className="rounded-xl h-11 w-11 bg-transparent border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all"
+                  className="rounded-xl h-11 w-11 bg-transparent border-border hover:bg-muted hover:border-primary transition-all"
                   onClick={() => onBulkImportClick("vehicles")}
                   title="Toplu İçe Aktar"
                 >
-                  <Upload className="h-4 w-4 text-gray-600" />
+                  <Upload className="h-4 w-4 text-muted-foreground" />
                 </Button>
               </>
             )}
@@ -265,20 +265,20 @@ export const VehicleFilters = ({
               <Button 
                 variant="outline" 
                 size="icon"
-                className="rounded-xl h-11 w-11 bg-transparent border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all"
+                className="rounded-xl h-11 w-11 bg-transparent border-border hover:bg-muted hover:border-primary transition-all"
                 onClick={onExportClick}
                 title="Dışa Aktar"
               >
-                <Download className="h-4 w-4 text-gray-600" />
+                <Download className="h-4 w-4 text-muted-foreground" />
               </Button>
             )}
             {activeTab === "vehicles" && onBulkImportClick && (
               <Button 
                 variant="outline" 
-                className="gap-2 rounded-xl h-11 bg-transparent border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all"
+                className="gap-2 rounded-xl h-11 bg-transparent border-border hover:bg-muted hover:border-primary transition-all"
                 onClick={() => onBulkImportClick("costs")}
               >
-                <FileUp className="h-4 w-4 text-gray-600" />
+                <FileUp className="h-4 w-4 text-muted-foreground" />
                 Masraf Aktar
               </Button>
             )}
@@ -287,20 +287,20 @@ export const VehicleFilters = ({
           {/* Tab Switch - Absolutely Centered */}
           {onActiveTabChange && (
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transform z-10 hidden sm:block">
-              <div className="flex items-center gap-4 px-4 py-2.5 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200 shadow-sm">
+              <div className="flex items-center gap-4 px-4 py-2.5 bg-gradient-to-r from-muted/50 to-muted rounded-xl border border-border shadow-sm">
                 <div className={cn(
                   "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all",
                   activeTab === "vehicles" 
-                    ? "bg-white shadow-sm text-[#003d82]" 
+                    ? "bg-card shadow-sm text-primary" 
                     : "text-gray-600"
                 )}>
                   <Car className={cn(
                     "h-4 w-4",
-                    activeTab === "vehicles" ? "text-[#003d82]" : "text-gray-600"
+                    activeTab === "vehicles" ? "text-primary" : "text-muted-foreground"
                   )} />
                   <span className={cn(
                     "text-sm font-semibold",
-                    activeTab === "vehicles" ? "text-[#003d82]" : "text-gray-600"
+                    activeTab === "vehicles" ? "text-primary" : "text-muted-foreground"
                   )}>Mevcut Araçlar</span>
                   {activeVehiclesCount !== undefined && (
                     <Badge 
@@ -308,8 +308,8 @@ export const VehicleFilters = ({
                       className={cn(
                         "text-xs px-2 py-0.5",
                         activeTab === "vehicles" 
-                          ? "bg-[#003d82]/10 text-[#003d82] border-[#003d82]/20" 
-                          : "bg-gray-200 text-gray-600"
+                          ? "bg-primary/10 text-primary border-primary/20"
+                          : "bg-muted text-muted-foreground"
                       )}
                     >
                       {activeVehiclesCount}
@@ -324,16 +324,16 @@ export const VehicleFilters = ({
                 <div className={cn(
                   "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all",
                   activeTab === "sold" 
-                    ? "bg-white shadow-sm text-[#003d82]" 
+                    ? "bg-card shadow-sm text-primary" 
                     : "text-gray-600"
                 )}>
                   <TrendingUp className={cn(
                     "h-4 w-4",
-                    activeTab === "sold" ? "text-[#003d82]" : "text-gray-600"
+                    activeTab === "sold" ? "text-primary" : "text-muted-foreground"
                   )} />
                   <span className={cn(
                     "text-sm font-semibold",
-                    activeTab === "sold" ? "text-[#003d82]" : "text-gray-600"
+                    activeTab === "sold" ? "text-primary" : "text-muted-foreground"
                   )}>Satılan Araçlar</span>
                   {soldVehiclesCount !== undefined && (
                     <Badge 
@@ -341,8 +341,8 @@ export const VehicleFilters = ({
                       className={cn(
                         "text-xs px-2 py-0.5",
                         activeTab === "sold" 
-                          ? "bg-[#003d82]/10 text-[#003d82] border-[#003d82]/20" 
-                          : "bg-gray-200 text-gray-600"
+                          ? "bg-primary/10 text-primary border-primary/20"
+                          : "bg-muted text-muted-foreground"
                       )}
                     >
                       {soldVehiclesCount}
@@ -356,20 +356,20 @@ export const VehicleFilters = ({
           {/* Tab Switch - Mobile (below other elements) */}
           {onActiveTabChange && (
             <div className="flex justify-center sm:hidden order-last w-full pt-2">
-              <div className="flex items-center gap-4 px-4 py-2.5 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200 shadow-sm">
+              <div className="flex items-center gap-4 px-4 py-2.5 bg-gradient-to-r from-muted/50 to-muted rounded-xl border border-border shadow-sm">
                 <div className={cn(
                   "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all",
                   activeTab === "vehicles" 
-                    ? "bg-white shadow-sm text-[#003d82]" 
+                    ? "bg-card shadow-sm text-primary" 
                     : "text-gray-600"
                 )}>
                   <Car className={cn(
                     "h-4 w-4",
-                    activeTab === "vehicles" ? "text-[#003d82]" : "text-gray-600"
+                    activeTab === "vehicles" ? "text-primary" : "text-muted-foreground"
                   )} />
                   <span className={cn(
                     "text-sm font-semibold",
-                    activeTab === "vehicles" ? "text-[#003d82]" : "text-gray-600"
+                    activeTab === "vehicles" ? "text-primary" : "text-muted-foreground"
                   )}>Mevcut Araçlar</span>
                   {activeVehiclesCount !== undefined && (
                     <Badge 
@@ -377,8 +377,8 @@ export const VehicleFilters = ({
                       className={cn(
                         "text-xs px-2 py-0.5",
                         activeTab === "vehicles" 
-                          ? "bg-[#003d82]/10 text-[#003d82] border-[#003d82]/20" 
-                          : "bg-gray-200 text-gray-600"
+                          ? "bg-primary/10 text-primary border-primary/20"
+                          : "bg-muted text-muted-foreground"
                       )}
                     >
                       {activeVehiclesCount}
@@ -393,16 +393,16 @@ export const VehicleFilters = ({
                 <div className={cn(
                   "flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all",
                   activeTab === "sold" 
-                    ? "bg-white shadow-sm text-[#003d82]" 
+                    ? "bg-card shadow-sm text-primary" 
                     : "text-gray-600"
                 )}>
                   <TrendingUp className={cn(
                     "h-4 w-4",
-                    activeTab === "sold" ? "text-[#003d82]" : "text-gray-600"
+                    activeTab === "sold" ? "text-primary" : "text-muted-foreground"
                   )} />
                   <span className={cn(
                     "text-sm font-semibold",
-                    activeTab === "sold" ? "text-[#003d82]" : "text-gray-600"
+                    activeTab === "sold" ? "text-primary" : "text-muted-foreground"
                   )}>Satılan Araçlar</span>
                   {soldVehiclesCount !== undefined && (
                     <Badge 
@@ -410,8 +410,8 @@ export const VehicleFilters = ({
                       className={cn(
                         "text-xs px-2 py-0.5",
                         activeTab === "sold" 
-                          ? "bg-[#003d82]/10 text-[#003d82] border-[#003d82]/20" 
-                          : "bg-gray-200 text-gray-600"
+                          ? "bg-primary/10 text-primary border-primary/20"
+                          : "bg-muted text-muted-foreground"
                       )}
                     >
                       {soldVehiclesCount}
@@ -426,7 +426,7 @@ export const VehicleFilters = ({
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap sm:flex-1 sm:justify-end">
             {/* View Toggle */}
             {onViewModeChange && viewMode !== undefined && (
-              <div className="flex gap-1 border border-gray-200 rounded-xl p-1 bg-gray-50">
+              <div className="flex gap-1 border border-border rounded-xl p-1 bg-muted">
                 <Button
                   variant={viewMode === "grid" ? "secondary" : "ghost"}
                   size="icon"
@@ -434,8 +434,8 @@ export const VehicleFilters = ({
                   className={cn(
                     "h-9 w-9 rounded-lg transition-all",
                     viewMode === "grid" 
-                      ? "bg-[#003d82] text-white hover:bg-[#003d82]/90 shadow-md" 
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md" 
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   )}
                 >
                   <Grid3x3 className="h-4 w-4" />
@@ -447,8 +447,8 @@ export const VehicleFilters = ({
                   className={cn(
                     "h-9 w-9 rounded-lg transition-all",
                     viewMode === "table" 
-                      ? "bg-[#003d82] text-white hover:bg-[#003d82]/90 shadow-md" 
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md" 
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
                   )}
                 >
                   <List className="h-4 w-4" />

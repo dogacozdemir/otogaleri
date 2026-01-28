@@ -223,6 +223,7 @@ const VehiclesPage = () => {
     { value: "USD", label: "Amerikan Doları (USD)" },
     { value: "EUR", label: "Euro (EUR)" },
     { value: "GBP", label: "İngiliz Sterlini (GBP)" },
+    { value: "JPY", label: "Japon Yeni (JPY)" },
   ];
 
   // Harcama kategorileri
@@ -437,7 +438,7 @@ const VehiclesPage = () => {
             payload[key] = featuresObj;
           }
         } else if (value) {
-          if (['km', 'cc', 'sale_price', 'target_profit'].includes(key)) {
+          if (['km', 'cc', 'sale_price', 'target_profit', 'vehicle_number', 'production_year', 'branch_id'].includes(key)) {
             payload[key] = Number(value);
           } else {
             payload[key] = value;
@@ -517,7 +518,7 @@ const VehiclesPage = () => {
             payload[key] = featuresObj;
           }
         } else if (value) {
-          if (['km', 'cc', 'sale_price', 'target_profit', 'vehicle_number', 'production_year'].includes(key)) {
+          if (['km', 'cc', 'sale_price', 'target_profit', 'vehicle_number', 'production_year', 'branch_id'].includes(key)) {
             payload[key] = Number(value);
           } else {
             payload[key] = value;
@@ -956,7 +957,7 @@ const VehiclesPage = () => {
   // Calculate statistics
   const activeVehiclesCount = vehiclesData.filteredVehicles.length;
   const soldVehiclesCount = vehiclesData.filteredSoldVehicles.length;
-  const inStockCount = vehiclesData.filteredVehicles.filter(v => !v.is_sold && v.stock_status === 'in_stock').length;
+  const inStockCount = vehiclesData.filteredVehicles.filter((v: Vehicle) => !v.is_sold && v.stock_status === 'in_stock').length;
 
   return (
     <div className="space-y-6">
@@ -1025,7 +1026,7 @@ const VehiclesPage = () => {
                             setAddModalStep(1);
                             setFormErrors({});
                           }}
-                  className="gap-2 rounded-xl h-11 bg-[#003d82] hover:bg-[#003d82]/90 text-white shadow-lg"
+                  className="gap-2 rounded-xl h-11 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg"
                         >
                   <Plus className="h-4 w-4" />
                   Yeni Araç Ekle
@@ -1276,7 +1277,7 @@ const VehiclesPage = () => {
           <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
                   <div className="flex items-center gap-2">
               {/* View Toggle */}
-              <div className="flex gap-1 border rounded-xl p-1 bg-gray-50">
+              <div className="flex gap-1 border rounded-xl p-1 bg-muted">
                             <Button
                   variant={soldViewMode === "grid" ? "secondary" : "ghost"}
                   size="icon"

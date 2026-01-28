@@ -250,7 +250,7 @@ const CustomerList = () => {
               variant="outline" 
               size="icon" 
               onClick={() => handleDeleteClick(customer)}
-              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300"
+              className="text-destructive hover:text-destructive/80 hover:bg-destructive/10 border-destructive/20 hover:border-destructive/30"
             >
               <Trash2 className="w-4 h-4" />
             </Button>
@@ -262,10 +262,10 @@ const CustomerList = () => {
 
   const renderCustomerTable = (customers: CustomerSegment[]) => {
     return (
-      <Card className="rounded-xl shadow-sm border border-gray-200">
+      <Card className="rounded-xl shadow-sm border border-border">
       <div className="overflow-x-auto">
         <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-muted/50 border-b border-border">
             <tr>
               <th className="text-left p-4 font-medium text-muted-foreground">
                 <div className="flex items-center space-x-2">
@@ -351,7 +351,7 @@ const CustomerList = () => {
             {customers.map((customer, index) => (
               <tr
                 key={customer.id}
-                  className={`border-b hover:bg-gray-50/80 transition-colors duration-150 ${index % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
+                  className={`border-b hover:bg-muted/50 transition-colors duration-150 ${index % 2 === 0 ? "bg-card" : "bg-muted/30"}`}
               >
                 <td className="p-4">
                   <p className="font-medium text-foreground">{customer.name}</p>
@@ -509,8 +509,8 @@ const CustomerList = () => {
                   <p className="text-3xl font-bold mt-3">{totalCustomers}</p>
                   <p className="text-sm text-green-600 mt-2">Toplam müşteri sayısı</p>
                     </div>
-                <div className="rounded-xl p-4 bg-blue-100">
-                  <UserPlus className="h-6 w-6 text-blue-600" />
+                <div className="rounded-xl p-4 bg-blue-100 dark:bg-blue-900/20">
+                  <UserPlus className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 </div>
               </div>
             </CardContent>
@@ -524,8 +524,8 @@ const CustomerList = () => {
                   <p className="text-3xl font-bold mt-3">{newCustomers}</p>
                   <p className="text-sm text-green-600 mt-2">Son 1 ayda sisteme eklenen müşteriler</p>
                     </div>
-                <div className="rounded-xl p-4 bg-green-100">
-                  <UserPlus className="h-6 w-6 text-green-600" />
+                <div className="rounded-xl p-4 bg-green-100 dark:bg-green-900/20">
+                  <UserPlus className="h-6 w-6 text-green-600 dark:text-green-400" />
                 </div>
               </div>
             </CardContent>
@@ -541,8 +541,8 @@ const CustomerList = () => {
                     {activeInstallmentCustomers > 0 ? `${activeInstallmentCustomers} aktif` : "Taksit yok"}
                   </p>
                     </div>
-                <div className="rounded-xl p-4 bg-orange-100">
-                  <Phone className="h-6 w-6 text-orange-600" />
+                <div className="rounded-xl p-4 bg-orange-100 dark:bg-orange-900/20">
+                  <Phone className="h-6 w-6 text-orange-600 dark:text-orange-400" />
                 </div>
               </div>
             </CardContent>
@@ -550,7 +550,7 @@ const CustomerList = () => {
         </div>
 
         {/* Filters and Search */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-4">
+        <div className="bg-card rounded-2xl shadow-sm border border-border p-6 space-y-4">
           <div className="flex flex-col lg:flex-row gap-4">
             {/* Search */}
             <div className="relative flex-1">
@@ -559,14 +559,14 @@ const CustomerList = () => {
                     placeholder="Müşteri ara..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-12 h-12 rounded-xl border-gray-200 hover:border-gray-300 focus-visible:ring-[#003d82] focus-visible:border-[#003d82] transition-colors"
+                className="pl-12 h-12 rounded-xl border-border hover:border-primary focus-visible:ring-primary focus-visible:border-primary transition-colors"
                   />
                 </div>
 
             {/* Filter Button */}
             <Button 
               variant="outline" 
-              className="h-12 rounded-xl border-gray-200 hover:border-gray-300 transition-colors"
+              className="h-12 rounded-xl border-border hover:border-primary transition-colors"
               onClick={() => setShowAdvancedFilters(true)}
             >
               <Filter className="h-4 w-4 mr-2" />
@@ -577,7 +577,7 @@ const CustomerList = () => {
             {hasActiveFilters && (
                   <Button
                     variant="outline"
-                className="h-12 rounded-xl text-orange-600 hover:text-orange-700 border-orange-200 hover:border-orange-300 bg-orange-50 hover:bg-orange-100"
+                className="h-12 rounded-xl text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 border-orange-200 dark:border-orange-800 hover:border-orange-300 dark:hover:border-orange-700 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30"
                 onClick={clearAllFilters}
                   >
                 <X className="w-4 h-4 mr-2" />
@@ -587,7 +587,7 @@ const CustomerList = () => {
               </div>
 
           {/* Action Bar */}
-          <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-gray-200 min-h-[60px]">
+          <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-border min-h-[60px]">
             {/* Left Section */}
             <div className="flex gap-2 flex-wrap items-center sm:flex-1 sm:justify-start">
               <Button onClick={() => setShowNewCustomer(true)} className="gap-2 rounded-xl h-11">
@@ -599,7 +599,7 @@ const CustomerList = () => {
             {/* Right Section - View Mode Switch */}
             <div className="flex items-center gap-3">
                   <span className="text-sm text-muted-foreground">Görünüm:</span>
-              <div className="flex bg-gray-100 rounded-xl p-1 gap-1">
+              <div className="flex bg-muted rounded-xl p-1 gap-1">
                     <Button
                       variant={viewMode === "table" ? "default" : "ghost"}
                       size="sm"
@@ -607,8 +607,8 @@ const CustomerList = () => {
                   className={cn(
                     "h-9 px-4 rounded-lg transition-all",
                     viewMode === "table" 
-                      ? "bg-[#003d82] text-white shadow-sm" 
-                      : "text-gray-600 hover:bg-gray-200"
+                      ? "bg-primary text-primary-foreground shadow-sm" 
+                      : "text-muted-foreground hover:bg-muted"
                   )}
                     >
                       <Table className="w-4 h-4 mr-2" />
@@ -621,8 +621,8 @@ const CustomerList = () => {
                   className={cn(
                     "h-9 px-4 rounded-lg transition-all",
                     viewMode === "list" 
-                      ? "bg-[#003d82] text-white shadow-sm" 
-                      : "text-gray-600 hover:bg-gray-200"
+                      ? "bg-primary text-primary-foreground shadow-sm" 
+                      : "text-muted-foreground hover:bg-muted"
                   )}
                 >
                   <Grid3x3 className="w-4 h-4 mr-2" />
@@ -638,7 +638,7 @@ const CustomerList = () => {
           filteredCustomers.length > 0 ? (
             renderCustomerTable(filteredCustomers)
             ) : (
-            <Card className="rounded-xl shadow-sm border border-gray-200">
+            <Card className="rounded-xl shadow-sm border border-border">
               <CardContent className="py-16 text-center">
                 <Search className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                 <p className="text-lg font-semibold text-gray-600 mb-2">Müşteri bulunamadı</p>
@@ -659,7 +659,7 @@ const CustomerList = () => {
               {filteredCustomers.map((c) => renderCustomerCard(c))}
                           </div>
           ) : (
-            <Card className="rounded-xl shadow-sm border border-gray-200">
+            <Card className="rounded-xl shadow-sm border border-border">
               <CardContent className="py-16 text-center">
                 <Search className="h-16 w-16 text-gray-400 mx-auto mb-4" />
                 <p className="text-lg font-semibold text-gray-600 mb-2">Müşteri bulunamadı</p>
@@ -897,7 +897,7 @@ const CustomerList = () => {
             <AlertDialogAction
               onClick={handleDeleteConfirm}
               disabled={isDeleting}
-              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+              className="bg-destructive hover:bg-destructive/90 focus:ring-destructive"
             >
               {isDeleting ? "Siliniyor..." : "Sil"}
             </AlertDialogAction>

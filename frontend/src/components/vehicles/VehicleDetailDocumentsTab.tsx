@@ -51,7 +51,7 @@ export const VehicleDetailDocumentsTab = ({
 
   return (
     <>
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-4 pt-2">
         <h3 className="font-semibold">Araç Belgeleri</h3>
         <Button onClick={onOpenDocumentDialog} size="sm">
           <Upload className="w-4 h-4 mr-2" />

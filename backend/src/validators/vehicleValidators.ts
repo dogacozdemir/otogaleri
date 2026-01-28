@@ -21,21 +21,21 @@ const sanitizedRequiredString = z.string().min(1).transform(sanitizeString);
  * Create Vehicle Schema
  */
 export const CreateVehicleSchema = z.object({
-  vehicle_number: z.number().int().positive().optional().nullable(),
-  branch_id: z.number().int().positive().optional().nullable(),
+  vehicle_number: z.coerce.number().int().positive().optional().nullable(),
+  branch_id: z.coerce.number().int().positive().optional().nullable(),
   maker: sanitizedString,
   model: sanitizedString,
-  production_year: z.number().int().min(1900).max(new Date().getFullYear() + 1).optional().nullable(),
+  production_year: z.coerce.number().int().min(1900).max(new Date().getFullYear() + 1).optional().nullable(),
   arrival_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-  purchase_amount: z.number().nonnegative().optional().nullable(),
+  purchase_amount: z.coerce.number().nonnegative().optional().nullable(),
   purchase_currency: z.string().length(3).optional(),
   purchase_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-  sale_price: z.number().nonnegative().optional().nullable(),
+  sale_price: z.coerce.number().nonnegative().optional().nullable(),
   sale_currency: z.string().length(3).optional(),
   status: z.enum(["new", "used", "damaged"]).optional(),
   stock_status: z.enum(["in_stock", "sold", "reserved", "pending"]).optional(),
   location: sanitizedString,
-  target_profit: z.number().nonnegative().optional().nullable(),
+  target_profit: z.coerce.number().nonnegative().optional().nullable(),
   features: z.any().optional().nullable(), // JSON object, validate structure if needed
 }).strict();
 
@@ -44,21 +44,21 @@ export const CreateVehicleSchema = z.object({
  */
 export const UpdateVehicleSchema = z.object({
   id: z.number().int().positive(),
-  vehicle_number: z.number().int().positive().optional().nullable(),
-  branch_id: z.number().int().positive().optional().nullable(),
+  vehicle_number: z.coerce.number().int().positive().optional().nullable(),
+  branch_id: z.coerce.number().int().positive().optional().nullable(),
   maker: sanitizedString,
   model: sanitizedString,
-  production_year: z.number().int().min(1900).max(new Date().getFullYear() + 1).optional().nullable(),
+  production_year: z.coerce.number().int().min(1900).max(new Date().getFullYear() + 1).optional().nullable(),
   arrival_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-  purchase_amount: z.number().nonnegative().optional().nullable(),
+  purchase_amount: z.coerce.number().nonnegative().optional().nullable(),
   purchase_currency: z.string().length(3).optional(),
   purchase_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-  sale_price: z.number().nonnegative().optional().nullable(),
+  sale_price: z.coerce.number().nonnegative().optional().nullable(),
   sale_currency: z.string().length(3).optional(),
   status: z.enum(["new", "used", "damaged"]).optional(),
   stock_status: z.enum(["in_stock", "sold", "reserved", "pending"]).optional(),
   location: sanitizedString,
-  target_profit: z.number().nonnegative().optional().nullable(),
+  target_profit: z.coerce.number().nonnegative().optional().nullable(),
   features: z.any().optional().nullable(),
 }).strict();
 

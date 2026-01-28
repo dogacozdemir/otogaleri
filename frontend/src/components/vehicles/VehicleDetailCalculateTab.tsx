@@ -109,7 +109,7 @@ export const VehicleDetailCalculateTab = ({
 
   return (
     <>
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center pt-2">
         <h3 className="font-semibold">Maliyet Hesaplama</h3>
         <Button onClick={() => onFetchCostCalculation(vehicle.id)}>
           <Calculator className="h-4 w-4 mr-2" />

@@ -198,7 +198,7 @@ export const useVehiclesData = () => {
   }, [vehicles, query]);
 
   const soldVehicles = useMemo(() => {
-    return vehicles.filter(v => v.is_sold);
+    return vehicles.filter((v: Vehicle) => v.is_sold);
   }, [vehicles]);
 
   const filteredSoldVehicles = useMemo(() => {
@@ -206,7 +206,7 @@ export const useVehiclesData = () => {
     
     if (query) {
       const searchLower = query.toLowerCase();
-      filtered = filtered.filter(v => 
+      filtered = filtered.filter((v: Vehicle) => 
         (v.maker && v.maker.toLowerCase().includes(searchLower)) ||
         (v.model && v.model.toLowerCase().includes(searchLower)) ||
         (v.chassis_no && v.chassis_no.toLowerCase().includes(searchLower)) ||
@@ -215,15 +215,15 @@ export const useVehiclesData = () => {
     }
     
     if (soldVehiclesFilter === "cash") {
-      filtered = filtered.filter(v => !v.installment_sale_id);
+      filtered = filtered.filter((v: Vehicle) => !v.installment_sale_id);
     } else if (soldVehiclesFilter === "installment_pending") {
-      filtered = filtered.filter(v => 
+      filtered = filtered.filter((v: Vehicle) => 
         v.installment_sale_id && 
         v.installment_remaining_balance && 
         v.installment_remaining_balance > 0
       );
     } else if (soldVehiclesFilter === "installment_completed") {
-      filtered = filtered.filter(v => 
+      filtered = filtered.filter((v: Vehicle) => 
         v.installment_sale_id && 
         (!v.installment_remaining_balance || v.installment_remaining_balance <= 0)
       );

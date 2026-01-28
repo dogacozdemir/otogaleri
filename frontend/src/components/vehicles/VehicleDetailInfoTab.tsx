@@ -13,7 +13,7 @@ import {
   Palette, 
   Settings, 
   FileText,
-  DollarSign,
+  Tag,
   MapPin,
   Package,
   Clock,
@@ -120,7 +120,7 @@ export const VehicleDetailInfoTab = ({
   };
   
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pt-2">
       {/* Basic Information */}
       <Card className="border border-border/50 shadow-sm">
         <CardHeader className="pb-3">
@@ -213,26 +213,26 @@ export const VehicleDetailInfoTab = ({
       <Card className="border border-border/50 shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-primary" />
+            <Tag className="h-5 w-5 text-primary" />
             Finansal Bilgiler
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <InfoItem
-              icon={<DollarSign className="h-4 w-4" />}
+              icon={<Tag className="h-4 w-4" />}
               label="Satış Fiyatı"
               value={vehicle.sale_price ? formatCurrencyWithCurrency(vehicle.sale_price, vehicle.sale_currency) : null}
               highlight
             />
             <InfoItem
-              icon={<DollarSign className="h-4 w-4" />}
+              icon={<Tag className="h-4 w-4" />}
               label="Ödenen Tutar"
               value={vehicle.paid ? currency(vehicle.paid) : null}
             />
             {vehicle.target_profit && (
               <InfoItem
-                icon={<DollarSign className="h-4 w-4" />}
+                icon={<Tag className="h-4 w-4" />}
                 label="Hedef Kar"
                 value={currency(vehicle.target_profit)}
               />
@@ -310,7 +310,7 @@ export const VehicleDetailInfoTab = ({
           <CardHeader className="pb-3">
             <div className="flex justify-between items-center">
               <CardTitle className="text-lg flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-primary" />
+                <Tag className="h-5 w-5 text-primary" />
                 Satış Bilgileri
               </CardTitle>
               <div className="flex gap-2">
@@ -379,12 +379,12 @@ export const VehicleDetailInfoTab = ({
                 <CreditCard className="h-5 w-5 text-primary" />
                 Taksitli Satış Bilgileri
               </CardTitle>
-              {vehicle.installment.status === 'active' && vehicle.installment.remaining_balance > 0 && (
+              {vehicle.installment?.status === 'active' && vehicle.installment?.remaining_balance > 0 && (
                 <Badge variant="outline" className="bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
                   Kalan Borç: {currency(vehicle.installment.remaining_balance)}
                 </Badge>
               )}
-              {vehicle.installment.status === 'completed' && (
+              {vehicle.installment?.status === 'completed' && (
                 <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
                   Tamamlandı
                 </Badge>
@@ -394,44 +394,44 @@ export const VehicleDetailInfoTab = ({
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
               <InfoItem
-                icon={<DollarSign className="h-4 w-4" />}
+                icon={<Tag className="h-4 w-4" />}
                 label="Toplam Satış Fiyatı"
-                value={currency(vehicle.installment.total_amount)}
+                value={currency(vehicle.installment?.total_amount)}
                 highlight
               />
               <InfoItem
-                icon={<DollarSign className="h-4 w-4" />}
+                icon={<Tag className="h-4 w-4" />}
                 label="Peşinat"
-                value={currency(vehicle.installment.down_payment)}
+                value={currency(vehicle.installment?.down_payment)}
               />
               <InfoItem
                 icon={<CreditCard className="h-4 w-4" />}
                 label="Taksit Sayısı"
-                value={vehicle.installment.installment_count}
+                value={vehicle.installment?.installment_count}
               />
               <InfoItem
-                icon={<DollarSign className="h-4 w-4" />}
+                icon={<Tag className="h-4 w-4" />}
                 label="Taksit Tutarı"
-                value={currency(vehicle.installment.installment_amount)}
+                value={currency(vehicle.installment?.installment_amount)}
               />
               <InfoItem
-                icon={<DollarSign className="h-4 w-4" />}
+                icon={<Tag className="h-4 w-4" />}
                 label="Ödenen Toplam"
-                value={currency(vehicle.installment.total_paid)}
+                value={currency(vehicle.installment?.total_paid)}
               />
               <InfoItem
-                icon={<DollarSign className="h-4 w-4" />}
+                icon={<Tag className="h-4 w-4" />}
                 label="Kalan Borç"
                 value={
-                  vehicle.installment.remaining_balance > 0 
+                  (vehicle.installment?.remaining_balance ?? 0) > 0 
                     ? currency(vehicle.installment.remaining_balance) 
                     : "Tamamlandı"
                 }
-                highlight={vehicle.installment.remaining_balance > 0}
+                highlight={(vehicle.installment?.remaining_balance ?? 0) > 0}
               />
             </div>
             
-            {vehicle.installment.payments && vehicle.installment.payments.length > 0 && (
+            {vehicle.installment?.payments && vehicle.installment.payments.length > 0 && (
               <div className="mt-4">
                 <h4 className="font-semibold mb-3 text-foreground">Ödeme Geçmişi</h4>
                 <div className="border border-border/50 rounded-xl overflow-hidden">
@@ -443,7 +443,7 @@ export const VehicleDetailInfoTab = ({
                         <TableHead>Taksit No</TableHead>
                         <TableHead>Tutar</TableHead>
                         <TableHead>Notlar</TableHead>
-                        {vehicle.installment.status === 'active' && onEditPayment && onDeletePayment && (
+                        {vehicle.installment?.status === 'active' && onEditPayment && onDeletePayment && (
                           <TableHead>İşlemler</TableHead>
                         )}
                       </TableRow>
@@ -464,7 +464,7 @@ export const VehicleDetailInfoTab = ({
                           </TableCell>
                           <TableCell>{formatCurrency(payment.amount, payment.currency)}</TableCell>
                           <TableCell>{payment.notes || '-'}</TableCell>
-                          {vehicle.installment.status === 'active' && onEditPayment && onDeletePayment && (
+                          {vehicle.installment?.status === 'active' && onEditPayment && onDeletePayment && (
                             <TableCell>
                               <div className="flex gap-2">
                                 <Button
@@ -492,7 +492,7 @@ export const VehicleDetailInfoTab = ({
               </div>
             )}
             
-            {vehicle.installment.status === 'active' && vehicle.installment.remaining_balance > 0 && onOpenPaymentModal && (
+            {vehicle.installment?.status === 'active' && (vehicle.installment?.remaining_balance ?? 0) > 0 && onOpenPaymentModal && (
               <div className="mt-4">
                 <Button onClick={onOpenPaymentModal}>
                   <Plus className="h-4 w-4 mr-2" />

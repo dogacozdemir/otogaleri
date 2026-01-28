@@ -348,7 +348,7 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="acl">
-          <Card className="bg-white rounded-xl border border-[#e2e8f0] shadow-md">
+          <Card className="bg-card rounded-xl border border-border shadow-md">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -379,7 +379,7 @@ export default function SettingsPage() {
                 <div className="space-y-6">
                   {roles.map((role) => (
                     <div key={role} className="space-y-4">
-                      <h3 className="text-lg font-semibold text-[#2d3748] capitalize">
+                      <h3 className="text-lg font-semibold text-foreground capitalize">
                         {role === "manager" ? "Yönetici" : 
                          role === "sales" ? "Satış" :
                          role === "accounting" ? "Muhasebe" : "Diğer"}
@@ -441,7 +441,7 @@ export default function SettingsPage() {
                       </div>
                     </div>
                   ))}
-                  <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                     <p className="text-sm text-blue-800">
                       <strong>Not:</strong> Owner ve Admin rolleri tüm yetkilere sahiptir ve bu tabloda gösterilmez.
                     </p>

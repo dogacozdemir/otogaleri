@@ -76,7 +76,7 @@ const AuthPage = () => {
 
   const getPasswordStrengthColor = (score: number) => {
     const colors = ["bg-red-500", "bg-orange-500", "bg-yellow-500", "bg-blue-500", "bg-green-500"];
-    return colors[score] || "bg-gray-300";
+    return colors[score] || "bg-muted";
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -243,12 +243,12 @@ const AuthPage = () => {
       <div className="w-full max-w-md">
         {/* Security Badge */}
         <div className="mb-6 flex items-center justify-center gap-2 text-slate-600 dark:text-slate-400">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#003d82]/10 dark:bg-[#003d82]/20">
-            <Shield className="h-5 w-5 text-[#003d82] dark:text-[#4a9eff]" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/20">
+            <Shield className="h-5 w-5 text-primary" />
           </div>
           <div className="text-left">
-            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Otogaleri Sistemi</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Güvenli Multi-Currency Platform</p>
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Akıllı Galeri</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Güvenli Galeri Yönetim Sistemi</p>
           </div>
         </div>
 
@@ -270,13 +270,13 @@ const AuthPage = () => {
               <TabsList className="grid w-full grid-cols-2 bg-slate-100 dark:bg-slate-700 p-1">
                 <TabsTrigger
                   value="login"
-                  className="data-[state=active]:bg-white data-[state=active]:text-[#003d82] data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-600 dark:data-[state=active]:text-white"
+                  className="data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm"
                 >
                   Giriş Yap
                 </TabsTrigger>
                 <TabsTrigger
                   value="register"
-                  className="data-[state=active]:bg-white data-[state=active]:text-[#003d82] data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-600 dark:data-[state=active]:text-white"
+                  className="data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm"
                 >
                   Kayıt Ol
                 </TabsTrigger>
@@ -331,7 +331,7 @@ const AuthPage = () => {
                             description: "Şifre sıfırlama özelliği yakında eklenecek",
                           });
                         }}
-                        className="text-xs font-medium text-[#003d82] hover:text-[#0052a3] hover:underline dark:text-[#4a9eff]"
+                        className="text-xs font-medium text-primary hover:text-primary/80 hover:underline"
                       >
                         Şifrenizi mi unuttunuz?
                       </button>
@@ -375,7 +375,7 @@ const AuthPage = () => {
                   <Button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-[#003d82] text-white hover:bg-[#0052a3] shadow-sm dark:bg-[#4a9eff] dark:hover:bg-[#6bb0ff]"
+                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
                     size="lg"
                   >
                     {loading ? (
@@ -611,7 +611,7 @@ const AuthPage = () => {
                   <Button
                     type="submit"
                     disabled={loading || !passwordMeetsRequirements}
-                    className="w-full bg-[#003d82] text-white hover:bg-[#0052a3] shadow-sm disabled:opacity-50 disabled:cursor-not-allowed dark:bg-[#4a9eff] dark:hover:bg-[#6bb0ff]"
+                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     size="lg"
                   >
                     {loading ? (
@@ -626,11 +626,11 @@ const AuthPage = () => {
 
                   <p className="text-center text-xs text-slate-500 dark:text-slate-400">
                     Hesap oluşturarak{" "}
-                    <button type="button" className="text-[#003d82] hover:underline dark:text-[#4a9eff]">
+                    <button type="button" className="text-primary hover:underline">
                       Hizmet Şartları
                     </button>{" "}
                     ve{" "}
-                    <button type="button" className="text-[#003d82] hover:underline dark:text-[#4a9eff]">
+                    <button type="button" className="text-primary hover:underline">
                       Gizlilik Politikası
                     </button>
                     'nı kabul etmiş olursunuz.

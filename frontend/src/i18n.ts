@@ -4,7 +4,7 @@ import { initReactI18next } from "react-i18next";
 const resources = {
   tr: {
     translation: {
-      "app.title": "Otogaleri Yönetim Sistemi",
+      "app.title": "Akıllı Galeri",
       "app.subtitle": "Çok şubeli, çok para birimli, profesyonel oto galeri yazılımı",
       "login.title": "Giriş Yap",
       "login.email": "E-posta",

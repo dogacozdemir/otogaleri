@@ -74,7 +74,7 @@ export const VehicleDetailDeliveryTab = ({
   return (
     <>
       {/* Teslimat Bilgileri */}
-      <div className="p-4 bg-gray-50 dark:bg-gray-900/20 rounded-lg">
+      <div className="p-4 bg-muted rounded-lg">
         <div className="grid grid-cols-2 gap-4">
           <div>
             <strong>Teslimat Tarihi:</strong> {formatDate(vehicle.delivery_date)}

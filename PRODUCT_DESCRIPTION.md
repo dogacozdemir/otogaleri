@@ -1,0 +1,11 @@
+# Otogaleri Yönetim Sistemi - Ürün Tanıtımı
+
+## Profesyonel Oto Galeri Yönetim Sistemi
+
+Otogaleri Yönetim Sistemi, oto galeri işletmelerinin tüm operasyonel süreçlerini tek bir platformda birleştiren, modern ve kapsamlı bir yönetim çözümüdür. Sistem, araç envanterinden satış işlemlerine, muhasebe takibinden müşteri ilişkileri yönetimine kadar galeri işletmenizin ihtiyaç duyduğu tüm fonksiyonları sunar. Multi-tenant yapısı sayesinde her galeri kendi verileriyle tamamen izole çalışırken, çoklu şube desteği ile büyüyen işletmelerin ihtiyaçlarını karşılar.
+
+Sistemin en güçlü yönlerinden biri, uluslararası işlemler için kritik olan çok para birimi (TRY, USD, EUR, GBP) desteğidir. Otomatik döviz kuru çekme ve kur farkı dahil kar hesaplama özellikleri ile farklı para birimlerinde işlem yapan galeriler için ideal bir çözümdür. Araç yönetimi modülü, detaylı masraf takibi, görsel yönetimi, belge saklama ve otomatik kar hesaplama ile araçlarınızın tüm yaşam döngüsünü takip etmenizi sağlar. Peşin ve taksitli satış seçenekleri, taksit ödeme takibi ve gecikmiş ödeme uyarıları ile nakit akışı yönetiminizi kolaylaştırır.
+
+Müşteri ilişkileri yönetimi (CRM) özellikleri ile müşterilerinizin satış geçmişini, taksit durumlarını ve takip görevlerini tek bir yerden yönetebilirsiniz. Gelişmiş filtreleme ve segmentasyon özellikleri ile VIP müşterilerinizi belirleyip özel kampanyalar oluşturabilirsiniz. Muhasebe modülü, gelir-gider takibi, kategori bazlı analiz ve görsel trend grafikleri ile finansal durumunuzu anlık olarak görmenizi sağlar. Stok yönetimi ile servis ve satış ürünlerinizi takip ederken, kritik stok seviyeleri için otomatik uyarılar alırsınız.
+
+Sistem, modern ve kullanıcı dostu arayüzü, dark mode desteği ve responsive tasarımı ile masaüstü ve mobil cihazlardan sorunsuz çalışır. Detaylı analitik ve raporlama özellikleri ile marka bazlı kar analizi, en karlı araçlar listesi, satış trendleri ve performans metriklerini görsel grafiklerle sunar. Teklif yönetimi modülü ile müşterilerinize profesyonel teklifler hazırlayıp onaylanan teklifleri tek tıkla satışa dönüştürebilirsiniz. Tüm bu özellikler, günlük işlemlerinizde %70-80 zaman tasarrufu sağlarken, matematiksel hataları %95 oranında azaltarak işletmenizin verimliliğini ve karlılığını artırır.

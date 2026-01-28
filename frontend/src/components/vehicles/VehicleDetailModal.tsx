@@ -14,7 +14,7 @@ import { VehicleDetailInfoTab } from "./VehicleDetailInfoTab";
 import { VehicleDetailDocumentsTab } from "./VehicleDetailDocumentsTab";
 import { VehicleDetailCostsTab } from "./VehicleDetailCostsTab";
 import { VehicleDetailCalculateTab } from "./VehicleDetailCalculateTab";
-import { Car, DollarSign, MapPin, Package, FileText, Calculator, Image as ImageIcon, X } from "lucide-react";
+import { Car, Tag, MapPin, Package, FileText, Calculator, Image as ImageIcon, X } from "lucide-react";
 
 interface VehicleDetailModalProps {
   open: boolean;
@@ -96,15 +96,6 @@ export const VehicleDetailModal = ({
           <>
             {/* Modern Header with Image and Info */}
             <div className="relative bg-gradient-to-br from-primary/10 via-primary/5 to-background border-b border-border">
-              <div className="absolute top-4 right-4 z-10">
-                <button
-                  onClick={() => onOpenChange(false)}
-                  className="rounded-full p-2 hover:bg-background/80 transition-colors"
-                >
-                  <X className="h-4 w-4 text-muted-foreground" />
-                </button>
-              </div>
-              
               <div className="grid grid-cols-12 gap-6 p-6">
                 {/* Vehicle Image */}
                 <div className="col-span-12 md:col-span-4">
@@ -198,7 +189,7 @@ export const VehicleDetailModal = ({
                     {vehicle.sale_price && (
                       <Card className="p-3 bg-card border border-border/50">
                         <div className="flex items-center gap-2 mb-1">
-                          <DollarSign className="h-4 w-4 text-primary" />
+                          <Tag className="h-4 w-4 text-primary" />
                           <span className="text-xs text-muted-foreground">Satış Fiyatı</span>
                         </div>
                         <p className="text-sm font-semibold text-foreground">
@@ -286,7 +277,7 @@ export const VehicleDetailModal = ({
                 </TabsList>
               </div>
               <div className="px-6 pb-6 flex-1 overflow-y-auto overflow-x-hidden min-h-0 bg-background">
-                <TabsContent value="info" className="space-y-4 mt-4 m-0">
+                <TabsContent value="info" className="space-y-4 mt-6 m-0">
                   <VehicleDetailInfoTab 
                     vehicle={vehicle} 
                     currency={currency}
@@ -296,14 +287,14 @@ export const VehicleDetailModal = ({
                   />
                 </TabsContent>
 
-                <TabsContent value="images" className="space-y-4 mt-4 m-0">
+                <TabsContent value="images" className="space-y-4 mt-6 m-0">
                   <VehicleImageUpload 
                     vehicleId={vehicle.id} 
                     onUpdate={onRefresh}
                   />
                 </TabsContent>
 
-                <TabsContent value="documents" className="space-y-4 mt-4 m-0">
+                <TabsContent value="documents" className="space-y-4 mt-6 m-0">
                   <VehicleDetailDocumentsTab
                     vehicle={vehicle}
                     vehicleDocuments={vehicleDocuments}
@@ -312,7 +303,7 @@ export const VehicleDetailModal = ({
                   />
                 </TabsContent>
 
-                <TabsContent value="costs" className="space-y-4 mt-4 m-0">
+                <TabsContent value="costs" className="space-y-4 mt-6 m-0">
                   <VehicleDetailCostsTab
                     vehicle={vehicle}
                     vehicleCosts={vehicleCosts}
@@ -322,7 +313,7 @@ export const VehicleDetailModal = ({
                   />
                 </TabsContent>
 
-                <TabsContent value="calculate" className="space-y-4 mt-4 m-0">
+                <TabsContent value="calculate" className="space-y-4 mt-6 m-0">
                   <VehicleDetailCalculateTab
                     vehicle={vehicle}
                     costCalculation={costCalculation}

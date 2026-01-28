@@ -52,6 +52,14 @@ export default function DashboardPage() {
   const { tenant } = useTenant();
   const { formatCurrency } = useCurrency();
   const targetCurrency = tenant?.default_currency || "TRY";
+  
+  // Clear any leftover dashboard layout data from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('dashboard-layout');
+    }
+  }, []);
+  
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [todayFollowups, setTodayFollowups] = useState<Followup[]>([]);
@@ -176,75 +184,70 @@ export default function DashboardPage() {
       {/* KPI Cards Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {/* Toplam Araç */}
-        <Card className="rounded-xl shadow-sm">
-          <CardContent className="p-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Toplam Araç</p>
-                <p className="text-3xl font-bold mt-3">{stats?.totalVehicles || 0}</p>
-                <p className="text-sm text-green-600 mt-2">
-                  {stats?.unsoldVehicles || 0} satılmamış
-                </p>
-              </div>
-              <div className="rounded-xl p-4 bg-blue-100">
-                <Car className="h-6 w-6 text-blue-600" />
-              </div>
+        <Card className="rounded-2xl border-l-4 border-l-blue-500 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Toplam Araç</CardTitle>
+            <div className="rounded-xl bg-blue-100 dark:bg-blue-900/20 p-2">
+              <Car className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats?.totalVehicles || 0}</div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <span>{stats?.unsoldVehicles || 0} satılmamış</span>
             </div>
           </CardContent>
         </Card>
 
         {/* Aylık Satış */}
-        <Card className="rounded-xl shadow-sm">
-          <CardContent className="p-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Aylık Satış</p>
-                <p className="text-3xl font-bold mt-3">{monthlySales?.currentMonth || 0}</p>
-                {monthlySales && (
-                  <p className={`text-sm mt-2 ${monthlySales.trend === "up" ? "text-green-600" : monthlySales.trend === "down" ? "text-red-600" : "text-muted-foreground"}`}>
-                    {monthlySales.trend === "up" ? "+" : ""}{monthlySales.changePercent?.toFixed(1) || 0}% geçen aya göre
-                  </p>
-                )}
-              </div>
-              <div className="rounded-xl p-4 bg-green-100">
-                <TrendingUp className="h-6 w-6 text-green-600" />
-              </div>
+        <Card className="rounded-2xl border-l-4 border-l-emerald-500 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Aylık Satış</CardTitle>
+            <div className="rounded-xl bg-emerald-100 dark:bg-emerald-900/20 p-2">
+              <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{monthlySales?.currentMonth || 0}</div>
+            {monthlySales && (
+              <div className={`flex items-center gap-1 text-xs ${monthlySales.trend === "up" ? "text-emerald-600" : monthlySales.trend === "down" ? "text-red-600" : "text-muted-foreground"}`}>
+                {monthlySales.trend === "up" && <TrendingUp className="h-3 w-3" />}
+                {monthlySales.trend === "down" && <ArrowDown className="h-3 w-3" />}
+                <span className="font-medium">{monthlySales.trend === "up" ? "+" : ""}{monthlySales.changePercent?.toFixed(1) || 0}%</span>
+                <span className="text-muted-foreground">geçen aya göre</span>
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {/* Taksiti Devam Eden Araç */}
-        <Card className="rounded-xl shadow-sm">
-          <CardContent className="p-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Aktif Taksitler</p>
-                <p className="text-3xl font-bold mt-3">{stats?.activeInstallmentCount || 0}</p>
-                <p className="text-sm text-green-600 mt-2">
-                  {activeInstallments.length > 0 ? `${activeInstallments.length} aktif` : "Taksit yok"}
-                </p>
-              </div>
-              <div className="rounded-xl p-4 bg-orange-100">
-                <CreditCard className="h-6 w-6 text-orange-600" />
-              </div>
+        <Card className="rounded-2xl border-l-4 border-l-amber-500 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Aktif Taksitler</CardTitle>
+            <div className="rounded-xl bg-amber-100 dark:bg-amber-900/20 p-2">
+              <CreditCard className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats?.activeInstallmentCount || 0}</div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <span>{activeInstallments.length > 0 ? `${activeInstallments.length} aktif` : "Taksit yok"}</span>
             </div>
           </CardContent>
         </Card>
 
         {/* Toplam Satış */}
-        <Card className="rounded-xl shadow-sm">
-          <CardContent className="p-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Toplam Satış</p>
-                <p className="text-3xl font-bold mt-3">{stats?.totalSales || 0}</p>
-                <p className="text-sm text-green-600 mt-2">
-                  Tüm zamanlar
-                </p>
-              </div>
-              <div className="rounded-xl p-4 bg-purple-100">
-                <DollarSign className="h-6 w-6 text-purple-600" />
-              </div>
+        <Card className="rounded-2xl border-l-4 border-l-purple-500 shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Toplam Satış</CardTitle>
+            <div className="rounded-xl bg-purple-100 dark:bg-purple-900/20 p-2">
+              <DollarSign className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats?.totalSales || 0}</div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <span>Tüm zamanlar</span>
             </div>
           </CardContent>
         </Card>
@@ -253,46 +256,67 @@ export default function DashboardPage() {
       {/* Grafikler: Sol (Bar Charts) - Sağ (Donut Charts) */}
       <div className="grid gap-6 grid-cols-12">
         {/* İlk Satır: Haftalık Araç Çıkışı (Bar Chart) - Sol */}
-        <Card className="col-span-12 lg:col-span-8 rounded-xl shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-slate-800 font-semibold">Haftalık Araç Çıkışı</CardTitle>
+        <Card className="col-span-12 lg:col-span-8 rounded-2xl border-l-4 border-l-blue-500 shadow-md hover:shadow-lg transition-all duration-300 group">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-blue-100 dark:bg-blue-900/20 p-2 group-hover:bg-blue-200 dark:group-hover:bg-blue-900/30 transition-colors">
+                <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <CardTitle className="text-base font-semibold text-foreground">Haftalık Araç Çıkışı</CardTitle>
+            </div>
           </CardHeader>
           <CardContent>
             {weeklySales.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={weeklySales}>
+                  <defs>
+                    <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#003d82" />
+                      <stop offset="100%" stopColor="#0066cc" />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                   <XAxis dataKey="week" stroke="#888888" fontSize={13} fontWeight={500} tick={{ dy: 5 }} />
                   <YAxis stroke="#888888" fontSize={12} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "white",
-                      border: "1px solid #e5e7eb",
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
                       borderRadius: "8px",
+                      color: "hsl(var(--foreground))",
+                      boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
                     }}
                   />
-                  <Bar dataKey="sales_count" fill="#003d82" radius={[4, 4, 0, 0]} barSize={40} />
+                  <Bar dataKey="sales_count" fill="url(#salesGradient)" radius={[8, 8, 0, 0]} barSize={45} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="text-center py-6">
-                <TrendingUp className="h-8 w-8 text-[#2d3748]/40 mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">Satış verisi yok</p>
+              <div className="text-center py-12">
+                <div className="rounded-full bg-blue-100 dark:bg-blue-900/20 p-4 w-16 h-16 mx-auto mb-3 flex items-center justify-center">
+                  <TrendingUp className="h-8 w-8 text-blue-500 dark:text-blue-400" />
+                </div>
+                <p className="text-sm font-medium text-muted-foreground">Satış verisi yok</p>
+                <p className="text-xs text-muted-foreground/70 mt-1">Veri geldiğinde burada görünecek</p>
               </div>
             )}
           </CardContent>
         </Card>
 
         {/* Satış Performansı Donut Chart - Sağ */}
-        <Card className="col-span-12 lg:col-span-4 rounded-xl shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-slate-800 font-semibold">Satış Performansı</CardTitle>
+        <Card className="col-span-12 lg:col-span-4 rounded-2xl border-l-4 border-l-emerald-500 shadow-md hover:shadow-lg transition-all duration-300 group">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-emerald-100 dark:bg-emerald-900/20 p-2 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-900/30 transition-colors">
+                <DollarSign className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <CardTitle className="text-base font-semibold text-foreground">Satış Performansı</CardTitle>
+            </div>
           </CardHeader>
           <CardContent>
             {monthlySales ? (() => {
               const salesPerformanceData = [
-                { name: "Bu Ay", value: monthlySales.currentMonth || 0, color: "#003d82" },
-                { name: "Geçen Ay", value: monthlySales.lastMonth || 0, color: "#0066cc" },
+                { name: "Bu Ay", value: monthlySales.currentMonth || 0, color: "#10b981" },
+                { name: "Geçen Ay", value: monthlySales.lastMonth || 0, color: "#34d399" },
               ];
               
               return (
@@ -316,36 +340,38 @@ export default function DashboardPage() {
                         contentStyle={{
                           backgroundColor: "white",
                           border: "1px solid #e5e7eb",
-                          borderRadius: "8px",
+                          borderRadius: "12px",
+                          boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+                          padding: "8px 12px",
                         }}
                       />
                     </PieChart>
                   </ResponsiveContainer>
-                  <div className="mt-3 space-y-1.5">
+                  <div className="mt-4 space-y-2">
                     {salesPerformanceData.map((item) => (
-                      <div key={item.name} className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-1.5">
-                          <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                          <span>{item.name}</span>
+                      <div key={item.name} className="flex items-center justify-between p-2 rounded-lg bg-emerald-50/50 dark:bg-emerald-900/10">
+                        <div className="flex items-center gap-2">
+                          <div className="h-3 w-3 rounded-full shadow-sm" style={{ backgroundColor: item.color }} />
+                          <span className="text-sm font-medium text-foreground">{item.name}</span>
                         </div>
-                        <span className="font-medium">{item.value}</span>
+                        <span className="font-bold text-emerald-600 dark:text-emerald-400">{item.value}</span>
                       </div>
                     ))}
                     {monthlySales.trend && (
-                      <div className="pt-1.5 border-t mt-1.5">
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <div className="pt-2 border-t border-emerald-200 dark:border-emerald-800/50 mt-2">
+                        <div className="flex items-center gap-1.5 text-xs">
                           {monthlySales.trend === "up" ? (
                             <>
-                              <ArrowUp className="h-2.5 w-2.5 text-green-600" />
-                              <span className="text-green-600">+{Math.abs(monthlySales.changePercent || 0).toFixed(1)}%</span>
+                              <ArrowUp className="h-3.5 w-3.5 text-emerald-600" />
+                              <span className="font-bold text-emerald-600">+{Math.abs(monthlySales.changePercent || 0).toFixed(1)}%</span>
                             </>
                           ) : monthlySales.trend === "down" ? (
                             <>
-                              <ArrowDown className="h-2.5 w-2.5 text-red-600" />
-                              <span className="text-red-600">{monthlySales.changePercent?.toFixed(1) || 0}%</span>
+                              <ArrowDown className="h-3.5 w-3.5 text-red-600" />
+                              <span className="font-bold text-red-600">{monthlySales.changePercent?.toFixed(1) || 0}%</span>
                             </>
                           ) : (
-                            <span>Değişiklik yok</span>
+                            <span className="text-muted-foreground">Değişiklik yok</span>
                           )}
                           <span className="text-muted-foreground">geçen aya göre</span>
                         </div>
@@ -355,58 +381,86 @@ export default function DashboardPage() {
                 </>
               );
             })() : (
-              <div className="text-center py-6">
-                <TrendingUp className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">Satış verisi yok</p>
+              <div className="text-center py-12">
+                <div className="rounded-full bg-emerald-100 dark:bg-emerald-900/20 p-4 w-16 h-16 mx-auto mb-3 flex items-center justify-center">
+                  <DollarSign className="h-8 w-8 text-emerald-500 dark:text-emerald-400" />
+                </div>
+                <p className="text-sm font-medium text-muted-foreground">Satış verisi yok</p>
+                <p className="text-xs text-muted-foreground/70 mt-1">Veri geldiğinde burada görünecek</p>
               </div>
             )}
           </CardContent>
         </Card>
 
         {/* İkinci Satır: Haftalık Ürün/Servis Çıkışı (Bar Chart) - Sol */}
-        <Card className="col-span-12 lg:col-span-8 rounded-xl shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-slate-800 font-semibold">Haftalık Ürün/Servis Çıkışı</CardTitle>
+        <Card className="col-span-12 lg:col-span-8 rounded-2xl border-l-4 border-l-purple-500 shadow-md hover:shadow-lg transition-all duration-300 group">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-purple-100 dark:bg-purple-900/20 p-2 group-hover:bg-purple-200 dark:group-hover:bg-purple-900/30 transition-colors">
+                <Package className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <CardTitle className="text-base font-semibold text-foreground">Haftalık Ürün/Servis Çıkışı</CardTitle>
+            </div>
           </CardHeader>
           <CardContent>
             {weeklyInventory.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={weeklyInventory}>
+                  <defs>
+                    <linearGradient id="serviceGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#003d82" />
+                      <stop offset="100%" stopColor="#0066cc" />
+                    </linearGradient>
+                    <linearGradient id="saleGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#0066cc" />
+                      <stop offset="100%" stopColor="#0088ff" />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                   <XAxis dataKey="week" stroke="#888888" fontSize={13} fontWeight={500} tick={{ dy: 5 }} />
                   <YAxis stroke="#888888" fontSize={12} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "white",
-                      border: "1px solid #e5e7eb",
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
                       borderRadius: "8px",
+                      color: "hsl(var(--foreground))",
+                      boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
                     }}
                   />
-                  <Bar dataKey="service_count" fill="#003d82" radius={[4, 4, 0, 0]} name="Servis" barSize={40} />
-                  <Bar dataKey="sale_count" fill="#0066cc" radius={[4, 4, 0, 0]} name="Satış" barSize={40} />
+                  <Bar dataKey="service_count" fill="url(#serviceGradient)" radius={[8, 8, 0, 0]} name="Servis" barSize={45} />
+                  <Bar dataKey="sale_count" fill="url(#saleGradient)" radius={[8, 8, 0, 0]} name="Satış" barSize={45} />
                   <Legend wrapperStyle={{ fontSize: "12px", paddingTop: "10px" }} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="text-center py-6">
-                <Package className="h-8 w-8 text-[#2d3748]/40 mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">Stok verisi yok</p>
+              <div className="text-center py-12">
+                <div className="rounded-full bg-purple-100 dark:bg-purple-900/20 p-4 w-16 h-16 mx-auto mb-3 flex items-center justify-center">
+                  <Package className="h-8 w-8 text-purple-500 dark:text-purple-400" />
+                </div>
+                <p className="text-sm font-medium text-muted-foreground">Stok verisi yok</p>
+                <p className="text-xs text-muted-foreground/70 mt-1">Veri geldiğinde burada görünecek</p>
               </div>
             )}
           </CardContent>
         </Card>
 
         {/* Stok Durumu Donut Chart - Sağ */}
-        <Card className="col-span-12 lg:col-span-4 rounded-xl shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-slate-800 font-semibold">Stok Durumu</CardTitle>
+        <Card className="col-span-12 lg:col-span-4 rounded-2xl border-l-4 border-l-amber-500 shadow-md hover:shadow-lg transition-all duration-300 group">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-amber-100 dark:bg-amber-900/20 p-2 group-hover:bg-amber-200 dark:group-hover:bg-amber-900/30 transition-colors">
+                <Package className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <CardTitle className="text-base font-semibold text-foreground">Stok Durumu</CardTitle>
+            </div>
           </CardHeader>
           <CardContent>
             {inventoryStats ? (() => {
               // Stok durumu için veri hazırla - Toplam ürün ve satılan ürün karşılaştırması
               const stockData = [
-                { name: "Toplam Ürün", value: inventoryStats.totalProducts || 0, color: "#003d82" },
-                { name: "Satılan", value: inventoryStats.topSelling?.salesCount || 0, color: "#0066cc" },
+                { name: "Toplam Ürün", value: inventoryStats.totalProducts || 0, color: "#f59e0b" },
+                { name: "Satılan", value: inventoryStats.topSelling?.salesCount || 0, color: "#fbbf24" },
               ];
               
               return (
@@ -430,36 +484,38 @@ export default function DashboardPage() {
                         contentStyle={{
                           backgroundColor: "white",
                           border: "1px solid #e5e7eb",
-                          borderRadius: "8px",
+                          borderRadius: "12px",
+                          boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+                          padding: "8px 12px",
                         }}
                       />
                     </PieChart>
                   </ResponsiveContainer>
-                  <div className="mt-3 space-y-1.5">
+                  <div className="mt-4 space-y-2">
                     {stockData.map((item) => (
-                      <div key={item.name} className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-1.5">
-                          <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                          <span>{item.name}</span>
+                      <div key={item.name} className="flex items-center justify-between p-2 rounded-lg bg-amber-50/50 dark:bg-amber-900/10">
+                        <div className="flex items-center gap-2">
+                          <div className="h-3 w-3 rounded-full shadow-sm" style={{ backgroundColor: item.color }} />
+                          <span className="text-sm font-medium text-foreground">{item.name}</span>
                         </div>
-                        <span className="font-medium">{item.value}</span>
+                        <span className="font-bold text-amber-600 dark:text-amber-400">{item.value}</span>
                       </div>
                     ))}
                     {inventoryStats.trend && (
-                      <div className="pt-1.5 border-t mt-1.5">
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <div className="pt-2 border-t border-amber-200 dark:border-amber-800/50 mt-2">
+                        <div className="flex items-center gap-1.5 text-xs">
                           {inventoryStats.trend === "up" ? (
                             <>
-                              <ArrowUp className="h-2.5 w-2.5 text-green-600" />
-                              <span className="text-green-600">+{Math.abs(inventoryStats.changePercent || 0).toFixed(1)}%</span>
+                              <ArrowUp className="h-3.5 w-3.5 text-emerald-600" />
+                              <span className="font-bold text-emerald-600">+{Math.abs(inventoryStats.changePercent || 0).toFixed(1)}%</span>
                             </>
                           ) : inventoryStats.trend === "down" ? (
                             <>
-                              <ArrowDown className="h-2.5 w-2.5 text-red-600" />
-                              <span className="text-red-600">{inventoryStats.changePercent?.toFixed(1) || 0}%</span>
+                              <ArrowDown className="h-3.5 w-3.5 text-red-600" />
+                              <span className="font-bold text-red-600">{inventoryStats.changePercent?.toFixed(1) || 0}%</span>
                             </>
                           ) : (
-                            <span>Değişiklik yok</span>
+                            <span className="text-muted-foreground">Değişiklik yok</span>
                           )}
                           <span className="text-muted-foreground">geçen aya göre</span>
                         </div>
@@ -479,9 +535,14 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent Sales Table */}
-      <Card className="rounded-xl shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-slate-800 font-semibold">Son Satışlar</CardTitle>
+      <Card className="rounded-2xl border-l-4 border-l-emerald-500 shadow-md hover:shadow-lg transition-all duration-300 group">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-emerald-100 dark:bg-emerald-900/20 p-2 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-900/30 transition-colors">
+              <Car className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <CardTitle className="text-base font-semibold text-foreground">Son Satışlar</CardTitle>
+          </div>
         </CardHeader>
         <CardContent>
           {recentSales.length > 0 ? (
@@ -509,13 +570,13 @@ export default function DashboardPage() {
                   const getStatusBadge = () => {
                     if (sale.payment_type === 'Taksitli') {
                       return (
-                        <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">
+                        <Badge className="bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30">
                           Taksitli
                         </Badge>
                       );
                     }
                     return (
-                      <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
+                      <Badge className="bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30">
                         Peşin
                       </Badge>
                     );
@@ -524,12 +585,12 @@ export default function DashboardPage() {
                   return (
                     <TableRow 
                       key={sale.id}
-                      className="cursor-pointer hover:bg-muted/50"
+                      className="cursor-pointer hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 transition-all duration-200 border-b border-border/50"
                       onClick={() => navigate(`/vehicles/${sale.vehicle_id}`)}
                     >
                       <TableCell>
                         {imageUrl ? (
-                          <div className="relative h-12 w-12 overflow-hidden rounded-lg bg-gray-100">
+                          <div className="relative h-14 w-14 overflow-hidden rounded-xl bg-muted ring-2 ring-border/50 hover:ring-emerald-500/30 transition-all">
                             <img 
                               src={imageUrl} 
                               alt={`${sale.maker} ${sale.model}`}
@@ -540,16 +601,16 @@ export default function DashboardPage() {
                             />
                           </div>
                         ) : (
-                          <div className="relative h-12 w-12 overflow-hidden rounded-lg bg-gray-100 flex items-center justify-center">
-                            <Car className="h-6 w-6 text-muted-foreground" />
+                          <div className="relative h-14 w-14 overflow-hidden rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-200 dark:from-emerald-900/30 dark:to-emerald-800/30 flex items-center justify-center ring-2 ring-border/50">
+                            <Car className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="font-medium">
+                      <TableCell className="font-semibold text-foreground">
                         {sale.maker} {sale.model} {sale.year}
                       </TableCell>
-                      <TableCell>{sale.customer_name || "Müşteri"}</TableCell>
-                      <TableCell className="font-semibold">{formattedPrice}</TableCell>
+                      <TableCell className="text-muted-foreground">{sale.customer_name || "Müşteri"}</TableCell>
+                      <TableCell className="font-bold text-emerald-600 dark:text-emerald-400">{formattedPrice}</TableCell>
                       <TableCell>
                         {getStatusBadge()}
                       </TableCell>
@@ -559,9 +620,12 @@ export default function DashboardPage() {
               </TableBody>
             </Table>
           ) : (
-            <div className="text-center py-8">
-              <Car className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">Satış verisi yok</p>
+            <div className="text-center py-12">
+              <div className="rounded-full bg-emerald-100 dark:bg-emerald-900/20 p-4 w-16 h-16 mx-auto mb-3 flex items-center justify-center">
+                <Car className="h-8 w-8 text-emerald-500 dark:text-emerald-400" />
+              </div>
+              <p className="text-sm font-medium text-muted-foreground">Satış verisi yok</p>
+              <p className="text-xs text-muted-foreground/70 mt-1">Satış yapıldığında burada görünecek</p>
             </div>
           )}
         </CardContent>
@@ -572,15 +636,17 @@ export default function DashboardPage() {
         {/* Sol Taraf: Gecikmiş Taksitler ve Süresi Dolacak Belgeler */}
         <div className="col-span-12 lg:col-span-8 grid gap-6 grid-cols-2 items-stretch">
           {/* Gecikmiş Taksitler */}
-          <Card className="rounded-xl shadow-sm h-full flex flex-col">
+          <Card className="rounded-2xl border-l-4 border-l-red-500 shadow-md hover:shadow-lg transition-all duration-300 h-full flex flex-col group">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-[#F0A500]" />
-                Gecikmiş Taksitler
-              </CardTitle>
+              <div className="flex items-center gap-3">
+                <div className="rounded-xl bg-red-100 dark:bg-red-900/20 p-2 group-hover:bg-red-200 dark:group-hover:bg-red-900/30 transition-colors">
+                  <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                </div>
+                <CardTitle className="text-base font-semibold text-foreground">Gecikmiş Taksitler</CardTitle>
+              </div>
               <div className="flex items-center gap-2">
                 {topOverdueInstallments.length > 0 && (
-                  <Badge className="bg-red-100 text-red-700 hover:bg-red-100">{topOverdueInstallments.length}</Badge>
+                  <Badge className="bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30">{topOverdueInstallments.length}</Badge>
                 )}
                 {topOverdueInstallments.length > 5 && (
                   <Button
@@ -601,7 +667,7 @@ export default function DashboardPage() {
                     {topOverdueInstallments.map((installment: any) => (
                       <div
                         key={installment.installment_sale_id}
-                        className="flex items-start gap-2 p-2 rounded-md hover:bg-red-50 transition-colors cursor-pointer border border-transparent hover:border-red-200"
+                        className="flex items-start gap-3 p-3 rounded-xl hover:bg-red-50/80 dark:hover:bg-red-900/20 transition-all duration-200 cursor-pointer border border-transparent hover:border-red-200 dark:hover:border-red-800/50 hover:shadow-sm group/item"
                         onClick={() => {
                           if (installment.customer_id) {
                             navigate(`/customers/${installment.customer_id}`);
@@ -611,22 +677,22 @@ export default function DashboardPage() {
                         }}
                       >
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                            <p className="text-xs font-medium truncate">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <p className="text-sm font-semibold text-foreground truncate group-hover/item:text-red-600 dark:group-hover/item:text-red-400 transition-colors">
                               {installment.customer_name || "Müşteri"}
                             </p>
-                            <Badge className="bg-red-100 text-red-700 text-[10px] px-1.5 py-0 h-4">
+                            <Badge className="bg-red-500 text-white text-xs px-2 py-0.5 h-5 font-semibold shadow-sm">
                               {installment.days_overdue || 0}g
                             </Badge>
                           </div>
-                          <p className="text-[10px] text-sm text-muted-foreground truncate">
+                          <p className="text-xs text-muted-foreground truncate mb-1">
                             {installment.maker} {installment.model} {installment.year}
                           </p>
-                          <p className="text-[10px] font-medium text-red-600 mt-0.5">
+                          <p className="text-sm font-bold text-red-600 dark:text-red-400">
                             {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: installment.currency || 'TRY', maximumFractionDigits: 0 }).format((installment.installment_amount || 0) * (installment.fx_rate_to_base || 1))}
                           </p>
                         </div>
-                        <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0 mt-0.5" />
+                        <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-1 group-hover/item:scale-110 transition-transform" />
                       </div>
                     ))}
                   </div>
@@ -643,14 +709,16 @@ export default function DashboardPage() {
           </Card>
 
           {/* Süresi Dolacak Belgeler */}
-          <Card className="rounded-xl shadow-sm h-full flex flex-col">
+          <Card className="rounded-2xl border-l-4 border-l-amber-500 shadow-md hover:shadow-lg transition-all duration-300 h-full flex flex-col group">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-                <FileText className="h-4 w-4 text-[#F0A500]" />
-                Süresi Dolacak Belgeler
-              </CardTitle>
+              <div className="flex items-center gap-3">
+                <div className="rounded-xl bg-amber-100 dark:bg-amber-900/20 p-2 group-hover:bg-amber-200 dark:group-hover:bg-amber-900/30 transition-colors">
+                  <FileText className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <CardTitle className="text-base font-semibold text-foreground">Süresi Dolacak Belgeler</CardTitle>
+              </div>
               {expiringDocuments.length > 0 && (
-                <Badge className={expiringDocuments.some((d: any) => d.days_until_expiry <= 7) ? "bg-red-100 text-red-700 hover:bg-red-100" : "bg-orange-100 text-orange-700 hover:bg-orange-100"}>
+                <Badge className={expiringDocuments.some((d: any) => d.days_until_expiry <= 7) ? "bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30" : "bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/30"}>
                   {expiringDocuments.length}
                 </Badge>
               )}
@@ -662,35 +730,35 @@ export default function DashboardPage() {
                     {expiringDocuments.map((doc: any) => (
                       <div
                         key={doc.id}
-                        className="flex items-start gap-2 p-2 rounded-md hover:bg-orange-50 transition-colors cursor-pointer border border-transparent hover:border-orange-200"
+                        className="flex items-start gap-3 p-3 rounded-xl hover:bg-amber-50/80 dark:hover:bg-amber-900/20 transition-all duration-200 cursor-pointer border border-transparent hover:border-amber-200 dark:hover:border-amber-800/50 hover:shadow-sm group/item"
                         onClick={() => navigate(`/vehicles`)}
                       >
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                            <p className="text-xs font-medium truncate">{doc.document_name}</p>
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <p className="text-sm font-semibold text-foreground truncate group-hover/item:text-amber-600 dark:group-hover/item:text-amber-400 transition-colors">{doc.document_name}</p>
                             <Badge
                               className={
                                 doc.days_until_expiry <= 7
-                                  ? "bg-red-100 text-red-700 text-[10px] px-1.5 py-0 h-4"
+                                  ? "bg-red-500 text-white text-xs px-2 py-0.5 h-5 font-semibold shadow-sm"
                                   : doc.days_until_expiry <= 14
-                                  ? "bg-orange-100 text-orange-700 text-[10px] px-1.5 py-0 h-4"
-                                  : "bg-gray-100 text-gray-700 text-[10px] px-1.5 py-0 h-4"
+                                  ? "bg-amber-500 text-white text-xs px-2 py-0.5 h-5 font-semibold shadow-sm"
+                                  : "bg-muted text-muted-foreground text-xs px-2 py-0.5 h-5"
                               }
                             >
                               {doc.days_until_expiry}g
                             </Badge>
                           </div>
-                          <p className="text-[10px] text-sm text-muted-foreground truncate">
+                          <p className="text-xs text-muted-foreground truncate mb-1">
                             {doc.maker} {doc.model}
                           </p>
                           {doc.expiry_date && (
-                            <p className="text-[10px] text-sm text-muted-foreground mt-0.5">
+                            <p className="text-xs text-muted-foreground">
                               {format(new Date(doc.expiry_date), "dd MMM yyyy", { locale: tr })}
                             </p>
                           )}
                         </div>
                         {doc.days_until_expiry <= 7 && (
-                          <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0 mt-0.5" />
+                          <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-1 group-hover/item:scale-110 transition-transform" />
                         )}
                       </div>
                     ))}
@@ -709,15 +777,20 @@ export default function DashboardPage() {
         </div>
 
         {/* Sağ Taraf: Aktiviteler ve Görevler (Sekmeli) */}
-        <Card className="col-span-12 lg:col-span-4 rounded-xl shadow-sm h-full flex flex-col">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-slate-800">Aktiviteler & Görevler</CardTitle>
+        <Card className="col-span-12 lg:col-span-4 rounded-2xl border-l-4 border-l-purple-500 shadow-md hover:shadow-lg transition-all duration-300 h-full flex flex-col group">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-purple-100 dark:bg-purple-900/20 p-2 group-hover:bg-purple-200 dark:group-hover:bg-purple-900/30 transition-colors">
+                <Activity className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <CardTitle className="text-base font-semibold text-foreground">Aktiviteler & Görevler</CardTitle>
+            </div>
           </CardHeader>
           <CardContent className="p-0 flex-1 flex flex-col">
             <Tabs defaultValue="activities" className="w-full flex-1 flex flex-col">
-              <TabsList className="grid w-full grid-cols-2 mx-4 mb-4 h-9">
-                <TabsTrigger value="activities" className="text-xs">Aktiviteler</TabsTrigger>
-                <TabsTrigger value="tasks" className="text-xs">Görevler</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 mx-4 mb-4 h-10 bg-muted/50">
+                <TabsTrigger value="activities" className="text-sm font-medium data-[state=active]:bg-purple-500 data-[state=active]:text-white transition-all">Aktiviteler</TabsTrigger>
+                <TabsTrigger value="tasks" className="text-sm font-medium data-[state=active]:bg-purple-500 data-[state=active]:text-white transition-all">Görevler</TabsTrigger>
               </TabsList>
               
               {/* Aktiviteler Timeline */}
@@ -726,15 +799,15 @@ export default function DashboardPage() {
                   <div className={`flex-1 ${recentActivities.length > 5 ? 'max-h-[500px] overflow-y-auto' : ''}`}>
                     <div className="relative px-4 pb-4">
                       {/* Timeline çizgisi */}
-                      <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-border" />
+                      <div className="absolute left-7 top-0 bottom-0 w-0.5 bg-gradient-to-b from-purple-500 via-purple-400 to-purple-500" />
                       <div className="space-y-3">
                         {recentActivities.map((activity: any, index: number) => {
                           const getActivityColor = () => {
-                            if (activity.type === 'sale') return 'bg-green-500';
-                            if (activity.type === 'payment') return 'bg-blue-500';
-                            if (activity.type === 'vehicle') return 'bg-[#003d82]'; // Primary color instead of purple
-                            if (activity.type === 'customer') return 'bg-orange-500';
-                            return 'bg-gray-500';
+                            if (activity.type === 'sale') return 'bg-success';
+                            if (activity.type === 'payment') return 'bg-info';
+                            if (activity.type === 'vehicle') return 'bg-primary'; // Primary color instead of purple
+                            if (activity.type === 'customer') return 'bg-warning';
+                            return 'bg-muted-foreground';
                           };
                           
                           const getActivityIcon = () => {
@@ -748,7 +821,7 @@ export default function DashboardPage() {
                           return (
                             <div
                               key={activity.id}
-                              className="relative flex items-start gap-3 cursor-pointer group"
+                              className="relative flex items-start gap-3 cursor-pointer group/item"
                               onClick={() => {
                                 if (activity.type === 'sale' || activity.type === 'vehicle') {
                                   navigate("/vehicles");
@@ -761,19 +834,19 @@ export default function DashboardPage() {
                             >
                               {/* Timeline noktası */}
                               <div className="relative z-10 flex-shrink-0 mt-0.5">
-                                <div className={`w-3 h-3 rounded-full ${getActivityColor()} border-2 border-background shadow-sm`} />
+                                <div className={`w-5 h-5 rounded-full ${getActivityColor()} border-2 border-background shadow-lg group-hover/item:scale-125 group-hover/item:shadow-xl transition-all duration-200 ring-2 ring-purple-200/50 dark:ring-purple-800/50`} />
                               </div>
                               
                               {/* İçerik */}
-                              <div className="flex-1 min-w-0 pb-2 group-hover:bg-accent/50 rounded-md p-1.5 -ml-1 transition-colors">
-                                <div className="flex items-start gap-2">
-                                  <div className={`${getActivityColor()} text-white rounded p-0.5 flex-shrink-0`}>
+                              <div className="flex-1 min-w-0 pb-2 group-hover/item:bg-purple-50/80 dark:group-hover/item:bg-purple-900/20 rounded-xl p-2.5 -ml-1 transition-all duration-200 border border-transparent group-hover/item:border-purple-200 dark:group-hover/item:border-purple-800/50 group-hover/item:shadow-sm">
+                                <div className="flex items-start gap-2.5">
+                                  <div className={`${getActivityColor()} text-white rounded-lg p-2 flex-shrink-0 shadow-md group-hover/item:scale-110 transition-transform`}>
                                     {getActivityIcon()}
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-medium truncate">{activity.title}</p>
-                                    <p className="text-[10px] text-sm text-muted-foreground truncate mt-0.5">{activity.subtitle}</p>
-                                    <p className="text-[10px] text-sm text-muted-foreground mt-0.5">
+                                    <p className="text-sm font-semibold truncate text-foreground group-hover/item:text-purple-600 dark:group-hover/item:text-purple-400 transition-colors">{activity.title}</p>
+                                    <p className="text-xs text-muted-foreground truncate mt-1">{activity.subtitle}</p>
+                                    <p className="text-xs text-muted-foreground mt-1.5 font-medium">
                                       {format(new Date(activity.date), "dd MMM HH:mm", { locale: tr })}
                                     </p>
                                   </div>
@@ -786,10 +859,13 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-8 px-4 flex-1 flex items-center justify-center">
+                  <div className="text-center py-12 px-4 flex-1 flex items-center justify-center">
                     <div>
-                      <Activity className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-xs text-sm text-muted-foreground">Aktivite yok</p>
+                      <div className="rounded-full bg-purple-100 dark:bg-purple-900/20 p-3 w-14 h-14 mx-auto mb-3 flex items-center justify-center">
+                        <Activity className="h-7 w-7 text-purple-500 dark:text-purple-400" />
+                      </div>
+                      <p className="text-sm font-medium text-muted-foreground">Aktivite yok</p>
+                      <p className="text-xs text-muted-foreground/70 mt-1">Yeni aktiviteler burada görünecek</p>
                     </div>
                   </div>
                 )}
@@ -803,7 +879,7 @@ export default function DashboardPage() {
                       {todayFollowups.map((followup: any) => (
                         <div
                           key={followup.id}
-                          className="flex items-start gap-2 p-2 rounded-md hover:bg-accent transition-colors cursor-pointer border border-transparent hover:border-border"
+                          className="flex items-start gap-3 p-3 rounded-xl hover:bg-purple-50/80 dark:hover:bg-purple-900/20 transition-all duration-200 cursor-pointer border border-transparent hover:border-purple-200 dark:hover:border-purple-800/50 hover:shadow-sm group/item"
                           onClick={() => {
                             if (followup.type === 'installment_overdue') {
                               navigate(`/vehicles`);
@@ -813,42 +889,45 @@ export default function DashboardPage() {
                           }}
                         >
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                              <p className="text-xs font-medium truncate">{followup.customer_name_full || followup.customer_name}</p>
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <p className="text-sm font-semibold truncate text-foreground group-hover/item:text-purple-600 dark:group-hover/item:text-purple-400 transition-colors">{followup.customer_name_full || followup.customer_name}</p>
                               {followup.type === 'installment_overdue' ? (
-                                <Badge className="bg-red-100 text-red-700 text-[10px] px-1.5 py-0 h-4">
+                                <Badge className="bg-red-500 text-white text-xs px-2 py-0.5 h-5 font-semibold shadow-sm">
                                   Gecikmiş
                                 </Badge>
                               ) : (
-                                <Badge className="bg-gray-100 text-gray-700 text-[10px] px-1.5 py-0 h-4">
+                                <Badge className="bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs px-2 py-0.5 h-5 font-medium">
                                   {followup.followup_type === "call" ? "Tel" : followup.followup_type === "sms" ? "SMS" : followup.followup_type === "email" ? "Email" : followup.followup_type}
                                 </Badge>
                               )}
                             </div>
-                            <p className="text-[10px] text-sm text-muted-foreground truncate">
+                            <p className="text-xs text-muted-foreground truncate mb-1">
                               {followup.maker} {followup.model}
                               {followup.type === 'installment_overdue' && followup.days_overdue && (
-                                <span className="text-red-600 font-medium"> - {followup.days_overdue}g</span>
+                                <span className="text-red-600 font-semibold"> - {followup.days_overdue}g</span>
                               )}
                             </p>
                             {followup.followup_time && !followup.type && (
-                              <p className="text-[10px] text-sm text-muted-foreground mt-0.5">{followup.followup_time}</p>
+                              <p className="text-xs text-muted-foreground">{followup.followup_time}</p>
                             )}
                           </div>
                           {followup.type === 'installment_overdue' ? (
-                            <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0 mt-0.5" />
+                            <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-1 group-hover/item:scale-110 transition-transform" />
                           ) : (
-                            <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0 mt-0.5" />
+                            <Clock className="h-4 w-4 text-purple-500 flex-shrink-0 mt-1 group-hover/item:scale-110 transition-transform" />
                           )}
                         </div>
                       ))}
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-8 px-4 flex-1 flex items-center justify-center">
+                  <div className="text-center py-12 px-4 flex-1 flex items-center justify-center">
                     <div>
-                      <MessageSquare className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-xs text-sm text-muted-foreground">Takip görevi yok</p>
+                      <div className="rounded-full bg-purple-100 dark:bg-purple-900/20 p-3 w-14 h-14 mx-auto mb-3 flex items-center justify-center">
+                        <MessageSquare className="h-7 w-7 text-purple-500 dark:text-purple-400" />
+                      </div>
+                      <p className="text-sm font-medium text-muted-foreground">Takip görevi yok</p>
+                      <p className="text-xs text-muted-foreground/70 mt-1">Yeni görevler burada görünecek</p>
                     </div>
                   </div>
                 )}

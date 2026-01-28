@@ -3,7 +3,7 @@ import { AuthRequest } from "../middleware/auth";
 import { dbPool } from "../config/database";
 import multer from "multer";
 import sharp from "sharp";
-import { fileTypeFromBuffer } from "file-type";
+const FileType = require("file-type");
 import { StorageService } from "../services/storage/storageService";
 
 // File upload configuration - use memory storage for S3 compatibility
@@ -141,7 +141,7 @@ export async function uploadVehicleImage(req: AuthRequest, res: Response) {
 
   // Magic number validation - verify actual file content matches declared MIME type
   try {
-    const detectedType = await fileTypeFromBuffer(req.file.buffer);
+    const detectedType = await FileType.fromBuffer(req.file.buffer);
     
     if (!detectedType) {
       return res.status(400).json({ 

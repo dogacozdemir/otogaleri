@@ -431,15 +431,15 @@ export default function AnalyticsPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="sticky top-0 z-10 bg-[#f8f9fa] pb-4">
+        <div className="sticky top-0 z-10 bg-background pb-4">
           <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2 rounded-xl bg-white p-1.5 shadow-sm border">
-              <div className="h-10 w-32 bg-gray-200 animate-pulse rounded-lg" />
-              <div className="h-10 w-32 bg-gray-200 animate-pulse rounded-lg" />
+            <div className="flex items-center gap-2 rounded-xl bg-card p-1.5 shadow-sm border border-border">
+              <div className="h-10 w-32 bg-muted animate-pulse rounded-lg" />
+              <div className="h-10 w-32 bg-muted animate-pulse rounded-lg" />
             </div>
             <div className="flex items-center gap-3">
-              <div className="h-10 w-40 bg-gray-200 animate-pulse rounded-lg" />
-              <div className="h-10 w-32 bg-gray-200 animate-pulse rounded-lg" />
+              <div className="h-10 w-40 bg-muted animate-pulse rounded-lg" />
+              <div className="h-10 w-32 bg-muted animate-pulse rounded-lg" />
             </div>
           </div>
         </div>
@@ -447,7 +447,7 @@ export default function AnalyticsPage() {
           {[1, 2, 3, 4].map((i) => (
             <Card key={i} className="rounded-xl shadow-sm">
                 <CardContent className="p-6">
-                <div className="h-32 bg-gray-200 animate-pulse rounded-lg" />
+                <div className="h-32 bg-muted animate-pulse rounded-lg" />
                 </CardContent>
               </Card>
             ))}
@@ -459,14 +459,14 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
       {/* Sticky Header */}
-      <div className="sticky top-0 z-10 bg-[#f8f9fa] pb-4">
+      <div className="sticky top-0 z-10 bg-background pb-4">
         <div className="flex items-center justify-between gap-4">
           {/* Segmented Control for Analytics Type */}
-          <div className="flex items-center gap-2 rounded-xl bg-white p-1.5 shadow-sm border">
+          <div className="flex items-center gap-2 rounded-xl bg-card p-1.5 shadow-sm border border-border">
             <button
               onClick={() => setAnalyticsType("vehicle")}
               className={`flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-medium transition-all ${
-                analyticsType === "vehicle" ? "bg-[#003d82] text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"
+                analyticsType === "vehicle" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted"
               }`}
             >
               <Car className="h-4 w-4" />
@@ -475,7 +475,7 @@ export default function AnalyticsPage() {
             <button
               onClick={() => setAnalyticsType("inventory")}
               className={`flex items-center gap-2 rounded-lg px-6 py-2.5 text-sm font-medium transition-all ${
-                analyticsType === "inventory" ? "bg-[#003d82] text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"
+                analyticsType === "inventory" ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted"
               }`}
             >
               <Package className="h-4 w-4" />
@@ -485,7 +485,7 @@ export default function AnalyticsPage() {
 
           <div className="flex items-center gap-3">
             <Select value={dateRange} onValueChange={setDateRange}>
-              <SelectTrigger className="w-[180px] bg-white">
+              <SelectTrigger className="w-[180px] bg-card">
                 <Calendar className="mr-2 h-4 w-4" />
                 <SelectValue />
               </SelectTrigger>
@@ -496,7 +496,7 @@ export default function AnalyticsPage() {
                 <SelectItem value="365">Bu Yıl</SelectItem>
               </SelectContent>
             </Select>
-            <Button className="bg-[#003d82] hover:bg-[#002d62]" onClick={handleDownloadReport}>
+            <Button className="bg-primary hover:bg-primary/90" onClick={handleDownloadReport}>
               <Download className="mr-2 h-4 w-4" />
               Rapor İndir
             </Button>
@@ -523,8 +523,8 @@ export default function AnalyticsPage() {
                       {Math.abs(vehicleKPIs.totalRevenueChange).toFixed(1)}% geçen aya göre
                     </p>
                     </div>
-                  <div className="rounded-xl p-3 bg-blue-100">
-                    <DollarSign className="h-6 w-6 text-[#003d82]" />
+                  <div className="rounded-xl p-3 bg-blue-100 dark:bg-blue-900/20">
+                    <DollarSign className="h-6 w-6 text-primary" />
                   </div>
                     </div>
                   </CardContent>
@@ -545,7 +545,7 @@ export default function AnalyticsPage() {
                       {Math.abs(vehicleKPIs.soldVehiclesChange).toFixed(1)}% geçen aya göre
                     </p>
                     </div>
-                  <div className="rounded-xl p-3 bg-green-100">
+                  <div className="rounded-xl p-3 bg-green-100 dark:bg-green-900/20">
                     <Car className="h-6 w-6 text-green-600" />
                   </div>
                 </div>
@@ -567,7 +567,7 @@ export default function AnalyticsPage() {
                       {Math.abs(vehicleKPIs.avgSalePriceChange).toFixed(1)}% geçen aya göre
                     </p>
                     </div>
-                  <div className="rounded-xl p-3 bg-orange-100">
+                  <div className="rounded-xl p-3 bg-orange-100 dark:bg-orange-900/20">
                     <Target className="h-6 w-6 text-orange-600" />
                   </div>
                 </div>
@@ -657,16 +657,16 @@ export default function AnalyticsPage() {
                       <div key={vehicle.id || index} className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
                           <span className="font-medium flex items-center gap-2">
-                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#003d82] text-xs text-white">
+                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
                               {index + 1}
                             </span>
                             {vehicle.maker} {vehicle.model}
                           </span>
                           <span className="font-bold text-green-600">{currency(vehicle.profit || 0)}</span>
                     </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
-                          <div
-                            className="h-full bg-[#003d82]"
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                            <div
+                              className="h-full bg-primary"
                             style={{
                               width: `${topProfitableConverted[0]?.profit > 0 ? ((vehicle.profit || 0) / topProfitableConverted[0].profit) * 100 : 0}%`,
                             }}
@@ -689,14 +689,14 @@ export default function AnalyticsPage() {
                 <TabsList className="grid w-full max-w-md grid-cols-2">
                   <TabsTrigger
                     value="detailed"
-                    className="data-[state=active]:bg-[#003d82] data-[state=active]:text-white"
+                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                   >
                     <FileText className="mr-2 h-4 w-4" />
                     Detaylı Raporlar
                   </TabsTrigger>
                   <TabsTrigger
                     value="custom"
-                    className="data-[state=active]:bg-[#003d82] data-[state=active]:text-white"
+                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                   >
                     <FileText className="mr-2 h-4 w-4" />
                     Özelleştirilmiş Raporlar
@@ -768,7 +768,7 @@ export default function AnalyticsPage() {
                                   {formatDateTime(report.last_run_at)}
                                 </td>
                                 <td className="py-4">
-                                  <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
+                                  <Badge className="bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30">
                                     {report.is_active ? "Hazır" : "Pasif"}
                                   </Badge>
                                 </td>
@@ -844,8 +844,8 @@ export default function AnalyticsPage() {
                       {Math.abs(inventoryKPIs.totalValueChange)}% geçen aya göre
                     </p>
       </div>
-                  <div className="rounded-xl p-3 bg-blue-100">
-                    <Package className="h-6 w-6 text-[#003d82]" />
+                  <div className="rounded-xl p-3 bg-blue-100 dark:bg-blue-900/20">
+                    <Package className="h-6 w-6 text-primary" />
                   </div>
                 </div>
               </CardContent>
@@ -862,7 +862,7 @@ export default function AnalyticsPage() {
                       Acil sipariş gerekli
                     </p>
                   </div>
-                  <div className="rounded-xl p-3 bg-red-100">
+                  <div className="rounded-xl p-3 bg-red-100 dark:bg-red-900/20">
                     <AlertTriangle className="h-6 w-6 text-red-600" />
                   </div>
                 </div>
@@ -884,7 +884,7 @@ export default function AnalyticsPage() {
                       +{inventoryKPIs.totalProductsChange} yeni ürün
                     </p>
                   </div>
-                  <div className="rounded-xl p-3 bg-green-100">
+                  <div className="rounded-xl p-3 bg-green-100 dark:bg-green-900/20">
                     <PackageCheck className="h-6 w-6 text-green-600" />
                   </div>
                 </div>
@@ -1080,9 +1080,9 @@ export default function AnalyticsPage() {
                           <span>Min: {item.min}</span>
                         </div>
                       </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                         <div
-                          className={`h-full ${item.status === "critical" ? "bg-red-500" : "bg-orange-500"}`}
+                          className={`h-full ${item.status === "critical" ? "bg-destructive" : "bg-warning"}`}
                           style={{
                             width: `${Math.min((item.current / item.min) * 100, 100)}%`,
                           }}

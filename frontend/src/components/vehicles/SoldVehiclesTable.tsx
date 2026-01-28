@@ -32,11 +32,11 @@ export const SoldVehiclesTable = ({
   const { formatCurrencyWithCurrency } = useCurrency();
   if (viewMode === 'table') {
     return (
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="bg-gray-50 hover:bg-gray-50">
+              <TableRow className="bg-muted/50 hover:bg-muted/50">
                 <TableHead className="font-semibold text-gray-900">Araç</TableHead>
                 <TableHead className="font-semibold text-gray-900">Bilgiler</TableHead>
                 <TableHead className="font-semibold text-gray-900">Şasi No</TableHead>
@@ -53,7 +53,7 @@ export const SoldVehiclesTable = ({
               ) : vehicles.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-16">
-                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 mb-4">
+                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-muted mb-4">
                       <Search className="h-10 w-10 text-gray-400" />
                     </div>
                     <h3 className="text-xl font-semibold text-gray-900 mb-2">Satılan araç bulunamadı</h3>
@@ -71,10 +71,10 @@ export const SoldVehiclesTable = ({
                     : null;
 
                     return (
-                      <TableRow key={vehicle.id} className="hover:bg-gray-50/80 transition-colors duration-150">
+                      <TableRow key={vehicle.id} className="hover:bg-muted/50 transition-colors duration-150">
                       <TableCell>
                         <div className="flex items-center gap-4">
-                          <div className="h-16 w-24 rounded-xl bg-gray-100 flex-shrink-0 overflow-hidden">
+                          <div className="h-16 w-24 rounded-xl bg-muted flex-shrink-0 overflow-hidden">
                             {imageUrl ? (
                               <img
                                 src={imageUrl}
@@ -100,7 +100,7 @@ export const SoldVehiclesTable = ({
                                   return (
                                     <div className="relative group">
                                       <AlertCircle className="h-4 w-4 text-orange-500" />
-                                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-50">
+                                      <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block bg-popover text-popover-foreground border border-border text-xs rounded py-1 px-2 whitespace-nowrap z-50">
                                         Son taksit ödemesinin üzerinden {overdueDays} gün geçti.
                                       </div>
                                     </div>
@@ -128,7 +128,7 @@ export const SoldVehiclesTable = ({
                       <TableCell className="font-mono text-sm text-gray-600">
                         {vehicle.chassis_no || "-"}
                       </TableCell>
-                      <TableCell className="text-right font-bold text-[#003d82]">
+                      <TableCell className="text-right font-bold text-primary">
                         {formatCurrencyWithCurrency(vehicle.sale_price, vehicle.sale_currency)}
                       </TableCell>
                       <TableCell className="text-right text-gray-600">
@@ -160,11 +160,11 @@ export const SoldVehiclesTable = ({
                                     Taksitle Satıldı
                                   </Badge>
                                   {status.isOverdue ? (
-                                    <Badge className="bg-red-500/10 text-red-700 border-red-200 hover:bg-red-500/20 font-medium">
+                                    <Badge className="bg-red-500/10 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800 hover:bg-red-500/20 dark:hover:bg-red-900/30 font-medium">
                                       Gecikmiş
                                     </Badge>
                                   ) : (
-                                    <Badge className="bg-orange-500/10 text-orange-700 border-orange-200 hover:bg-orange-500/20 font-medium">
+                                    <Badge className="bg-orange-500/10 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800 hover:bg-orange-500/20 dark:hover:bg-orange-900/30 font-medium">
                                       {status.paidCount}/{status.totalCount}
                                     </Badge>
                                   )}
@@ -185,7 +185,7 @@ export const SoldVehiclesTable = ({
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg"
+                            className="h-9 w-9 text-info dark:text-info hover:text-info/80 hover:bg-info/10 rounded-lg"
                             onClick={() => onDetailClick(vehicle)}
                           >
                             <Eye className="h-4 w-4" />
@@ -209,8 +209,8 @@ export const SoldVehiclesTable = ({
       {loading ? (
         <VehicleGridSkeleton />
       ) : vehicles.length === 0 ? (
-        <div className="col-span-full bg-white rounded-2xl shadow-sm border border-gray-200 p-16 text-center">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 mb-4">
+        <div className="col-span-full bg-card rounded-2xl shadow-sm border border-border p-16 text-center">
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-muted mb-4">
             <Search className="h-10 w-10 text-gray-400" />
           </div>
           <h3 className="text-xl font-semibold text-gray-900 mb-2">Satılan araç bulunamadı</h3>
@@ -238,10 +238,10 @@ export const SoldVehiclesTable = ({
           return (
             <div
               key={vehicle.id}
-              className="group bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg hover:border-[#003d82]/20 transition-all duration-300 hover:-translate-y-1"
+              className="group bg-card rounded-2xl shadow-sm border border-border overflow-hidden hover:shadow-lg hover:border-primary/20 transition-all duration-300 hover:-translate-y-1"
             >
               {/* Image */}
-              <div className="relative h-56 bg-gray-100 overflow-hidden">
+              <div className="relative h-56 bg-muted overflow-hidden">
                 {imageUrl ? (
                   <img
                     src={imageUrl}
@@ -253,7 +253,7 @@ export const SoldVehiclesTable = ({
                     }}
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                    <div className="w-full h-full flex items-center justify-center bg-muted">
                     <ImageIcon className="h-12 w-12 text-gray-300" />
                   </div>
                 )}
@@ -267,7 +267,7 @@ export const SoldVehiclesTable = ({
                             Taksitle Satıldı
                           </Badge>
                           {status.isOverdue && (
-                            <Badge className="bg-red-500/10 text-red-700 border-red-200 hover:bg-red-500/20 font-medium">
+                            <Badge className="bg-red-500/10 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800 hover:bg-red-500/20 dark:hover:bg-red-900/30 font-medium">
                               Gecikmiş
                             </Badge>
                           )}
@@ -282,7 +282,7 @@ export const SoldVehiclesTable = ({
                   })()}
                 </div>
                 <div className="absolute top-4 left-4">
-                  <Badge className="bg-white/90 text-gray-900 border-0 backdrop-blur-sm">
+                    <Badge className="bg-card/90 text-foreground border-0 backdrop-blur-sm">
                     {vehicle.vehicle_number ? `#${vehicle.vehicle_number}` : `#${vehicle.id}`}
                   </Badge>
                 </div>
@@ -290,7 +290,7 @@ export const SoldVehiclesTable = ({
                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-2">
                   <Button 
                     size="icon" 
-                    className="rounded-xl bg-white text-gray-900 hover:bg-gray-100 h-11 w-11"
+                      className="rounded-xl bg-card text-foreground hover:bg-muted h-11 w-11"
                     onClick={() => onDetailClick(vehicle)}
                   >
                     <Eye className="h-5 w-5" />
@@ -310,7 +310,7 @@ export const SoldVehiclesTable = ({
                           return (
                             <div className="relative group">
                               <AlertCircle className="h-4 w-4 text-orange-500" />
-                              <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-50">
+                              <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block bg-popover text-popover-foreground border border-border text-xs rounded py-1 px-2 whitespace-nowrap z-50">
                                 Son taksit ödemesinin üzerinden {overdueDays} gün geçti.
                               </div>
                             </div>
@@ -345,7 +345,7 @@ export const SoldVehiclesTable = ({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Satış Fiyatı</span>
-                    <span className="text-lg font-bold text-[#003d82]">
+                    <span className="text-lg font-bold text-primary">
                       {formatCurrencyWithCurrency(vehicle.sale_price, vehicle.sale_currency)}
                     </span>
                   </div>

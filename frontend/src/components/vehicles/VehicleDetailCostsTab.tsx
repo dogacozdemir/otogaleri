@@ -47,7 +47,7 @@ export const VehicleDetailCostsTab = ({
 
   return (
     <>
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center pt-2">
         <h3 className="font-semibold">Harcamalar</h3>
         <Button onClick={onOpenCostModal}>
           <Plus className="h-4 w-4 mr-2" />

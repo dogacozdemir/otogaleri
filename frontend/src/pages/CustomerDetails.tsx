@@ -467,7 +467,7 @@ const CustomerDetails: React.FC = () => {
                 </div>
               )}
               {customer.notes && (
-                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="pt-4 border-t border-border">
                   <p className="text-sm text-gray-500 dark:text-gray-400">{customer.notes}</p>
                 </div>
               )}
@@ -596,7 +596,7 @@ const CustomerDetails: React.FC = () => {
                               variant="outline"
                               size="sm"
                               onClick={() => downloadPDF(sale.id, "contract")}
-                              className="rounded-xl border-[#003d82] text-[#003d82] hover:bg-[#003d82] hover:text-white"
+                              className="rounded-xl border-primary text-primary hover:bg-primary hover:text-primary-foreground"
                             >
                               <Download className="h-4 w-4 mr-2" />
                               Sözleşme İndir
@@ -605,7 +605,7 @@ const CustomerDetails: React.FC = () => {
                               variant="outline"
                               size="sm"
                               onClick={() => downloadPDF(sale.id, "invoice")}
-                              className="rounded-xl border-[#F0A500] text-[#F0A500] hover:bg-[#F0A500] hover:text-white"
+                              className="rounded-xl border-accent text-accent hover:bg-accent hover:text-accent-foreground"
                             >
                               <Download className="h-4 w-4 mr-2" />
                               Fatura İndir
@@ -644,7 +644,7 @@ const CustomerDetails: React.FC = () => {
                                               });
                                             }
                                           }}
-                                          className="rounded-xl border-[#F0A500] text-[#F0A500] hover:bg-[#F0A500] hover:text-white"
+                                          className="rounded-xl border-accent text-accent hover:bg-accent hover:text-accent-foreground"
                                         >
                                           <Bell className="h-4 w-4 mr-2" />
                                           Hatırlatma Gönder
@@ -728,31 +728,31 @@ const CustomerDetails: React.FC = () => {
                 {/* Quotes Tab */}
                 <TabsContent value="quotes" className="space-y-4">
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-[#2d3748]">Müşteri Teklifleri</h3>
+                    <h3 className="text-lg font-semibold text-foreground">Müşteri Teklifleri</h3>
                     <Button
                       onClick={() => navigate(`/quotes`)}
-                      className="bg-[#F0A500] hover:bg-[#d89400] text-white rounded-xl"
+                      className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl"
                     >
                       <FileText className="h-4 w-4 mr-2" />
                       Yeni Teklif
                     </Button>
                   </div>
                   {quotes.length === 0 ? (
-                    <Card className="bg-white rounded-xl border border-[#e2e8f0]">
+                    <Card className="bg-card rounded-xl border border-border">
                       <CardContent className="p-8 text-center">
-                        <FileText className="h-12 w-12 text-[#2d3748]/40 mx-auto mb-4" />
-                        <p className="text-[#2d3748]/60">Bu müşteri için henüz teklif oluşturulmamış.</p>
+                        <FileText className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
+                        <p className="text-muted-foreground/60">Bu müşteri için henüz teklif oluşturulmamış.</p>
                       </CardContent>
                     </Card>
                   ) : (
                     <div className="space-y-3">
                       {quotes.map((quote) => (
-                        <Card key={quote.id} className="bg-white rounded-xl border border-[#e2e8f0] shadow-sm">
+                        <Card key={quote.id} className="bg-card rounded-xl border border-border shadow-sm">
                           <CardContent className="p-4">
                             <div className="flex items-start justify-between">
                               <div className="flex-1">
                                 <div className="flex items-center gap-3 mb-2">
-                                  <h4 className="font-semibold text-[#2d3748]">{quote.quote_number}</h4>
+                                  <h4 className="font-semibold text-foreground">{quote.quote_number}</h4>
                                   <Badge
                                     className={`rounded-xl px-2 py-0.5 text-xs ${
                                       quote.status === "approved"
@@ -761,7 +761,7 @@ const CustomerDetails: React.FC = () => {
                                         ? "bg-red-500 text-white"
                                         : quote.status === "sent"
                                         ? "bg-blue-500 text-white"
-                                        : "bg-gray-500 text-white"
+                                        : "bg-muted-foreground text-muted"
                                     }`}
                                   >
                                     {quote.status === "approved"
@@ -773,13 +773,13 @@ const CustomerDetails: React.FC = () => {
                                       : "Taslak"}
                                   </Badge>
                                 </div>
-                                <p className="text-sm text-[#2d3748] mb-1">
+                                <p className="text-sm text-foreground mb-1">
                                   <strong>Araç:</strong> {quote.maker} {quote.model} {quote.production_year}
                                 </p>
-                                <p className="text-lg font-bold text-[#003d82] mb-1">
+                                <p className="text-lg font-bold text-primary mb-1">
                                   {formatCurrency(quote.sale_price * quote.fx_rate_to_base)}
                                 </p>
-                                <div className="flex gap-4 text-xs text-[#2d3748]/60">
+                                <div className="flex gap-4 text-xs text-muted-foreground/60">
                                   <span>
                                     <Calendar className="h-3 w-3 inline mr-1" />
                                     {format(new Date(quote.quote_date), "dd MMM yyyy", { locale: tr })}

@@ -50,12 +50,37 @@ export async function listVehicles(req: AuthRequest, res: Response) {
 // Create vehicle
 // Note: validateCreateVehicle middleware should be applied in routes
 export async function createVehicle(req: AuthRequest, res: Response) {
+  // Convert FormData string numbers to actual numbers before validation
+  // This prevents "Expected number, received string" errors from Zod
+  const body = { ...req.body };
+  const numericFields = [
+    'vehicle_number',
+    'branch_id',
+    'production_year',
+    'km',
+    'cc',
+    'purchase_amount',
+    'sale_price',
+    'target_profit',
+  ];
+  
+  for (const field of numericFields) {
+    if (body[field] !== undefined && body[field] !== null && body[field] !== '') {
+      const numValue = Number(body[field]);
+      if (!isNaN(numValue)) {
+        body[field] = numValue;
+      } else {
+        body[field] = null;
+      }
+    }
+  }
+  
   // req.body is already validated and sanitized by validateCreateVehicle middleware
   try {
     if (!req.tenantQuery) {
       return res.status(500).json({ error: "Tenant query not available" });
     }
-    const vehicle = await VehicleService.createVehicle(req.tenantQuery, req.body);
+    const vehicle = await VehicleService.createVehicle(req.tenantQuery, body);
 
     res.status(201).json(vehicle);
   } catch (err: any) {

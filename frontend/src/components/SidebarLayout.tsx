@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
 import { 
   Menu, 
@@ -14,8 +14,20 @@ import {
   Wallet,
   Package,
   Settings,
-  FileText
+  FileText,
+  ChevronLeft,
+  ChevronRight,
+  Search
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import ThemeToggle from "./ThemeToggle";
 import GlobalSearch from "./GlobalSearch";
 import CurrencyConverterPopover from "./CurrencyConverterPopover";
@@ -89,19 +101,25 @@ const menuItems = [
 const SidebarLayout = () => {
   const [open, setOpen] = useState(false);
   const [user, setUser] = useState<{ name?: string } | null>(null);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const { tenant } = useTenant();
+  
+  // Sidebar collapse state with localStorage persistence
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('sidebar-collapsed');
+      return saved === 'true';
+    }
+    return false;
+  });
 
   // Load user from localStorage
-  const loadUser = () => {
+  const loadUser = useCallback(() => {
     try {
       const token = getToken();
       if (token) {
-        // Decode token to get user info (simplified)
         const userData = { name: "Admin" };
         setUser(userData);
       }
@@ -109,22 +127,27 @@ const SidebarLayout = () => {
       console.warn("Kullanıcı verisi çözümlenemedi:", e);
       setUser(null);
     }
-  };
+  }, []);
 
   // Initial load
   useEffect(() => {
     loadUser();
-  }, []);
+  }, [loadUser]);
 
-  const handleLogout = () => {
+  // Save collapse state to localStorage
+  useEffect(() => {
+    localStorage.setItem('sidebar-collapsed', String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
+
+  const handleLogout = useCallback(() => {
     removeToken();
     navigate("/login", { replace: true });
-  };
+  }, [navigate]);
 
-  const galleryName = tenant?.name ?? "Oto Galeri";
+  const galleryName = useMemo(() => tenant?.name ?? "Akıllı Galeri", [tenant?.name]);
   
   // Get user initials for avatar
-  const getUserInitials = () => {
+  const getUserInitials = useCallback(() => {
     if (user?.name) {
       const parts = user.name.trim().split(" ");
       if (parts.length >= 2) {
@@ -133,87 +156,75 @@ const SidebarLayout = () => {
       return user.name[0].toUpperCase();
     }
     return "U";
-  };
+  }, [user?.name]);
 
-  // ESC ile kapatma
+  // ESC ile sidebar kapatma
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [open]);
 
-  // Dropdown için ESC ile kapatma ve dışına tıklama
+  // Click outside handler for mobile sidebar
   useEffect(() => {
-    if (!dropdownOpen && !profileDropdownOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setDropdownOpen(false);
-        setProfileDropdownOpen(false);
-      }
-    };
-    const onClickOutside = (e: MouseEvent) => {
+    if (!open || !isMobile) return;
+    const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target.closest('.quick-actions-dropdown') && !target.closest('.profile-dropdown')) {
-        setDropdownOpen(false);
-        setProfileDropdownOpen(false);
+      if (!target.closest('aside') && !target.closest('button[aria-label="Menüyü aç"]')) {
+        setOpen(false);
       }
     };
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("click", onClickOutside);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("click", onClickOutside);
-    };
-  }, [dropdownOpen, profileDropdownOpen]);
-
-  // Dropdown dışına tıklandığında kapatma
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element;
-      if (!target.closest('.quick-actions-dropdown')) {
-        setDropdownOpen(false);
-      }
-      if (!target.closest('.profile-dropdown')) {
-        setProfileDropdownOpen(false);
-      }
-    };
-
-    if (dropdownOpen || profileDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [dropdownOpen, profileDropdownOpen]);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open, isMobile]);
 
   return (
-    <div className="flex min-h-screen bg-[#f8f9fa]">
+    <div className="flex min-h-screen bg-background">
       {/* Fixed Left Sidebar - Deep Navy Background */}
       <aside
         className={`
-          fixed z-40 top-0 left-0 h-screen w-64 bg-[#003d82] text-white transform
-          transition-transform duration-300 ease-in-out shadow-xl
+          fixed z-40 top-0 left-0 h-screen bg-[#003d82] dark:bg-[#002952] text-white transform
+          transition-all duration-300 ease-in-out shadow-xl overflow-hidden
+          ${sidebarCollapsed && !isMobile ? "w-16" : "w-64"}
           ${open || !isMobile ? "translate-x-0" : "-translate-x-full"}
           lg:translate-x-0
         `}
         aria-hidden={!open && isMobile}
       >
-        <div className="p-6 flex items-center justify-between border-b border-white/10">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-              <Car className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-white">
-                {galleryName}
-              </h1>
-              <p className="text-xs text-white/70 font-medium">
-                Profesyonel Yönetim
-              </p>
+        {/* Header - Fixed height h-20 (80px) */}
+        <div className="h-20 flex items-center border-b border-white/10 justify-between">
+          <div className="flex items-center w-full">
+            {!isMobile && (
+              <div className="w-16 flex-shrink-0 flex items-center justify-center">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                  className="text-white hover:bg-white/10"
+                  aria-label={sidebarCollapsed ? "Sidebar'ı genişlet" : "Sidebar'ı daralt"}
+                >
+                  {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                </Button>
+              </div>
+            )}
+            <div 
+              className={`overflow-hidden transition-[max-width,opacity] duration-300 h-[3.5rem] ${
+                sidebarCollapsed && !isMobile 
+                  ? 'max-w-0 opacity-0' 
+                  : 'max-w-[200px] opacity-100'
+              }`}
+            >
+              <div className="whitespace-nowrap h-full flex flex-col justify-center pl-3">
+                <h1 className="text-xl font-bold tracking-tight text-white leading-tight">
+                  {galleryName}
+                </h1>
+                <p className="text-xs text-white/90 font-medium leading-tight">
+                  Profesyonel Yönetim
+                </p>
+              </div>
             </div>
           </div>
           <button 
@@ -225,35 +236,72 @@ const SidebarLayout = () => {
           </button>
         </div>
         
-        {/* Navigation Menu - Premium Styling */}
-        <div className="flex-1 flex flex-col">
-          <nav className="flex-1 p-4">
-            <div className="space-y-1">
-              {menuItems.map((item) => {
+        {/* Navigation Menu - Scrollable with custom scrollbar */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <nav className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent hover:scrollbar-thumb-white/30">
+            <style>{`
+              .scrollbar-thin::-webkit-scrollbar {
+                width: 6px;
+              }
+              .scrollbar-thin::-webkit-scrollbar-track {
+                background: transparent;
+              }
+              .scrollbar-thin::-webkit-scrollbar-thumb {
+                background: rgba(255, 255, 255, 0.2);
+                border-radius: 3px;
+              }
+              .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+                background: rgba(255, 255, 255, 0.3);
+              }
+            `}</style>
+            <div className="space-y-1 py-2">
+              {menuItems
+                .filter(item => item.path !== "/staff" && item.path !== "/branches")
+                .map((item) => {
                 const Icon = item.icon;
                 const isActive = location.pathname === item.path;
                 
                 return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    onClick={() => isMobile && setOpen(false)}
-                    className={`
-                      group flex items-center space-x-3 px-3 py-2.5 rounded-xl transition-all duration-200
-                      ${isActive 
-                        ? "bg-white/10 text-white sidebar-active-border" 
-                        : "text-white/80 hover:bg-white/5 hover:text-white"
-                      }
-                    `}
-                    title={item.description}
-                  >
-                    <Icon className={`w-5 h-5 flex-shrink-0 ${
-                      isActive ? "text-[#F0A500]" : "text-white/70 group-hover:text-white"
-                    }`} />
-                    <div className="flex-1 min-w-0">
-                      <span className="font-semibold text-sm truncate block">{item.name}</span>
-                    </div>
-                  </Link>
+                  <div key={item.path} className="relative group w-full">
+                    <Link
+                      to={item.path}
+                      onClick={() => isMobile && setOpen(false)}
+                      className={`
+                        group flex items-center py-2.5 rounded-xl relative
+                        transition-colors duration-200
+                        ${isActive 
+                          ? "bg-white/10 text-white border-l-2 border-[#F0A500]/80" 
+                          : "text-white/80 hover:bg-white/5 hover:text-white"
+                        }
+                      `}
+                      title={sidebarCollapsed && !isMobile ? item.name : item.description}
+                      aria-current={isActive ? "page" : undefined}
+                    >
+                      {/* Fixed width icon container - always at left-0, never moves */}
+                      <div className="w-16 flex-shrink-0 flex items-center justify-center">
+                        <Icon className={`w-5 h-5 transition-colors ${
+                          isActive ? "text-[#F0A500]" : "text-white/90 group-hover:text-white"
+                        }`} />
+                      </div>
+                      {/* Text container with smooth transition */}
+                      <div 
+                        className={`overflow-hidden transition-[max-width,opacity] duration-300 ${
+                          sidebarCollapsed && !isMobile 
+                            ? 'max-w-0 opacity-0' 
+                            : 'max-w-[200px] opacity-100'
+                        }`}
+                      >
+                        <span className="font-semibold text-sm whitespace-nowrap block text-white">{item.name}</span>
+                      </div>
+                    </Link>
+                    {/* Tooltip for collapsed state - Fixed z-index and no clipping */}
+                    {sidebarCollapsed && !isMobile && (
+                      <div className="absolute left-full ml-2 px-3 py-2 bg-popover text-popover-foreground border border-border text-sm rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[100] whitespace-nowrap">
+                        {item.name}
+                        <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-popover"></div>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -261,36 +309,60 @@ const SidebarLayout = () => {
         </div>
 
         {/* Footer - Logout Section */}
-        <div className="p-4 border-t border-white/10">
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center space-x-3 px-3 py-2.5 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-all duration-200"
-          >
-            <LogOut className="w-5 h-5" />
-            <span className="font-semibold text-sm">Güvenli Çıkış</span>
-          </button>
+        <div className="border-t border-white/10 flex-shrink-0 py-2">
+          <div className="relative group">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center py-2.5 text-white/95 hover:text-white hover:bg-white/10 rounded-xl relative transition-colors duration-200"
+              title={sidebarCollapsed && !isMobile ? "Güvenli Çıkış" : undefined}
+              aria-label="Güvenli çıkış yap"
+            >
+              {/* Fixed width icon container - always at left-0, never moves */}
+              <div className="w-16 flex-shrink-0 flex items-center justify-center">
+                <LogOut className="w-5 h-5" />
+              </div>
+              {/* Text container with smooth transition */}
+              <div 
+                className={`overflow-hidden transition-[max-width,opacity] duration-300 ${
+                  sidebarCollapsed && !isMobile 
+                    ? 'max-w-0 opacity-0' 
+                    : 'max-w-[200px] opacity-100'
+                }`}
+              >
+                <span className="font-semibold text-sm whitespace-nowrap">Güvenli Çıkış</span>
+              </div>
+            </button>
+            {/* Tooltip for collapsed state - Fixed z-index */}
+            {sidebarCollapsed && !isMobile && (
+              <div className="absolute left-full ml-2 px-3 py-2 bg-popover text-popover-foreground border border-border text-sm rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[100] whitespace-nowrap">
+                Güvenli Çıkış
+                <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-popover"></div>
+              </div>
+            )}
+          </div>
         </div>
       </aside>
 
       {/* Main content - Offset for fixed sidebar */}
-      <div className="flex flex-col flex-1 min-h-screen lg:ml-64">
-        <header className="w-full bg-white/95 backdrop-blur-md shadow-sm border-b border-[#e2e8f0] sticky top-0 z-20 min-h-[72px] flex-shrink-0">
-          <div className="w-full px-4 sm:px-6 lg:px-8 py-3 sm:py-4 h-full">
+      <div className={`flex flex-col flex-1 min-h-screen transition-all duration-300 ${sidebarCollapsed && !isMobile ? 'lg:ml-16' : 'lg:ml-64'}`}>
+        {/* Header - Fixed height h-20 (80px) matching sidebar */}
+        <header className="w-full bg-card/95 backdrop-blur-md shadow-sm border-b border-border sticky top-0 z-20 h-20 flex-shrink-0">
+          <div className="w-full px-4 sm:px-6 lg:px-8 h-full">
             <div className="flex items-center justify-between h-full max-w-[1400px] mx-auto">
               {/* Left Section - Menu & Brand */}
               <div className="flex items-center space-x-3 sm:space-x-6 flex-1 min-w-0">
                 <button 
                   onClick={() => setOpen(true)}
-                  className="lg:hidden p-2 sm:p-3 rounded-xl bg-[#003d82] hover:bg-[#003d82]/90 flex-shrink-0 transition-colors"
+                  className="lg:hidden p-2 sm:p-3 rounded-xl bg-primary hover:bg-primary/90 flex-shrink-0 transition-colors"
                   aria-label="Menüyü aç"
                 >
                   <Menu className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </button>
-                <div className="border-l border-[#e2e8f0] pl-3 sm:pl-6 flex-shrink-0 min-w-0">
-                  <h2 className="text-lg sm:text-xl font-bold text-[#2d3748] truncate">
+                <div className="border-l border-border pl-3 sm:pl-6 flex-shrink-0 min-w-0">
+                  <h2 className="text-lg sm:text-xl font-bold text-foreground truncate">
                     {isMobile ? galleryName.split(' ')[0] : galleryName}
                   </h2>
-                  <p className="text-xs sm:text-sm text-[#2d3748]/70 hidden sm:block min-h-[16px]">
+                  <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block min-h-[16px]">
                     {menuItems.find(item => item.path === location.pathname)?.description || "Profesyonel Yönetim Paneli"}
                   </p>
                 </div>
@@ -303,9 +375,9 @@ const SidebarLayout = () => {
               
               {/* Right Section - Status & User */}
               <div className="flex items-center space-x-2 sm:space-x-6 flex-shrink-0">
-                {/* Mobile Search */}
+                {/* Mobile Search - Icon only */}
                 <div className="sm:hidden flex-shrink-0">
-                  <GlobalSearch />
+                  <GlobalSearch iconOnly />
                 </div>
                 
                 {/* Theme Toggle */}
@@ -318,144 +390,117 @@ const SidebarLayout = () => {
                   <CurrencyConverterPopover />
                 </div>
                 
-                {/* Quick Actions Button */}
-                <div className="relative quick-actions-dropdown flex-shrink-0">
-                  <button 
-                    onClick={() => setDropdownOpen(!dropdownOpen)}
-                    className="flex items-center space-x-2 px-3 py-2 bg-[#003d82] rounded-xl shadow-sm hover:shadow-md transition-all duration-200 whitespace-nowrap"
-                  >
-                    <Plus className="w-5 h-5 text-white flex-shrink-0" />
-                    <span className="text-white font-medium text-sm hidden sm:inline">Hızlı İşlemler</span>
-                  </button>
-                  
-                  {/* Dropdown Menu */}
-                  {dropdownOpen && (
-                    <div className="absolute right-0 top-12 w-64 bg-card border border-border rounded-xl shadow-professional-lg z-50 animate-fade-in">
-                      <div className="p-4">
-                        <h3 className="text-sm font-semibold text-muted-foreground mb-3">Hızlı İşlemler</h3>
-                        <div className="space-y-2">
-                          <button
-                            onClick={() => {
-                              setDropdownOpen(false);
-                              navigate('/vehicles');
-                            }}
-                            className="w-full flex items-center space-x-3 p-3 text-left rounded-lg hover:bg-accent transition-colors duration-200"
-                          >
-                            <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-                              <Plus className="w-4 h-4 text-primary" />
-                            </div>
-                            <div>
-                              <p className="font-medium text-sm">Yeni Araç</p>
-                              <p className="text-xs text-muted-foreground">Araç ekle</p>
-                            </div>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setDropdownOpen(false);
-                              navigate('/vehicles');
-                            }}
-                            className="w-full flex items-center space-x-3 p-3 text-left rounded-lg hover:bg-accent transition-colors duration-200"
-                          >
-                            <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-                              <Car className="w-4 h-4 text-primary" />
-                            </div>
-                            <div>
-                              <p className="font-medium text-sm">Araç Sat</p>
-                              <p className="text-xs text-muted-foreground">Araç satış işlemi</p>
-                            </div>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setDropdownOpen(false);
-                              navigate('/customers');
-                            }}
-                            className="w-full flex items-center space-x-3 p-3 text-left rounded-lg hover:bg-accent transition-colors duration-200"
-                          >
-                            <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-                              <Users className="w-4 h-4 text-primary" />
-                            </div>
-                            <div>
-                              <p className="font-medium text-sm">Müşteri Ekle</p>
-                              <p className="text-xs text-muted-foreground">Yeni müşteri ekle</p>
-                            </div>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setDropdownOpen(false);
-                              navigate('/inventory');
-                            }}
-                            className="w-full flex items-center space-x-3 p-3 text-left rounded-lg hover:bg-accent transition-colors duration-200"
-                          >
-                            <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-                              <Package className="w-4 h-4 text-primary" />
-                            </div>
-                            <div>
-                              <p className="font-medium text-sm">Stok</p>
-                              <p className="text-xs text-muted-foreground">Stok yönetimi</p>
-                            </div>
-                          </button>
-                        </div>
+                {/* Quick Actions Dropdown - Using shadcn/ui */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button 
+                      className="flex items-center space-x-2 px-3 py-2 bg-primary rounded-xl shadow-sm hover:shadow-md transition-all duration-200 whitespace-nowrap"
+                      aria-label="Hızlı işlemler menüsü"
+                    >
+                      <Plus className="w-5 h-5 text-white flex-shrink-0" />
+                      <span className="text-white font-medium text-sm hidden sm:inline">Hızlı İşlemler</span>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64">
+                    <DropdownMenuLabel>Hızlı İşlemler</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => navigate('/vehicles')}
+                      className="cursor-pointer"
+                    >
+                      <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center mr-3">
+                        <Plus className="w-4 h-4 text-primary" />
                       </div>
-                    </div>
-                  )}
-                </div>
+                      <div>
+                        <p className="font-medium text-sm">Yeni Araç</p>
+                        <p className="text-xs text-muted-foreground">Araç ekle</p>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => navigate('/vehicles')}
+                      className="cursor-pointer"
+                    >
+                      <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center mr-3">
+                        <Car className="w-4 h-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">Araç Sat</p>
+                        <p className="text-xs text-muted-foreground">Araç satış işlemi</p>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => navigate('/customers')}
+                      className="cursor-pointer"
+                    >
+                      <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center mr-3">
+                        <Users className="w-4 h-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">Müşteri Ekle</p>
+                        <p className="text-xs text-muted-foreground">Yeni müşteri ekle</p>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => navigate('/inventory')}
+                      className="cursor-pointer"
+                    >
+                      <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center mr-3">
+                        <Package className="w-4 h-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">Stok</p>
+                        <p className="text-xs text-muted-foreground">Stok yönetimi</p>
+                      </div>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 
-                {/* User Avatar with Dropdown */}
-                <div className="relative profile-dropdown flex-shrink-0">
-                  <button
-                    onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                    className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-primary/20 to-primary/30 rounded-full flex items-center justify-center shadow-professional-sm hover:shadow-professional-md transition-all duration-200 border-2 border-primary/30 flex-shrink-0"
-                    aria-label="Profil menüsü"
-                  >
-                    <span className="text-primary font-bold text-xs sm:text-sm">
-                      {getUserInitials()}
-                    </span>
-                  </button>
-
-                  {/* Profile Dropdown Menu */}
-                  {profileDropdownOpen && (
-                    <div className="absolute right-0 top-12 w-56 bg-card border border-border rounded-xl shadow-professional-lg z-50 animate-fade-in">
-                      <div className="p-2">
-                        <button
-                          onClick={() => {
-                            setProfileDropdownOpen(false);
-                            navigate('/settings');
-                          }}
-                          className="w-full flex items-center space-x-3 p-3 text-left rounded-lg hover:bg-accent transition-colors duration-200"
-                        >
-                          <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-                            <Settings className="w-4 h-4 text-primary" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-sm">Ayarlar</p>
-                            <p className="text-xs text-muted-foreground">Galeri ayarları</p>
-                          </div>
-                        </button>
-                        <button
-                          onClick={() => {
-                            setProfileDropdownOpen(false);
-                            handleLogout();
-                          }}
-                          className="w-full flex items-center space-x-3 p-3 text-left rounded-lg hover:bg-destructive/10 transition-colors duration-200 text-destructive"
-                        >
-                          <div className="w-8 h-8 bg-destructive/10 rounded-lg flex items-center justify-center">
-                            <LogOut className="w-4 h-4 text-destructive" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-sm">Çıkış Yap</p>
-                            <p className="text-xs text-muted-foreground">Güvenli çıkış</p>
-                          </div>
-                        </button>
+                {/* User Avatar with Dropdown - Using shadcn/ui */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-primary/20 to-primary/30 rounded-full flex items-center justify-center shadow-professional-sm hover:shadow-professional-md transition-all duration-200 border-2 border-primary/30 flex-shrink-0"
+                      aria-label="Profil menüsü"
+                    >
+                      <span className="text-primary font-bold text-xs sm:text-sm">
+                        {getUserInitials()}
+                      </span>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem
+                      onClick={() => navigate('/settings')}
+                      className="cursor-pointer"
+                    >
+                      <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center mr-3">
+                        <Settings className="w-4 h-4 text-primary" />
                       </div>
-                    </div>
-                  )}
-                </div>
+                      <div>
+                        <p className="font-medium text-sm">Ayarlar</p>
+                        <p className="text-xs text-muted-foreground">Galeri ayarları</p>
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={handleLogout}
+                      className="cursor-pointer text-destructive focus:text-destructive"
+                    >
+                      <div className="w-8 h-8 bg-destructive/10 rounded-lg flex items-center justify-center mr-3">
+                        <LogOut className="w-4 h-4 text-destructive" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">Çıkış Yap</p>
+                        <p className="text-xs text-muted-foreground">Güvenli çıkış</p>
+                      </div>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </div>
         </header>
 
-        <main className="flex-1 bg-[#f8f9fa]">
+        <main className="flex-1 bg-background">
           <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
             <div className="max-w-[1400px] mx-auto">
               <Outlet />

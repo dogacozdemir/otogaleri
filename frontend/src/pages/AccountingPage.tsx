@@ -113,27 +113,27 @@ const getCategoryIcon = (category: string) => {
 const getCategoryColor = (category: string) => {
   const cat = category.toLowerCase();
   if (cat.includes("araç") || cat.includes("vehicle") || cat.includes("satış")) {
-    return "bg-emerald-100 text-emerald-700 border-emerald-200";
+    return "bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800";
   }
   if (cat.includes("servis") || cat.includes("service") || cat.includes("bakım")) {
-    return "bg-blue-100 text-blue-700 border-blue-200";
+    return "bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800";
   }
   if (cat.includes("parça") || cat.includes("part")) {
-    return "bg-purple-100 text-purple-700 border-purple-200";
+    return "bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800";
   }
   if (cat.includes("personel") || cat.includes("salary") || cat.includes("maaş")) {
-    return "bg-orange-100 text-orange-700 border-orange-200";
+    return "bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800";
   }
   if (cat.includes("kira") || cat.includes("rent")) {
-    return "bg-red-100 text-red-700 border-red-200";
+    return "bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800";
   }
   if (cat.includes("stok") || cat.includes("stock")) {
-    return "bg-amber-100 text-amber-700 border-amber-200";
+    return "bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800";
   }
   if (cat.includes("fatura") || cat.includes("utilities")) {
-    return "bg-yellow-100 text-yellow-700 border-yellow-200";
+    return "bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800";
   }
-  return "bg-gray-100 text-gray-700 border-gray-200";
+  return "bg-muted text-muted-foreground border-border";
 };
 
 const AccountingPage = () => {
@@ -612,7 +612,7 @@ const AccountingPage = () => {
         <Card className="rounded-2xl border-l-4 border-l-red-500 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Toplam Gider</CardTitle>
-            <div className="rounded-xl bg-red-100 p-2">
+            <div className="rounded-xl bg-red-100 dark:bg-red-900/20 p-2">
               <TrendingDown className="h-5 w-5 text-red-600" />
             </div>
           </CardHeader>
@@ -629,7 +629,7 @@ const AccountingPage = () => {
         <Card className="rounded-2xl border-l-4 border-l-blue-500 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Net Gelir</CardTitle>
-            <div className="rounded-xl bg-blue-100 p-2">
+            <div className="rounded-xl bg-blue-100 dark:bg-blue-900/20 p-2">
               <DollarSign className="h-5 w-5 text-blue-600" />
             </div>
           </CardHeader>
@@ -715,16 +715,16 @@ const AccountingPage = () => {
                   <div key={`${item.category}-${index}`} className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#003d82] text-xs text-white">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
                           {index + 1}
                         </span>
                         {item.category}
                       </span>
                       <span className="font-bold text-green-600">{formatCurrency(item.value)}</span>
                     </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
-                      <div
-                        className="h-full bg-[#003d82]"
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full bg-primary"
                         style={{
                           width: `${categoryData[0]?.value > 0 ? (item.value / categoryData[0].value) * 100 : 0}%`,
                         }}
@@ -883,7 +883,7 @@ const AccountingPage = () => {
           <TabsContent value="expense" className="m-0">
             <CardContent className="pt-6">
               <div className="mb-4 flex justify-end">
-                <Button className="gap-2 rounded-xl bg-red-600 hover:bg-red-700" onClick={() => {
+                <Button className="gap-2 rounded-xl bg-destructive hover:bg-destructive/90" onClick={() => {
                   setEditingExpense(null);
                   setExpenseForm({ description: "", category: "", amount: "", currency: "TRY", expense_date: new Date().toISOString().split("T")[0] });
                   setExpenseModalOpen(true);

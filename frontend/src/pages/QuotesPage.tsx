@@ -345,12 +345,12 @@ export default function QuotesPage() {
 
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { label: string; className: string }> = {
-      draft: { label: "Taslak", className: "bg-gray-500 text-white" },
-      sent: { label: "Gönderildi", className: "bg-blue-500 text-white" },
-      approved: { label: "Onaylandı", className: "bg-green-600 text-white" },
-      rejected: { label: "Reddedildi", className: "bg-red-500 text-white" },
-      expired: { label: "Süresi Doldu", className: "bg-orange-500 text-white" },
-      converted: { label: "Satışa Dönüştü", className: "bg-[#003d82] text-white" },
+      draft: { label: "Taslak", className: "bg-muted-foreground text-muted" },
+      sent: { label: "Gönderildi", className: "bg-info text-info-foreground" },
+      approved: { label: "Onaylandı", className: "bg-success text-success-foreground" },
+      rejected: { label: "Reddedildi", className: "bg-destructive text-destructive-foreground" },
+      expired: { label: "Süresi Doldu", className: "bg-warning text-warning-foreground" },
+      converted: { label: "Satışa Dönüştü", className: "bg-primary text-primary-foreground" },
     };
 
     const config = statusConfig[status] || statusConfig.draft;
@@ -379,8 +379,8 @@ export default function QuotesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-[#2d3748]">Teklif Yönetimi</h1>
-          <p className="text-sm text-[#2d3748]/60 mt-1">
+          <h1 className="text-3xl font-bold text-foreground">Teklif Yönetimi</h1>
+          <p className="text-sm text-muted-foreground/60 mt-1">
             Araç satış tekliflerini oluşturun, yönetin ve takip edin
           </p>
         </div>
@@ -388,23 +388,23 @@ export default function QuotesPage() {
           <DialogTrigger asChild>
             <Button
               onClick={resetForm}
-              className="bg-[#F0A500] hover:bg-[#d89400] text-white rounded-xl shadow-md"
+              className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl shadow-md"
             >
               <Plus className="h-4 w-4 mr-2" />
               Yeni Teklif
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl bg-white rounded-xl border border-[#e2e8f0]">
+          <DialogContent className="max-w-2xl bg-card rounded-xl border border-border">
             <DialogHeader>
-              <DialogTitle className="text-[#2d3748]">Yeni Teklif Oluştur</DialogTitle>
-              <DialogDescription className="text-[#2d3748]/70">
+              <DialogTitle className="text-foreground">Yeni Teklif Oluştur</DialogTitle>
+              <DialogDescription className="text-muted-foreground/70">
                 Müşteriye gönderilecek satış teklifini oluşturun
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-[#2d3748] mb-2 block">
+                  <label className="text-sm font-medium text-foreground mb-2 block">
                     Araç <span className="text-red-500">*</span>
                   </label>
                   <Select
@@ -433,7 +433,7 @@ export default function QuotesPage() {
                   </Select>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-[#2d3748] mb-2 block">Müşteri</label>
+                  <label className="text-sm font-medium text-foreground mb-2 block">Müşteri</label>
                   <Select
                     value={quoteForm.customer_id || "none"}
                     onValueChange={(value) => setQuoteForm({ ...quoteForm, customer_id: value === "none" ? "" : value })}
@@ -454,7 +454,7 @@ export default function QuotesPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-[#2d3748] mb-2 block">
+                  <label className="text-sm font-medium text-foreground mb-2 block">
                     Teklif Tarihi <span className="text-red-500">*</span>
                   </label>
                   <Input
@@ -465,7 +465,7 @@ export default function QuotesPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-[#2d3748] mb-2 block">
+                  <label className="text-sm font-medium text-foreground mb-2 block">
                     Geçerlilik Tarihi <span className="text-red-500">*</span>
                   </label>
                   <Input
@@ -478,7 +478,7 @@ export default function QuotesPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-[#2d3748] mb-2 block">
+                  <label className="text-sm font-medium text-foreground mb-2 block">
                     Satış Fiyatı <span className="text-red-500">*</span>
                   </label>
                   <Input
@@ -490,7 +490,7 @@ export default function QuotesPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-[#2d3748] mb-2 block">Para Birimi</label>
+                  <label className="text-sm font-medium text-foreground mb-2 block">Para Birimi</label>
                   <Select
                     value={quoteForm.currency}
                     onValueChange={(value) => setQuoteForm({ ...quoteForm, currency: value })}
@@ -509,7 +509,7 @@ export default function QuotesPage() {
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-[#2d3748] mb-2 block">Peşinat</label>
+                  <label className="text-sm font-medium text-foreground mb-2 block">Peşinat</label>
                   <Input
                     type="number"
                     value={quoteForm.down_payment}
@@ -519,7 +519,7 @@ export default function QuotesPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-[#2d3748] mb-2 block">Taksit Sayısı</label>
+                  <label className="text-sm font-medium text-foreground mb-2 block">Taksit Sayısı</label>
                   <Input
                     type="number"
                     value={quoteForm.installment_count}
@@ -529,7 +529,7 @@ export default function QuotesPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-[#2d3748] mb-2 block">Taksit Tutarı</label>
+                  <label className="text-sm font-medium text-foreground mb-2 block">Taksit Tutarı</label>
                   <Input
                     type="number"
                     value={quoteForm.installment_amount}
@@ -540,7 +540,7 @@ export default function QuotesPage() {
                 </div>
               </div>
               <div>
-                <label className="text-sm font-medium text-[#2d3748] mb-2 block">Notlar</label>
+                <label className="text-sm font-medium text-foreground mb-2 block">Notlar</label>
                 <Input
                   value={quoteForm.notes}
                   onChange={(e) => setQuoteForm({ ...quoteForm, notes: e.target.value })}
@@ -555,7 +555,7 @@ export default function QuotesPage() {
               </Button>
               <Button
                 onClick={handleCreateQuote}
-                className="bg-[#003d82] hover:bg-[#0052a3] text-white rounded-xl"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
               >
                 Oluştur
               </Button>
@@ -567,7 +567,7 @@ export default function QuotesPage() {
       {/* Filters */}
       <div className="flex gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-[#2d3748]/40" />
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground/40" />
           <Input
             className="pl-8 rounded-xl"
             placeholder="Teklif ara (numara, araç, müşteri)..."
@@ -592,32 +592,32 @@ export default function QuotesPage() {
       </div>
 
       {/* Quotes Table */}
-      <Card className="bg-white rounded-xl border border-[#e2e8f0] shadow-md">
+      <Card className="bg-card rounded-xl border border-border shadow-md">
         <CardContent className="p-0">
-          <div className="rounded-xl overflow-hidden border border-[#e2e8f0]">
+          <div className="rounded-xl overflow-hidden border border-border">
             <Table className="table-zebra">
-              <TableHeader className="bg-[#f8f9fa] sticky top-0 z-10">
-                <TableRow className="border-b border-[#e2e8f0] hover:bg-transparent">
-                  <TableHead className="text-[#2d3748] font-semibold">Teklif No</TableHead>
-                  <TableHead className="text-[#2d3748] font-semibold">Araç</TableHead>
-                  <TableHead className="text-[#2d3748] font-semibold">Müşteri</TableHead>
-                  <TableHead className="text-[#2d3748] font-semibold">Fiyat</TableHead>
-                  <TableHead className="text-[#2d3748] font-semibold">Tarih</TableHead>
-                  <TableHead className="text-[#2d3748] font-semibold">Geçerlilik</TableHead>
-                  <TableHead className="text-[#2d3748] font-semibold">Durum</TableHead>
-                  <TableHead className="text-[#2d3748] font-semibold">İşlemler</TableHead>
+              <TableHeader className="bg-muted/50 sticky top-0 z-10">
+                <TableRow className="border-b border-border hover:bg-transparent">
+                  <TableHead className="text-foreground font-semibold">Teklif No</TableHead>
+                  <TableHead className="text-foreground font-semibold">Araç</TableHead>
+                  <TableHead className="text-foreground font-semibold">Müşteri</TableHead>
+                  <TableHead className="text-foreground font-semibold">Fiyat</TableHead>
+                  <TableHead className="text-foreground font-semibold">Tarih</TableHead>
+                  <TableHead className="text-foreground font-semibold">Geçerlilik</TableHead>
+                  <TableHead className="text-foreground font-semibold">Durum</TableHead>
+                  <TableHead className="text-foreground font-semibold">İşlemler</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-[#2d3748]">
+                    <TableCell colSpan={8} className="text-center text-foreground">
                       Yükleniyor...
                     </TableCell>
                   </TableRow>
                 ) : filteredQuotes.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-[#2d3748]">
+                    <TableCell colSpan={8} className="text-center text-foreground">
                       Teklif bulunamadı.
                     </TableCell>
                   </TableRow>
@@ -625,26 +625,26 @@ export default function QuotesPage() {
                   filteredQuotes.map((quote, index) => (
                     <TableRow
                       key={quote.id}
-                      className={`table-row-modern border-b border-[#e2e8f0] ${
-                        index % 2 === 0 ? "bg-white" : "bg-[#f8f9fa]"
+                      className={`table-row-modern border-b border-border ${
+                        index % 2 === 0 ? "bg-card" : "bg-muted/30"
                       }`}
                     >
-                      <TableCell className="text-[#2d3748] font-medium">
+                      <TableCell className="text-foreground font-medium">
                         {quote.quote_number}
                       </TableCell>
-                      <TableCell className="text-[#2d3748]">
+                      <TableCell className="text-foreground">
                         {quote.maker} {quote.model} {quote.production_year}
                       </TableCell>
-                      <TableCell className="text-[#2d3748]">
+                      <TableCell className="text-foreground">
                         {quote.customer_name_full || "-"}
                       </TableCell>
-                      <TableCell className="text-[#2d3748] font-medium">
+                      <TableCell className="text-foreground font-medium">
                         {formatCurrency(quote.sale_price, quote.currency, locale)}
                       </TableCell>
-                      <TableCell className="text-[#2d3748]">
+                      <TableCell className="text-foreground">
                         {format(new Date(quote.quote_date), "dd MMM yyyy", { locale: tr })}
                       </TableCell>
-                      <TableCell className="text-[#2d3748]">
+                      <TableCell className="text-foreground">
                         {format(new Date(quote.valid_until), "dd MMM yyyy", { locale: tr })}
                       </TableCell>
                       <TableCell>{getStatusBadge(quote.status)}</TableCell>
@@ -725,14 +725,14 @@ export default function QuotesPage() {
 
       {/* Edit Dialog */}
       <Dialog open={openEdit} onOpenChange={setOpenEdit}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white rounded-xl border border-[#e2e8f0]">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-card rounded-xl border border-border">
           <DialogHeader>
-            <DialogTitle className="text-[#2d3748]">Teklifi Düzenle</DialogTitle>
+            <DialogTitle className="text-foreground">Teklifi Düzenle</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium text-[#2d3748] mb-2 block">Araç</label>
+                <label className="text-sm font-medium text-foreground mb-2 block">Araç</label>
                 <Select
                   value={quoteForm.vehicle_id}
                   onValueChange={(value) => {
@@ -759,7 +759,7 @@ export default function QuotesPage() {
                 </Select>
               </div>
               <div>
-                <label className="text-sm font-medium text-[#2d3748] mb-2 block">Müşteri</label>
+                <label className="text-sm font-medium text-foreground mb-2 block">Müşteri</label>
                 <Select
                   value={quoteForm.customer_id || "none"}
                   onValueChange={(value) => setQuoteForm({ ...quoteForm, customer_id: value === "none" ? "" : value })}
@@ -780,7 +780,7 @@ export default function QuotesPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium text-[#2d3748] mb-2 block">Teklif Tarihi</label>
+                <label className="text-sm font-medium text-foreground mb-2 block">Teklif Tarihi</label>
                 <Input
                   type="date"
                   value={quoteForm.quote_date}
@@ -789,7 +789,7 @@ export default function QuotesPage() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-[#2d3748] mb-2 block">Geçerlilik Tarihi</label>
+                <label className="text-sm font-medium text-foreground mb-2 block">Geçerlilik Tarihi</label>
                 <Input
                   type="date"
                   value={quoteForm.valid_until}
@@ -800,7 +800,7 @@ export default function QuotesPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium text-[#2d3748] mb-2 block">Satış Fiyatı</label>
+                <label className="text-sm font-medium text-foreground mb-2 block">Satış Fiyatı</label>
                 <Input
                   type="number"
                   value={quoteForm.sale_price}
@@ -809,7 +809,7 @@ export default function QuotesPage() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-[#2d3748] mb-2 block">Para Birimi</label>
+                <label className="text-sm font-medium text-foreground mb-2 block">Para Birimi</label>
                 <Select
                   value={quoteForm.currency}
                   onValueChange={(value) => setQuoteForm({ ...quoteForm, currency: value })}
@@ -828,7 +828,7 @@ export default function QuotesPage() {
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="text-sm font-medium text-[#2d3748] mb-2 block">Peşinat</label>
+                <label className="text-sm font-medium text-foreground mb-2 block">Peşinat</label>
                 <Input
                   type="number"
                   value={quoteForm.down_payment}
@@ -837,7 +837,7 @@ export default function QuotesPage() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-[#2d3748] mb-2 block">Taksit Sayısı</label>
+                <label className="text-sm font-medium text-foreground mb-2 block">Taksit Sayısı</label>
                 <Input
                   type="number"
                   value={quoteForm.installment_count}
@@ -846,7 +846,7 @@ export default function QuotesPage() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-[#2d3748] mb-2 block">Taksit Tutarı</label>
+                <label className="text-sm font-medium text-foreground mb-2 block">Taksit Tutarı</label>
                 <Input
                   type="number"
                   value={quoteForm.installment_amount}
@@ -856,7 +856,7 @@ export default function QuotesPage() {
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium text-[#2d3748] mb-2 block">Durum</label>
+              <label className="text-sm font-medium text-foreground mb-2 block">Durum</label>
               <Select
                 value={quoteForm.status}
                 onValueChange={(value) => setQuoteForm({ ...quoteForm, status: value as any })}
@@ -873,7 +873,7 @@ export default function QuotesPage() {
               </Select>
             </div>
             <div>
-              <label className="text-sm font-medium text-[#2d3748] mb-2 block">Notlar</label>
+              <label className="text-sm font-medium text-foreground mb-2 block">Notlar</label>
               <Input
                 value={quoteForm.notes}
                 onChange={(e) => setQuoteForm({ ...quoteForm, notes: e.target.value })}
@@ -887,7 +887,7 @@ export default function QuotesPage() {
             </Button>
             <Button
               onClick={handleUpdateQuote}
-              className="bg-[#003d82] hover:bg-[#0052a3] text-white rounded-xl"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
             >
               Güncelle
             </Button>
@@ -897,22 +897,22 @@ export default function QuotesPage() {
 
       {/* Convert to Sale Dialog */}
       <Dialog open={openConvert} onOpenChange={setOpenConvert}>
-        <DialogContent className="max-w-md bg-white rounded-xl border border-[#e2e8f0]">
+        <DialogContent className="max-w-md bg-card rounded-xl border border-border">
           <DialogHeader>
-            <DialogTitle className="text-[#2d3748]">Teklifi Satışa Dönüştür</DialogTitle>
-            <DialogDescription className="text-[#2d3748]/70">
+            <DialogTitle className="text-foreground">Teklifi Satışa Dönüştür</DialogTitle>
+            <DialogDescription className="text-muted-foreground/70">
               Bu işlem teklifi onaylı bir satışa dönüştürecektir. Devam etmek istiyor musunuz?
             </DialogDescription>
           </DialogHeader>
           {selectedQuote && (
             <div className="py-4 space-y-2">
-              <p className="text-sm text-[#2d3748]">
+              <p className="text-sm text-foreground">
                 <strong>Teklif No:</strong> {selectedQuote.quote_number}
               </p>
-              <p className="text-sm text-[#2d3748]">
+              <p className="text-sm text-foreground">
                 <strong>Araç:</strong> {selectedQuote.maker} {selectedQuote.model}
               </p>
-              <p className="text-sm text-[#2d3748]">
+              <p className="text-sm text-foreground">
                 <strong>Fiyat:</strong> {formatCurrency(selectedQuote.sale_price, selectedQuote.currency, locale)}
               </p>
             </div>
@@ -923,7 +923,7 @@ export default function QuotesPage() {
             </Button>
             <Button
               onClick={handleConvertToSale}
-              className="bg-[#F0A500] hover:bg-[#d89400] text-white rounded-xl"
+              className="bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl"
             >
               Satışa Dönüştür
             </Button>

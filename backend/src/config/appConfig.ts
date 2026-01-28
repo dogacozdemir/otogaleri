@@ -83,7 +83,13 @@ export const subdomainConfig = {
 /**
  * CORS Configuration
  */
-export const corsConfig = {
+export interface CorsConfig {
+  allowedOrigins: string[];
+  isOriginAllowed(origin: string): boolean;
+  readonly allowed: string[];
+}
+
+export const corsConfig: CorsConfig = {
   allowedOrigins: process.env.ALLOWED_ORIGINS 
     ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
     : process.env.NODE_ENV === 'production' 
@@ -94,6 +100,41 @@ export const corsConfig = {
           'http://127.0.0.1:5173',
           'http://127.0.0.1:5175',
         ],
+  
+  /**
+   * Check if origin is allowed (supports wildcard subdomains)
+   * Examples:
+   * - Exact match: "https://galeri.calenius.io"
+   * - Wildcard: "*.calenius.io" matches "https://galeri.calenius.io", "https://app.calenius.io", etc.
+   * Supports galeri.calenius.io domain
+   */
+  isOriginAllowed: function(origin: string): boolean {
+    const allowedOrigins = this.allowed;
+    
+    // Check exact matches first
+    if (allowedOrigins.includes(origin)) {
+      return true;
+    }
+    
+    // Check wildcard patterns (e.g., "*.calenius.io")
+    for (const pattern of allowedOrigins) {
+      if (pattern.includes('*')) {
+        // Convert wildcard pattern to regex
+        // "*.calenius.io" -> /^https?:\/\/[^.]+\.calenius\.io$/
+        const regexPattern = pattern
+          .replace(/\./g, '\\.')  // Escape dots
+          .replace(/\*/g, '[^.]+') // Replace * with non-dot characters
+          .replace(/^/, '^https?:\\/\\/'); // Add protocol prefix
+        
+        const regex = new RegExp(regexPattern + '$');
+        if (regex.test(origin)) {
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  },
   
   get allowed() {
     if (process.env.NODE_ENV === 'production' && this.allowedOrigins.length === 0) {

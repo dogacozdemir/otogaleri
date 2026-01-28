@@ -243,7 +243,7 @@ const VehicleImageUpload: React.FC<VehicleImageUploadProps> = ({ vehicleId, onUp
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pt-2">
       {/* Yükleme Butonları */}
       <div className="flex items-center gap-2 flex-wrap">
         <input

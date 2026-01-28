@@ -472,7 +472,7 @@ const InventoryPage = () => {
       );
     } else if (product.is_for_sale) {
       return (
-        <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+        <Badge variant="secondary" className="bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30">
           Satış
         </Badge>
       );
@@ -503,7 +503,7 @@ const InventoryPage = () => {
       );
     }
     return (
-      <Badge variant="secondary" className="gap-1 bg-green-100 text-green-800 hover:bg-green-100">
+      <Badge variant="secondary" className="gap-1 bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30">
         <TrendingUp className="h-3 w-3" />
         {current}
       </Badge>
@@ -512,14 +512,14 @@ const InventoryPage = () => {
 
   const getFlowTypeBadge = (type: string) => {
     const styles: Record<string, string> = {
-      sale: "bg-green-100 text-green-800",
-      in: "bg-blue-100 text-blue-800",
-      purchase: "bg-blue-100 text-blue-800",
-      return: "bg-red-100 text-red-800",
-      service_usage: "bg-purple-100 text-purple-800",
-      service: "bg-purple-100 text-purple-800",
-      correction: "bg-orange-100 text-orange-800",
-      out: "bg-gray-100 text-gray-800",
+      sale: "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-300",
+      in: "bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300",
+      purchase: "bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300",
+      return: "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-300",
+      service_usage: "bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-300",
+      service: "bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-300",
+      correction: "bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-300",
+      out: "bg-muted text-muted-foreground",
     };
     const labels: Record<string, string> = {
       sale: "Satış",
@@ -532,7 +532,7 @@ const InventoryPage = () => {
       out: "Çıkış",
     };
     return (
-      <Badge variant="secondary" className={cn("hover:bg-inherit", styles[type] || "bg-gray-100 text-gray-800")}>
+      <Badge variant="secondary" className={cn("hover:bg-inherit", styles[type] || "bg-muted text-muted-foreground")}>
         {labels[type] || type}
       </Badge>
     );
@@ -551,7 +551,7 @@ const InventoryPage = () => {
               <p className="text-sm font-medium text-muted-foreground">Toplam Ürün</p>
               <h3 className="text-3xl font-bold mt-2">{analytics?.totalProducts || 0}</h3>
               </div>
-            <div className="h-12 w-12 rounded-xl bg-blue-100 flex items-center justify-center">
+            <div className="h-12 w-12 rounded-xl bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
               <Package className="h-6 w-6 text-blue-600" />
             </div>
             </div>
@@ -563,7 +563,7 @@ const InventoryPage = () => {
               <p className="text-sm font-medium text-muted-foreground">Kritik Stok</p>
               <h3 className="text-3xl font-bold mt-2 text-red-600">{analytics?.lowStockCount || 0}</h3>
               </div>
-            <div className="h-12 w-12 rounded-xl bg-red-100 flex items-center justify-center">
+            <div className="h-12 w-12 rounded-xl bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
               <AlertTriangle className="h-6 w-6 text-red-600" />
             </div>
             </div>
@@ -575,7 +575,7 @@ const InventoryPage = () => {
               <p className="text-sm font-medium text-muted-foreground">Satış Ürünleri</p>
               <h3 className="text-3xl font-bold mt-2">{saleProducts}</h3>
               </div>
-            <div className="h-12 w-12 rounded-xl bg-green-100 flex items-center justify-center">
+            <div className="h-12 w-12 rounded-xl bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
               <ShoppingCart className="h-6 w-6 text-green-600" />
             </div>
             </div>
@@ -587,7 +587,7 @@ const InventoryPage = () => {
               <p className="text-sm font-medium text-muted-foreground">Servis Ürünleri</p>
               <h3 className="text-3xl font-bold mt-2">{serviceProducts}</h3>
               </div>
-            <div className="h-12 w-12 rounded-xl bg-purple-100 flex items-center justify-center">
+            <div className="h-12 w-12 rounded-xl bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center">
               <Wrench className="h-6 w-6 text-purple-600" />
             </div>
             </div>
@@ -631,7 +631,7 @@ const InventoryPage = () => {
                 onClick={() => setActiveFilter("all")}
                 className={cn(
                   "rounded-lg px-4",
-                  activeFilter === "all" && "bg-[#003d82] text-white shadow-sm hover:bg-[#003d82]",
+                  activeFilter === "all" && "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90",
                   activeFilter !== "all" && "hover:bg-transparent text-muted-foreground",
                 )}
               >
@@ -643,7 +643,7 @@ const InventoryPage = () => {
                 onClick={() => setActiveFilter("sale")}
                 className={cn(
                   "rounded-lg px-4",
-                  activeFilter === "sale" && "bg-[#003d82] text-white shadow-sm hover:bg-[#003d82]",
+                  activeFilter === "sale" && "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90",
                   activeFilter !== "sale" && "hover:bg-transparent text-muted-foreground",
                 )}
               >
@@ -655,7 +655,7 @@ const InventoryPage = () => {
                 onClick={() => setActiveFilter("service")}
                 className={cn(
                   "rounded-lg px-4",
-                  activeFilter === "service" && "bg-[#003d82] text-white shadow-sm hover:bg-[#003d82]",
+                  activeFilter === "service" && "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90",
                   activeFilter !== "service" && "hover:bg-transparent text-muted-foreground",
                 )}
               >
@@ -673,7 +673,7 @@ const InventoryPage = () => {
                 onClick={() => setActiveFilter("all")}
                 className={cn(
                   "rounded-lg px-4",
-                  activeFilter === "all" && "bg-[#003d82] text-white shadow-sm hover:bg-[#003d82]",
+                  activeFilter === "all" && "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90",
                   activeFilter !== "all" && "hover:bg-transparent text-muted-foreground",
                 )}
               >
@@ -685,7 +685,7 @@ const InventoryPage = () => {
                 onClick={() => setActiveFilter("sale")}
                 className={cn(
                   "rounded-lg px-4",
-                  activeFilter === "sale" && "bg-[#003d82] text-white shadow-sm hover:bg-[#003d82]",
+                  activeFilter === "sale" && "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90",
                   activeFilter !== "sale" && "hover:bg-transparent text-muted-foreground",
                 )}
               >
@@ -697,7 +697,7 @@ const InventoryPage = () => {
                 onClick={() => setActiveFilter("service")}
                 className={cn(
                   "rounded-lg px-4",
-                  activeFilter === "service" && "bg-[#003d82] text-white shadow-sm hover:bg-[#003d82]",
+                  activeFilter === "service" && "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90",
                   activeFilter !== "service" && "hover:bg-transparent text-muted-foreground",
                 )}
               >
@@ -859,7 +859,7 @@ const InventoryPage = () => {
                 <Button
                   variant="outline"
                   onClick={() => setOpenAdd(false)}
-                  className="border-gray-600 text-muted-foreground"
+                  className="border-border text-muted-foreground"
                 >
                   İptal
                 </Button>
@@ -948,7 +948,7 @@ const InventoryPage = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-9 px-3 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 font-medium border border-green-200"
+                        className="h-9 px-3 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30 hover:text-green-800 dark:hover:text-green-200 font-medium border border-green-200 dark:border-green-800"
                         onClick={(e) => {
                           e.stopPropagation();
                           openEntryModal(p);
@@ -972,7 +972,7 @@ const InventoryPage = () => {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-9 w-9 rounded-lg hover:bg-red-100 hover:text-red-600"
+                        className="h-9 w-9 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleDelete(p.id);
@@ -1036,7 +1036,7 @@ const InventoryPage = () => {
             <Button
               variant="outline"
               onClick={() => setOpenEntry(false)}
-              className="border-gray-600 text-muted-foreground"
+              className="border-border text-muted-foreground"
             >
               İptal
             </Button>
@@ -1181,7 +1181,7 @@ const InventoryPage = () => {
             <Button
               variant="outline"
               onClick={() => setOpenHistory(false)}
-              className="border-gray-600 text-muted-foreground"
+              className="border-border text-muted-foreground"
             >
               Kapat
             </Button>
@@ -1309,7 +1309,7 @@ const InventoryPage = () => {
             <Button
               variant="outline"
               onClick={() => setOpenExit(false)}
-              className="border-gray-600 text-muted-foreground"
+              className="border-border text-muted-foreground"
             >
               İptal
             </Button>

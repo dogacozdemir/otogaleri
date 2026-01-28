@@ -14,31 +14,19 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-export const useTheme = () => {
-  const context = useContext(ThemeContext);
-  if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider');
-  }
-  return context;
-};
-
 interface ThemeProviderProps {
   children: React.ReactNode;
 }
 
-export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
+export function ThemeProvider({ children }: ThemeProviderProps) {
   const [mode, setModeState] = useState<ThemeMode>(() => {
-    // Local storage'dan mode'u al, yoksa sistem tercihini kullan
+    // Local storage'dan mode'u al, yoksa light mode'u varsayılan olarak kullan
     const savedMode = localStorage.getItem('theme-mode') as ThemeMode;
     if (savedMode) {
       return savedMode;
     }
     
-    // Sistem dark mode tercihini kontrol et
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      return 'dark';
-    }
-    
+    // Varsayılan olarak light mode
     return 'light';
   });
 
@@ -76,24 +64,6 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     applyTheme(theme, mode);
   }, [theme, mode]);
 
-  // Sistem tema değişikliklerini dinle
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    
-    const handleChange = (e: MediaQueryListEvent) => {
-      // Eğer kullanıcı manuel bir tercih yapmadıysa sistem tercihini takip et
-      const savedMode = localStorage.getItem('theme-mode');
-      if (!savedMode) {
-        setModeState(e.matches ? 'dark' : 'light');
-      }
-    };
-
-    mediaQuery.addEventListener('change', handleChange);
-    
-    return () => {
-      mediaQuery.removeEventListener('change', handleChange);
-    };
-  }, []);
 
   const value = {
     mode,
@@ -109,4 +79,12 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       {children}
     </ThemeContext.Provider>
   );
+}
+
+export const useTheme = () => {
+  const context = useContext(ThemeContext);
+  if (context === undefined) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  return context;
 };

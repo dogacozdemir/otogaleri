@@ -58,20 +58,26 @@ nano .env
 **Backend .env Örneği:**
 ```env
 # Database
-DB_HOST=localhost
-DB_USER=otogaleri_user
-DB_PASSWORD=güçlü_şifre_buraya
-DB_NAME=otogaleri
+OTG_DB_HOST=localhost
+OTG_DB_PORT=3306
+OTG_DB_USER=otogaleri_user
+OTG_DB_PASSWORD=güçlü_şifre_buraya
+OTG_DB_NAME=otogaleri
 
 # Server
 PORT=5005
 NODE_ENV=production
 
-# JWT
-JWT_SECRET=çok_güvenli_ve_uzun_jwt_secret_key_buraya
+# JWT (Minimum 64 karakter, güçlü bir secret kullanın)
+JWT_SECRET=çok_güvenli_ve_uzun_jwt_secret_key_buraya_minimum_64_karakter_olmalı
+
+# CORS - Frontend domain'lerini buraya ekleyin (virgülle ayırın)
+# Wildcard pattern desteği: *.calenius.io tüm subdomain'leri kapsar
+ALLOWED_ORIGINS=https://galeri.calenius.io,https://www.galeri.calenius.io,*.calenius.io
 
 # FreeCurrencyAPI (Opsiyonel - kur analizi için)
 FREECURRENCY_API_KEY=your_api_key_here
+FREECURRENCY_API_BASE=https://api.freecurrencyapi.com/v1
 ```
 
 ### Veritabanı Migration
@@ -287,17 +293,30 @@ npm run build
 - Nginx proxy yapılandırmasını kontrol edin
 - Browser console'da hataları kontrol edin
 
+### CORS Hatası (Not allowed by CORS)
+- Backend `.env` dosyasında `ALLOWED_ORIGINS` environment variable'ını ayarlayın
+- Frontend domain'inizi (hem http hem https) ekleyin: `ALLOWED_ORIGINS=https://galeri.calenius.io,http://galeri.calenius.io`
+- Wildcard pattern kullanabilirsiniz: `ALLOWED_ORIGINS=*.calenius.io` (tüm subdomain'leri kapsar)
+- Backend'i yeniden başlatın: `pm2 restart otogaleri-backend`
+
 ### Resimler görünmüyor
 - `/uploads` klasörünün izinlerini kontrol edin
 - Nginx'te `/uploads` location'ının doğru yapılandırıldığından emin olun
 
 ## Güvenlik Notları
 
-1. **JWT_SECRET:** Güçlü ve rastgele bir secret key kullanın
-2. **Database Password:** Güçlü bir şifre kullanın
-3. **Environment Variables:** `.env` dosyalarını asla git'e commit etmeyin
-4. **HTTPS:** Production'da mutlaka SSL kullanın
-5. **Firewall:** Sadece gerekli portları açık tutun
+1. **JWT_SECRET:** Güçlü ve rastgele bir secret key kullanın (minimum 64 karakter)
+   ```bash
+   # Güçlü secret oluşturma:
+   openssl rand -base64 64
+   ```
+2. **ALLOWED_ORIGINS:** Production'da mutlaka frontend domain'lerinizi ekleyin
+   - Sadece güvendiğiniz domain'leri ekleyin
+   - Wildcard pattern kullanabilirsiniz: `*.calenius.io`
+3. **Database Password:** Güçlü bir şifre kullanın
+4. **Environment Variables:** `.env` dosyalarını asla git'e commit etmeyin
+5. **HTTPS:** Production'da mutlaka SSL kullanın
+6. **Firewall:** Sadece gerekli portları açık tutun
 
 ## Performans Optimizasyonları
 

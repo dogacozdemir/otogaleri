@@ -48,27 +48,27 @@ export const VehicleQuoteModal = ({
 }: VehicleQuoteModalProps) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl bg-white rounded-xl border border-[#e2e8f0]">
+      <DialogContent className="max-w-2xl bg-card rounded-xl border border-border">
         <DialogHeader>
-          <DialogTitle className="text-[#2d3748]">Yeni Teklif Oluştur</DialogTitle>
-          <DialogDescription className="text-[#2d3748]/70">
+          <DialogTitle className="text-foreground">Yeni Teklif Oluştur</DialogTitle>
+          <DialogDescription className="text-muted-foreground/70">
             {vehicle && `${vehicle.maker} ${vehicle.model} ${vehicle.production_year}`} için teklif oluşturun
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium text-[#2d3748] mb-2 block">
+              <label className="text-sm font-medium text-foreground mb-2 block">
                 Araç <span className="text-red-500">*</span>
               </label>
               <Input
                 value={vehicle ? `${vehicle.maker} ${vehicle.model} ${vehicle.production_year} - #${vehicle.vehicle_number}` : ""}
                 disabled
-                className="rounded-xl bg-gray-50"
+                className="rounded-xl bg-muted"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-[#2d3748] mb-2 block">Müşteri</label>
+              <label className="text-sm font-medium text-foreground mb-2 block">Müşteri</label>
               <Select
                 value={quoteForm.customer_id || "none"}
                 onValueChange={(value) => onFormChange('customer_id', value === "none" ? "" : value)}
@@ -89,7 +89,7 @@ export const VehicleQuoteModal = ({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium text-[#2d3748] mb-2 block">
+              <label className="text-sm font-medium text-foreground mb-2 block">
                 Teklif Tarihi <span className="text-red-500">*</span>
               </label>
               <Input
@@ -100,7 +100,7 @@ export const VehicleQuoteModal = ({
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-[#2d3748] mb-2 block">
+              <label className="text-sm font-medium text-foreground mb-2 block">
                 Geçerlilik Tarihi <span className="text-red-500">*</span>
               </label>
               <Input
@@ -113,7 +113,7 @@ export const VehicleQuoteModal = ({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium text-[#2d3748] mb-2 block">
+              <label className="text-sm font-medium text-foreground mb-2 block">
                 Satış Fiyatı <span className="text-red-500">*</span>
               </label>
               <Input
@@ -125,7 +125,7 @@ export const VehicleQuoteModal = ({
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-[#2d3748] mb-2 block">Para Birimi</label>
+              <label className="text-sm font-medium text-foreground mb-2 block">Para Birimi</label>
               <Select
                 value={quoteForm.currency}
                 onValueChange={(value) => onFormChange('currency', value)}
@@ -144,7 +144,7 @@ export const VehicleQuoteModal = ({
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="text-sm font-medium text-[#2d3748] mb-2 block">Peşinat</label>
+              <label className="text-sm font-medium text-foreground mb-2 block">Peşinat</label>
               <Input
                 type="number"
                 value={quoteForm.down_payment}
@@ -154,7 +154,7 @@ export const VehicleQuoteModal = ({
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-[#2d3748] mb-2 block">Taksit Sayısı</label>
+              <label className="text-sm font-medium text-foreground mb-2 block">Taksit Sayısı</label>
               <Input
                 type="number"
                 value={quoteForm.installment_count}
@@ -164,7 +164,7 @@ export const VehicleQuoteModal = ({
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-[#2d3748] mb-2 block">Taksit Tutarı</label>
+              <label className="text-sm font-medium text-foreground mb-2 block">Taksit Tutarı</label>
               <Input
                 type="number"
                 value={quoteForm.installment_amount}
@@ -175,7 +175,7 @@ export const VehicleQuoteModal = ({
             </div>
           </div>
           <div>
-            <label className="text-sm font-medium text-[#2d3748] mb-2 block">Notlar</label>
+            <label className="text-sm font-medium text-foreground mb-2 block">Notlar</label>
             <Input
               value={quoteForm.notes}
               onChange={(e) => onFormChange('notes', e.target.value)}
@@ -190,7 +190,7 @@ export const VehicleQuoteModal = ({
           </Button>
           <Button
             onClick={onSubmit}
-            className="bg-[#003d82] hover:bg-[#0052a3] text-white rounded-xl"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
           >
             Oluştur
           </Button>
