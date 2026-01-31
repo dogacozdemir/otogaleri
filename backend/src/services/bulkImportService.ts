@@ -17,6 +17,7 @@ export const VehicleImportSchema = z.object({
   grade: z.string().optional().nullable(),
   cc: z.coerce.number().nullable().optional(),
   color: z.string().optional().nullable(),
+  engine_no: z.string().optional().nullable(),
   other: z.string().optional().nullable(),
   sale_price: z.coerce.number().nullable().optional(),
   purchase_amount: z.coerce.number().nullable().optional(),

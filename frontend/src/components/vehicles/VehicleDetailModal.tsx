@@ -101,20 +101,28 @@ export const VehicleDetailModal = ({
                 <div className="col-span-12 md:col-span-4">
                   <Card className="overflow-hidden border-2 border-primary/20 shadow-lg h-full">
                     {vehicle.primary_image_url ? (
-                      <div className="aspect-video relative bg-muted h-full">
+                      <div className="aspect-video relative bg-muted h-full overflow-hidden">
+                        {/* Skeleton Loader */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-muted via-muted/50 to-muted animate-pulse" />
                         <img
                           src={(() => {
                             const imageUrl = vehicle.primary_image_url || '';
                             if (imageUrl.startsWith('http')) {
                               return imageUrl;
                             }
-                            // Backend returns path like /uploads/vehicles/filename.webp
-                            // We need to prepend API base URL
-                            const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:5005';
+                            // Backend returns path like /uploads/vehicles/filename.webp (local) or full CDN URL (S3)
+                            // Strip /api so static files use origin root, not /api/uploads/...
+                            const apiBase = (import.meta.env.VITE_API_BASE || 'http://localhost:5005').replace(/\/api\/?$/, '') || 'http://localhost:5005';
                             return `${apiBase}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
                           })()}
                           alt={`${vehicle.maker} ${vehicle.model}`}
-                          className="w-full h-full object-cover"
+                          className="relative w-full h-full object-cover transition-opacity duration-500 opacity-0"
+                          loading="lazy"
+                          onLoad={(e) => {
+                            const img = e.target as HTMLImageElement;
+                            img.classList.remove('opacity-0');
+                            img.classList.add('opacity-100');
+                          }}
                           onError={(e) => {
                             // If image fails to load, show placeholder
                             const target = e.target as HTMLImageElement;

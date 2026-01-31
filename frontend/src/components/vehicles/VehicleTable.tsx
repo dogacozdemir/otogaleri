@@ -121,15 +121,24 @@ export const VehicleTable = ({
                 {/* Image */}
                 <div className="relative h-56 bg-muted overflow-hidden">
                   {imageUrl ? (
-                    <img
-                      src={imageUrl}
-                      alt={`${vehicle.maker} ${vehicle.model}`}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                      loading="lazy"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
+                    <>
+                      {/* Skeleton Loader */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-muted via-muted/50 to-muted animate-pulse" />
+                      <img
+                        src={imageUrl}
+                        alt={`${vehicle.maker} ${vehicle.model}`}
+                        className="relative w-full h-full object-cover group-hover:scale-110 transition-all duration-500 opacity-0 animate-fade-in"
+                        loading="lazy"
+                        onLoad={(e) => {
+                          const img = e.target as HTMLImageElement;
+                          img.classList.remove('opacity-0');
+                          img.classList.add('opacity-100');
+                        }}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    </>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-muted">
                       <ImageIcon className="h-12 w-12 text-gray-300" />

@@ -3,9 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Switch } from "@/components/ui/switch";
 import { 
-  CheckCircle, AlertCircle, Image as ImageIcon, Eye, Grid3x3, List, Search
+  AlertCircle, Image as ImageIcon, Eye, Search
 } from "lucide-react";
 import { getInstallmentStatus, getInstallmentOverdueDays } from "@/utils/vehicleUtils";
 import { getApiBaseUrl } from "@/lib/utils";
@@ -18,7 +17,6 @@ interface SoldVehiclesTableProps {
   viewMode: 'table' | 'grid';
   currency: (amount: number | null) => string;
   onDetailClick: (vehicle: Vehicle) => void;
-  onViewModeChange: (mode: 'table' | 'grid') => void;
 }
 
 export const SoldVehiclesTable = ({
@@ -27,7 +25,6 @@ export const SoldVehiclesTable = ({
   viewMode,
   currency,
   onDetailClick,
-  onViewModeChange,
 }: SoldVehiclesTableProps) => {
   const { formatCurrencyWithCurrency } = useCurrency();
   if (viewMode === 'table') {
@@ -243,15 +240,24 @@ export const SoldVehiclesTable = ({
               {/* Image */}
               <div className="relative h-56 bg-muted overflow-hidden">
                 {imageUrl ? (
-                  <img
-                    src={imageUrl}
-                    alt={`${vehicle.maker} ${vehicle.model}`}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    loading="lazy"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
+                  <>
+                    {/* Skeleton Loader */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-muted via-muted/50 to-muted animate-pulse" />
+                    <img
+                      src={imageUrl}
+                      alt={`${vehicle.maker} ${vehicle.model}`}
+                      className="relative w-full h-full object-cover group-hover:scale-110 transition-all duration-500 opacity-0"
+                      loading="lazy"
+                      onLoad={(e) => {
+                        const img = e.target as HTMLImageElement;
+                        img.classList.remove('opacity-0');
+                        img.classList.add('opacity-100');
+                      }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </>
                 ) : (
                     <div className="w-full h-full flex items-center justify-center bg-muted">
                     <ImageIcon className="h-12 w-12 text-gray-300" />

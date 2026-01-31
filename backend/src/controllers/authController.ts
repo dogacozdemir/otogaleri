@@ -1,9 +1,11 @@
 import { Request, Response } from "express";
+import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import zxcvbn from "zxcvbn";
 import { dbPool } from "../config/database";
 import { generateToken, AuthRequest } from "../middleware/auth";
 import { loggerService } from "../services/loggerService";
+import { sendPasswordResetEmail, sendWelcomeEmail } from "../services/emailService";
 
 /**
  * Enhanced password validation
@@ -114,6 +116,19 @@ export async function signup(req: Request, res: Response) {
 
     await conn.commit();
     conn.release();
+
+    // Karşılama maili (hata olsa bile kayıt başarılı sayılır)
+    try {
+      const welcomeResult = await sendWelcomeEmail(
+        ownerEmail.toLowerCase().trim(),
+        ownerName?.trim() || tenantName.trim()
+      );
+      if (!welcomeResult.success) {
+        console.error("[auth] Welcome email failed:", welcomeResult.error);
+      }
+    } catch (mailErr) {
+      console.error("[auth] Welcome email error (signup succeeded):", mailErr);
+    }
 
     // Include token_version (0 for new users) in token
     const token = generateToken(tenantId, userId, "owner", 0);
@@ -279,5 +294,138 @@ export async function changePassword(req: AuthRequest, res: Response) {
   } catch (err) {
     console.error("[auth] Change password error", err);
     res.status(500).json({ error: "Failed to change password" });
+  }
+}
+
+/**
+ * Şifremi unuttum: e-posta ile token oluşturup mail gönderir.
+ * Kullanıcı bulunamazsa bile aynı yanıt dönülür (bilgi sızıntısı önlenir).
+ */
+export async function forgotPassword(req: Request, res: Response) {
+  const { email } = req.body;
+
+  if (!email || typeof email !== "string") {
+    return res.status(400).json({ error: "E-posta adresi gerekli" });
+  }
+
+  const emailTrimmed = email.toLowerCase().trim();
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(emailTrimmed)) {
+    return res.status(400).json({ error: "Geçersiz e-posta formatı" });
+  }
+
+  try {
+    const [rows] = await dbPool.query(
+      "SELECT id, tenant_id, email FROM users WHERE email = ? AND is_active = 1 LIMIT 1",
+      [emailTrimmed]
+    );
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      // Bilgi sızıntısı önleme: aynı mesaj dön
+      res.status(200).json({
+        message: "Bu e-posta adresi sistemde kayıtlıysa, şifre sıfırlama linki gönderildi.",
+      });
+      return;
+    }
+
+    const user = rows[0] as { id: number; tenant_id: number; email: string };
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 saat
+
+    await dbPool.query(
+      "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)",
+      [user.id, tokenHash, expiresAt]
+    );
+
+    const mailResult = await sendPasswordResetEmail(user.email, rawToken);
+    if (!mailResult.success) {
+      console.error("[auth] Forgot password email failed:", mailResult.error);
+      // Token oluşturuldu ama mail gitmedi; token'ı sil ki tekrar denesin
+      await dbPool.query("DELETE FROM password_reset_tokens WHERE user_id = ? AND token_hash = ?", [
+        user.id,
+        tokenHash,
+      ]);
+      res.status(500).json({
+        error: "E-posta gönderilemedi. Lütfen daha sonra tekrar deneyin.",
+      });
+      return;
+    }
+
+    res.status(200).json({
+      message: "Bu e-posta adresi sistemde kayıtlıysa, şifre sıfırlama linki gönderildi.",
+    });
+  } catch (err) {
+    console.error("[auth] Forgot password error:", err);
+    res.status(500).json({ error: "İşlem sırasında bir hata oluştu. Lütfen daha sonra tekrar deneyin." });
+  }
+}
+
+/**
+ * Token ile şifre sıfırlama. Token geçerli ve süresi dolmamış olmalı.
+ */
+export async function resetPassword(req: Request, res: Response) {
+  const { token, newPassword } = req.body;
+
+  if (!token || typeof token !== "string") {
+    return res.status(400).json({ error: "Token gerekli" });
+  }
+  if (!newPassword || typeof newPassword !== "string") {
+    return res.status(400).json({ error: "Yeni şifre gerekli" });
+  }
+
+  const passwordValidation = validatePassword(newPassword);
+  if (!passwordValidation.valid) {
+    return res.status(400).json({ error: passwordValidation.error });
+  }
+
+  const tokenHash = crypto.createHash("sha256").update(token.trim()).digest("hex");
+
+  try {
+    const [rows] = await dbPool.query(
+      "SELECT prt.id, prt.user_id FROM password_reset_tokens prt WHERE prt.token_hash = ? AND prt.expires_at > NOW() LIMIT 1",
+      [tokenHash]
+    );
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({
+        error: "Geçersiz veya süresi dolmuş link. Lütfen şifre sıfırlama talebini tekrarlayın.",
+      });
+    }
+
+    const row = rows[0] as { id: number; user_id: number };
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+    const conn = await dbPool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const [userRows] = await conn.query(
+        "SELECT tenant_id, token_version FROM users WHERE id = ?",
+        [row.user_id]
+      );
+      const userRow = Array.isArray(userRows) && userRows.length > 0 ? (userRows[0] as { tenant_id: number; token_version: number }) : null;
+      const newTokenVersion = (userRow?.token_version ?? 0) + 1;
+
+      await conn.query(
+        "UPDATE users SET password_hash = ?, token_version = ? WHERE id = ?",
+        [newPasswordHash, newTokenVersion, row.user_id]
+      );
+      await conn.query("DELETE FROM password_reset_tokens WHERE id = ?", [row.id]);
+
+      await conn.commit();
+    } catch (txErr) {
+      await conn.rollback();
+      throw txErr;
+    } finally {
+      conn.release();
+    }
+
+    res.status(200).json({
+      message: "Şifreniz başarıyla güncellendi. Giriş yapabilirsiniz.",
+    });
+  } catch (err) {
+    console.error("[auth] Reset password error:", err);
+    res.status(500).json({ error: "Şifre güncellenirken bir hata oluştu. Lütfen tekrar deneyin." });
   }
 }

@@ -32,6 +32,7 @@ export type Vehicle = {
   grade: string | null;
   cc: number | null;
   color: string | null;
+  engine_no: string | null;
   other: string | null;
   sale_price: number | null;
   sale_currency?: string | null;

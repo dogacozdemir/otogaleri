@@ -30,6 +30,7 @@ export type VehicleFormData = {
   grade: string;
   cc: string;
   color: string;
+  engine_no: string;
   other: string;
   sale_price: string;
   sale_currency: string;
@@ -289,6 +290,14 @@ export const VehicleAddEditModal = ({
                   <Input
                     value={vehicleForm.color}
                     onChange={(e) => onFormChange('color', e.target.value)}
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Motor No</label>
+                  <Input
+                    value={vehicleForm.engine_no}
+                    onChange={(e) => onFormChange('engine_no', e.target.value)}
                     className="h-8"
                   />
                 </div>

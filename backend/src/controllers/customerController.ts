@@ -2,6 +2,7 @@ import { Response } from "express";
 import { AuthRequest } from "../middleware/auth";
 import "../middleware/tenantQuery"; // Import for type augmentation
 import { TenantAwareQuery } from "../repositories/tenantAwareQuery";
+import { StorageService } from "../services/storage/storageService";
 
 export async function listCustomers(req: AuthRequest, res: Response) {
   if (!req.tenantQuery) {
@@ -109,7 +110,7 @@ export async function getCustomerById(req: AuthRequest, res: Response) {
       LEFT JOIN (
         SELECT 
           vi.vehicle_id,
-          vi.image_filename,
+          vi.image_path,
           ROW_NUMBER() OVER (
             PARTITION BY vi.vehicle_id 
             ORDER BY vi.is_primary DESC, vi.display_order ASC, vi.created_at ASC
@@ -190,16 +191,24 @@ export async function getCustomerById(req: AuthRequest, res: Response) {
       }, {} as Record<number, any>);
     }
     
-    // Satışlara installment bilgilerini ekle
-    const formattedSales = salesArray.map(sale => {
-      const formatted: any = {
-        ...sale,
-        primary_image_url: sale.primary_image_filename 
-          ? `/uploads/vehicles/${sale.primary_image_filename}` 
-          : null,
-      };
-      
-      delete formatted.primary_image_filename;
+    // Satışlara installment bilgilerini ve resim URL'lerini ekle (StorageService/CDN üzerinden)
+    const formattedSales = await Promise.all(
+      salesArray.map(async (sale) => {
+        let primary_image_url: string | null = null;
+        if (sale.primary_image_path) {
+          try {
+            const key = sale.primary_image_path.replace(/^\/uploads\//, "");
+            primary_image_url = await StorageService.getUrl(key, true);
+          } catch (urlError) {
+            console.error("[customerController] Failed to get image URL:", urlError);
+            primary_image_url = null;
+          }
+        }
+        const formatted: any = {
+          ...sale,
+          primary_image_url,
+        };
+        delete formatted.primary_image_path;
       
       if (sale.vehicle_id && installmentsMap[sale.vehicle_id]) {
         const installment = installmentsMap[sale.vehicle_id];
@@ -211,8 +220,9 @@ export async function getCustomerById(req: AuthRequest, res: Response) {
         formatted.installment_remaining_balance = Number(installment.remaining_balance || 0);
       }
       
-      return formatted;
-    });
+        return formatted;
+      })
+    );
 
     // Müşterinin gelir kayıtlarını getir
     const [income] = await tenantQuery.query(

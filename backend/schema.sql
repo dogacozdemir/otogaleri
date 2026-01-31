@@ -27,6 +27,18 @@ CREATE TABLE IF NOT EXISTS users (
   UNIQUE KEY uniq_tenant_email (tenant_id, email)
 );
 
+-- Password reset tokens (şifremi unuttum akışı)
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  token_hash VARCHAR(64) NOT NULL COMMENT 'SHA-256 hash of token',
+  expires_at DATETIME NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_token_hash (token_hash),
+  INDEX idx_expires_at (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Branches (subeler)
 CREATE TABLE IF NOT EXISTS branches (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -108,6 +120,7 @@ CREATE TABLE IF NOT EXISTS vehicles (
   grade VARCHAR(100) NULL,
   cc INT NULL,
   color VARCHAR(50) NULL,
+  engine_no VARCHAR(100) NULL,
   other TEXT NULL,
   status ENUM('new','used','damaged','repaired') DEFAULT 'used',
   stock_status ENUM('in_stock','on_sale','reserved','sold') DEFAULT 'in_stock',

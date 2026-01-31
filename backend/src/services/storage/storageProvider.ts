@@ -17,6 +17,7 @@ export interface UploadOptions {
   filename?: string; // Custom filename (optional, will be generated if not provided)
   contentType?: string; // MIME type
   makePublic?: boolean; // Whether file should be publicly accessible
+  tenantId?: number; // Tenant ID for multi-tenant isolation (e.g., "tenants/{tenantId}/vehicles/")
 }
 
 export interface DeleteOptions {
@@ -45,9 +46,10 @@ export interface IStorageProvider {
   /**
    * Get public URL for a file
    * @param key - File key/path
-   * @returns Public URL
+   * @param isPublic - Whether file is publicly accessible (for CDN optimization)
+   * @returns Public URL (CDN URL if configured and public, otherwise signed URL)
    */
-  getUrl(key: string): Promise<string>;
+  getUrl(key: string, isPublic?: boolean): Promise<string>;
 
   /**
    * Check if file exists
@@ -62,6 +64,13 @@ export interface IStorageProvider {
    * @returns File metadata (size, contentType, etc.)
    */
   getMetadata(key: string): Promise<{ size: number; contentType: string; lastModified?: Date } | null>;
+
+  /**
+   * Purge CDN cache for a file (CloudFront invalidation)
+   * @param key - File key/path
+   * @returns True if purge was successful or not needed
+   */
+  purgeCache?(key: string): Promise<boolean>;
 }
 
 

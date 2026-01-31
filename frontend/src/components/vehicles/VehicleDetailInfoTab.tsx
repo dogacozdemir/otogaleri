@@ -205,6 +205,11 @@ export const VehicleDetailInfoTab = ({
               label="Renk"
               value={vehicle.color}
             />
+            <InfoItem
+              icon={<Gauge className="h-4 w-4" />}
+              label="Motor No"
+              value={vehicle.engine_no}
+            />
           </div>
         </CardContent>
       </Card>

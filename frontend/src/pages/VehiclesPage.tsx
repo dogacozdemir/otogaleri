@@ -82,9 +82,8 @@ const VehiclesPage = () => {
   // Use the extracted hook for data management
   const vehiclesData = useVehiclesData();
   
-  // Local state for modals and forms (not yet extracted)
+  // Local state for modals and forms (not yet extracted) - single viewMode for both Mevcut and Satılan tabs
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid');
-  const [soldViewMode, setSoldViewMode] = useState<'table' | 'grid'>('grid');
 
   // Modal states
   const [openAdd, setOpenAdd] = useState(false);
@@ -158,6 +157,7 @@ const VehiclesPage = () => {
     grade: "",
     cc: "",
     color: "",
+    engine_no: "",
     other: "",
     sale_price: "",
     sale_currency: "TRY",
@@ -353,6 +353,7 @@ const VehiclesPage = () => {
       grade: "",
       cc: "",
       color: "",
+      engine_no: "",
       other: "",
       sale_price: "",
       sale_currency: "TRY",
@@ -611,6 +612,7 @@ const VehiclesPage = () => {
       grade: vehicle.grade || "",
       cc: vehicle.cc?.toString() || "",
       color: vehicle.color || "",
+      engine_no: vehicle.engine_no || "",
       other: vehicle.other || "",
       sale_price: vehicle.sale_price?.toString() || "",
       sale_currency: vehicle.sale_currency || "TRY",
@@ -1273,39 +1275,13 @@ const VehiclesPage = () => {
       />
 
         <TabsContent value="sold" className="space-y-6">
-          {/* Action Bar */}
-          <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
-                  <div className="flex items-center gap-2">
-              {/* View Toggle */}
-              <div className="flex gap-1 border rounded-xl p-1 bg-muted">
-                            <Button
-                  variant={soldViewMode === "grid" ? "secondary" : "ghost"}
-                  size="icon"
-                  onClick={() => setSoldViewMode("grid")}
-                  className="h-9 w-9 rounded-lg"
-                            >
-                  <Grid3x3 className="h-4 w-4" />
-                            </Button>
-                              <Button
-                  variant={soldViewMode === "table" ? "secondary" : "ghost"}
-                  size="icon"
-                  onClick={() => setSoldViewMode("table")}
-                  className="h-9 w-9 rounded-lg"
-                              >
-                  <List className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                </div>
-
-          {/* Sold Vehicles Table/Grid */}
+          {/* Sold Vehicles Table/Grid - uses same viewMode as Mevcut Araçlar (controlled by switch in VehicleFilters) */}
           <SoldVehiclesTable
             vehicles={vehiclesData.filteredSoldVehicles}
             loading={vehiclesData.loading}
-            viewMode={soldViewMode}
+            viewMode={viewMode}
             currency={currency}
             onDetailClick={openDetailModal}
-            onViewModeChange={(mode: 'table' | 'grid') => setSoldViewMode(mode)}
           />
         </TabsContent>
         </Tabs>

@@ -35,6 +35,7 @@ export const CreateVehicleSchema = z.object({
   status: z.enum(["new", "used", "damaged"]).optional(),
   stock_status: z.enum(["in_stock", "sold", "reserved", "pending"]).optional(),
   location: sanitizedString,
+  engine_no: sanitizedString,
   target_profit: z.coerce.number().nonnegative().optional().nullable(),
   features: z.any().optional().nullable(), // JSON object, validate structure if needed
 }).strict();
@@ -58,6 +59,7 @@ export const UpdateVehicleSchema = z.object({
   status: z.enum(["new", "used", "damaged"]).optional(),
   stock_status: z.enum(["in_stock", "sold", "reserved", "pending"]).optional(),
   location: sanitizedString,
+  engine_no: sanitizedString,
   target_profit: z.coerce.number().nonnegative().optional().nullable(),
   features: z.any().optional().nullable(),
 }).strict();

@@ -54,6 +54,7 @@ export async function globalSearch(req: AuthRequest, res: Response) {
           v.model,
           v.production_year as year,
           v.color,
+          v.engine_no,
           v.fuel,
           v.transmission,
           v.features,
@@ -72,6 +73,7 @@ export async function globalSearch(req: AuthRequest, res: Response) {
           v.model LIKE ? OR 
           v.chassis_no LIKE ? OR
           v.color LIKE ? OR
+          v.engine_no LIKE ? OR
           v.fuel LIKE ? OR
           v.transmission LIKE ? OR
           v.other LIKE ? OR
@@ -94,6 +96,7 @@ export async function globalSearch(req: AuthRequest, res: Response) {
         searchTerm, // v.model
         searchTerm, // v.chassis_no
         searchTerm, // v.color
+        searchTerm, // v.engine_no
         searchTerm, // v.fuel
         searchTerm, // v.transmission
         searchTerm, // v.other

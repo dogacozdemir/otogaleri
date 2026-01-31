@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import zxcvbn from "zxcvbn";
 import { api, setToken } from "../api";
 import { Button } from "@/components/ui/button";
@@ -323,18 +323,12 @@ const AuthPage = () => {
                       <Label htmlFor="login-password" className="text-slate-700 dark:text-slate-300">
                         Şifre
                       </Label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          toast({
-                            title: "Yakında",
-                            description: "Şifre sıfırlama özelliği yakında eklenecek",
-                          });
-                        }}
+                      <Link
+                        to="/forgot-password"
                         className="text-xs font-medium text-primary hover:text-primary/80 hover:underline"
                       >
                         Şifrenizi mi unuttunuz?
-                      </button>
+                      </Link>
                     </div>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400 dark:text-slate-500" />

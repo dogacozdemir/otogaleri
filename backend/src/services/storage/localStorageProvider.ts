@@ -20,9 +20,15 @@ export class LocalStorageProvider implements IStorageProvider {
   }
 
   /**
-   * Generate a unique file key
+   * Generate a unique file key with tenant isolation
+   * Structure: tenants/{tenantId}/{folder}/{filename} or {folder}/{filename} if tenantId is not provided
    */
-  private generateKey(folder: string | undefined, filename: string | undefined, originalName?: string): string {
+  private generateKey(
+    folder: string | undefined, 
+    filename: string | undefined, 
+    tenantId?: number,
+    originalName?: string
+  ): string {
     const timestamp = Date.now();
     const random = Math.round(Math.random() * 1e9);
     
@@ -36,17 +42,24 @@ export class LocalStorageProvider implements IStorageProvider {
       finalFilename = `${timestamp}-${random}`;
     }
 
-    if (folder) {
-      return `${folder}/${finalFilename}`;
+    // Build path parts with tenant isolation
+    const parts: string[] = [];
+    if (tenantId) {
+      parts.push(`tenants/${tenantId}`);
     }
-    return finalFilename;
+    if (folder) {
+      parts.push(folder);
+    }
+    parts.push(finalFilename);
+    
+    return parts.join('/');
   }
 
   /**
    * Upload file buffer to local filesystem
    */
   async upload(buffer: Buffer, options: UploadOptions): Promise<UploadResult> {
-    const key = this.generateKey(options.folder, options.filename);
+    const key = this.generateKey(options.folder, options.filename, options.tenantId);
     const filePath = path.join(this.basePath, key);
     const folderPath = path.dirname(filePath);
 
@@ -93,7 +106,7 @@ export class LocalStorageProvider implements IStorageProvider {
   /**
    * Get public URL for a file
    */
-  async getUrl(key: string): Promise<string> {
+  async getUrl(key: string, isPublic?: boolean): Promise<string> {
     return `/uploads/${key}`;
   }
 
@@ -138,6 +151,14 @@ export class LocalStorageProvider implements IStorageProvider {
     } catch (error) {
       return null;
     }
+  }
+
+  /**
+   * Purge CDN cache (not applicable for local storage)
+   */
+  async purgeCache(key: string): Promise<boolean> {
+    // Local storage doesn't use CDN, so no-op
+    return true;
   }
 }
 

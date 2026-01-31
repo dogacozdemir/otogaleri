@@ -124,12 +124,12 @@ export async function bulkImportVehicles(req: AuthRequest, res: Response) {
 
         // Insert vehicle
         const [result] = await conn.query(
-          `INSERT INTO vehicles (
+            `INSERT INTO vehicles (
             tenant_id, vehicle_number, maker, model, production_year, arrival_date,
-            transmission, chassis_no, plate_number, km, fuel, grade, cc, color, other,
+            transmission, chassis_no, plate_number, km, fuel, grade, cc, color, engine_no, other,
             purchase_amount, purchase_currency, purchase_fx_rate_to_base, purchase_date,
             sale_price, sale_currency, status, stock_status, location, target_profit
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             req.tenantId,
             finalVehicleNumber,
@@ -145,6 +145,7 @@ export async function bulkImportVehicles(req: AuthRequest, res: Response) {
             vehicle.grade || null,
             vehicle.cc || null,
             vehicle.color || null,
+            vehicle.engine_no || null,
             vehicle.other || null,
             vehicle.purchase_amount || null,
             purchaseCurrency,

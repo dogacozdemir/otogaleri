@@ -98,12 +98,14 @@ export async function listVehicleImages(req: AuthRequest, res: Response) {
     );
 
     // Get URLs from storage service for each image
+    // Vehicle images are public (makePublic: true), so CDN URL will be used if configured
     const imagesArray = images as any[];
     const imagesWithUrls = await Promise.all(
       imagesArray.map(async (image) => {
         // Extract key from image_path (remove /uploads/ prefix if exists)
         const key = image.image_path.replace(/^\/uploads\//, '');
-        const url = await StorageService.getUrl(key);
+        // Vehicle images are public, pass isPublic=true for CDN optimization
+        const url = await StorageService.getUrl(key, true);
         return {
           ...image,
           url,
@@ -171,14 +173,21 @@ export async function uploadVehicleImage(req: AuthRequest, res: Response) {
     // Continue with upload but log the warning
   }
 
+  const conn = await dbPool.getConnection();
+  await conn.beginTransaction();
+  
+  let uploadResult: any = null;
+
   try {
     // Check if vehicle exists and belongs to tenant
-    const [vehicleRows] = await dbPool.query(
+    const [vehicleRows] = await conn.query(
       "SELECT id FROM vehicles WHERE id = ? AND tenant_id = ?",
       [vehicle_id, req.tenantId]
     );
     const vehicleRowsArray = vehicleRows as any[];
     if (vehicleRowsArray.length === 0) {
+      await conn.rollback();
+      conn.release();
       return res.status(404).json({ error: "Vehicle not found" });
     }
 
@@ -192,22 +201,23 @@ export async function uploadVehicleImage(req: AuthRequest, res: Response) {
       optimizedBuffer = req.file.buffer;
     }
 
-    // Get display order (next available)
-    const [orderRows] = await dbPool.query(
-      "SELECT COALESCE(MAX(display_order), 0) + 1 as next_order FROM vehicle_images WHERE vehicle_id = ?",
-      [vehicle_id]
+    // Get display order (next available) - within transaction
+    const [orderRows] = await conn.query(
+      "SELECT COALESCE(MAX(display_order), 0) + 1 as next_order FROM vehicle_images WHERE vehicle_id = ? AND tenant_id = ?",
+      [vehicle_id, req.tenantId]
     );
     const nextOrder = (orderRows as any[])[0]?.next_order || 1;
 
-    // Upload to storage (S3 or local)
-    const uploadResult = await StorageService.upload(optimizedBuffer, {
+    // Upload to storage (S3 or local) - BEFORE database insert
+    uploadResult = await StorageService.upload(optimizedBuffer, {
       folder: "vehicles",
+      tenantId: req.tenantId,
       contentType: "image/webp",
       makePublic: true, // Make images publicly accessible
     });
 
-    // Insert into database
-    const [result] = await dbPool.query(
+    // Insert into database (within transaction)
+    const [result] = await conn.query(
       `INSERT INTO vehicle_images (
         tenant_id, vehicle_id, image_path, image_filename,
         file_size, mime_type, display_order, uploaded_by
@@ -225,6 +235,12 @@ export async function uploadVehicleImage(req: AuthRequest, res: Response) {
     );
 
     const imageId = (result as any).insertId;
+    
+    // Commit transaction before generating URL (to ensure data consistency)
+    await conn.commit();
+    conn.release();
+
+    // Get the inserted image
     const [rows] = await dbPool.query(
       `SELECT 
         id,
@@ -240,13 +256,37 @@ export async function uploadVehicleImage(req: AuthRequest, res: Response) {
     );
 
     const image = (rows as any[])[0];
-    const url = await StorageService.getUrl(image.image_path);
+    
+    // Normalize key (remove /uploads/ prefix if exists)
+    const key = image.image_path.replace(/^\/uploads\//, '');
+    // Vehicle images are public, use CDN URL if configured
+    const url = await StorageService.getUrl(key, true);
+
+    // Purge CDN cache asynchronously (don't await - background task)
+    StorageService.purgeCache(key).catch((error) => {
+      console.error(`[vehicleImage] CDN purge failed for ${key}:`, error);
+    });
 
     res.status(201).json({
       ...image,
       url,
     });
   } catch (err) {
+    // Rollback database transaction
+    await conn.rollback();
+    conn.release();
+
+    // Cleanup: Delete file from S3 if upload was successful but DB insert failed
+    if (uploadResult && uploadResult.key) {
+      try {
+        await StorageService.delete(uploadResult.key);
+        console.log(`[vehicleImage] Cleaned up S3 file after failed DB insert: ${uploadResult.key}`);
+      } catch (cleanupError) {
+        console.error(`[vehicleImage] Failed to cleanup S3 file ${uploadResult.key}:`, cleanupError);
+        // Don't throw - cleanup failure shouldn't prevent error response
+      }
+    }
+
     console.error("[vehicleImage] Upload error", err);
     res.status(500).json({ error: "Failed to upload image" });
   }
@@ -295,7 +335,11 @@ export async function setPrimaryImage(req: AuthRequest, res: Response) {
     );
 
     const image = (updatedRows as any[])[0];
-    const url = await StorageService.getUrl(image.image_path);
+    
+    // Normalize key (remove /uploads/ prefix if exists)
+    const key = image.image_path.replace(/^\/uploads\//, '');
+    // Vehicle images are public, use CDN URL if configured
+    const url = await StorageService.getUrl(key, true);
 
     res.json({
       ...image,
@@ -311,32 +355,58 @@ export async function deleteVehicleImage(req: AuthRequest, res: Response) {
   const vehicle_id = req.params.vehicle_id || req.params.id;
   const image_id = req.params.image_id;
 
+  const conn = await dbPool.getConnection();
+  await conn.beginTransaction();
+
   try {
-    // Check if image exists and belongs to tenant
-    const [imageRows] = await dbPool.query(
+    // Check if image exists and belongs to tenant (within transaction)
+    const [imageRows] = await conn.query(
       `SELECT image_filename, image_path FROM vehicle_images 
        WHERE id = ? AND vehicle_id = ? AND tenant_id = ?`,
       [image_id, vehicle_id, req.tenantId]
     );
     const imageRowsArray = imageRows as any[];
     if (imageRowsArray.length === 0) {
+      await conn.rollback();
+      conn.release();
       return res.status(404).json({ error: "Image not found" });
     }
 
     const image = imageRowsArray[0];
     const storageKey = image.image_path; // Use the stored key/path
+    
+    // Normalize key (remove /uploads/ prefix if exists)
+    const normalizedKey = storageKey.replace(/^\/uploads\//, '');
 
-    // Delete from storage
-    await StorageService.delete(storageKey);
-
-    // Delete from database
-    await dbPool.query(
+    // Delete from database FIRST (within transaction)
+    await conn.query(
       "DELETE FROM vehicle_images WHERE id = ? AND tenant_id = ?",
       [image_id, req.tenantId]
     );
 
+    // Commit transaction before deleting from storage
+    // If storage delete fails, DB record is already gone (acceptable trade-off)
+    await conn.commit();
+    conn.release();
+
+    // Delete from storage (after successful DB deletion)
+    try {
+      await StorageService.delete(normalizedKey);
+      
+      // Purge CDN cache asynchronously (don't await - background task)
+      StorageService.purgeCache(normalizedKey).catch((error) => {
+        console.error(`[vehicleImage] CDN purge failed for ${normalizedKey}:`, error);
+      });
+    } catch (storageError) {
+      // Log but don't fail - DB record is already deleted
+      console.error(`[vehicleImage] Failed to delete file from storage ${normalizedKey}:`, storageError);
+      // Could implement a cleanup job here for orphaned files
+    }
+
     res.json({ message: "Image deleted successfully" });
   } catch (err) {
+    await conn.rollback();
+    conn.release();
     console.error("[vehicleImage] Delete error", err);
     res.status(500).json({ error: "Failed to delete image" });
   }

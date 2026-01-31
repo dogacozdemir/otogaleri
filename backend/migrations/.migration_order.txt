@@ -16,6 +16,8 @@
 011_add_inventory_tables.sql
 012_add_track_stock_to_inventory.sql
 013_seed_data.sql
+014_add_engine_no.sql
+015_add_password_reset_tokens.sql
 
 # Not: Eğer migration sırası farklıysa, dosya isimlerini buna göre düzenleyin
 

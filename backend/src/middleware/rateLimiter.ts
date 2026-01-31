@@ -71,6 +71,30 @@ export const signupLimiter = rateLimit({
 });
 
 /**
+ * Forgot password rate limiter
+ * - 5 requests per 15 minutes per IP (abuse önleme)
+ */
+export const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,
+  message: "Çok fazla şifre sıfırlama talebi. Lütfen 15 dakika sonra tekrar deneyin.",
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+/**
+ * Reset password rate limiter
+ * - 10 requests per 15 minutes per IP
+ */
+export const resetPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: "Çok fazla deneme. Lütfen 15 dakika sonra tekrar deneyin.",
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+/**
  * File upload rate limiter
  * - 10 uploads per hour per IP
  * - Prevents abuse of file storage

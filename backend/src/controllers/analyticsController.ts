@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { AuthRequest } from "../middleware/auth";
 import { dbPool } from "../config/database";
+import { StorageService } from "../services/storage/storageService";
 
 export async function getBrandProfit(req: AuthRequest, res: Response) {
   const { limit = 10, start_date, end_date } = req.query;
@@ -723,7 +724,7 @@ export async function getRecentSales(req: AuthRequest, res: Response) {
         v.maker,
         v.model,
         v.production_year as year,
-        primary_img.image_filename as primary_image_filename,
+        primary_img.image_path as primary_image_path,
         CASE 
           WHEN vis.id IS NOT NULL THEN 'Taksitli'
           ELSE 'Peşin'
@@ -734,7 +735,7 @@ export async function getRecentSales(req: AuthRequest, res: Response) {
       LEFT JOIN (
         SELECT 
           vi.vehicle_id,
-          vi.image_filename,
+          vi.image_path,
           ROW_NUMBER() OVER (
             PARTITION BY vi.vehicle_id 
             ORDER BY vi.is_primary DESC, vi.display_order ASC, vi.created_at ASC
@@ -750,7 +751,15 @@ export async function getRecentSales(req: AuthRequest, res: Response) {
     );
 
     const rowsArray = rows as any[];
-    const formattedRows = rowsArray.map(row => ({
+    const normalizeKey = (path: string) => (path || "").replace(/^\/uploads\//, "");
+    const withUrls = await Promise.all(
+      rowsArray.map(async (row: any) => {
+        const key = row.primary_image_path ? normalizeKey(row.primary_image_path) : null;
+        const imageUrl = key ? await StorageService.getUrl(key, true) : null;
+        return { ...row, imageUrl };
+      })
+    );
+    const formattedRows = withUrls.map((row: any) => ({
       id: row.id,
       vehicle_id: row.vehicle_id,
       sale_date: row.sale_date,
@@ -758,7 +767,7 @@ export async function getRecentSales(req: AuthRequest, res: Response) {
       maker: row.maker,
       model: row.model,
       year: row.year,
-      image: row.primary_image_filename ? `/uploads/vehicles/${row.primary_image_filename}` : null,
+      image: row.imageUrl,
       price: row.sale_amount,
       currency: row.sale_currency,
       payment_type: row.payment_type,

@@ -3,6 +3,7 @@ import { getOrFetchRate } from "./fxCacheService";
 import { SupportedCurrency } from "./currencyService";
 import { MoneyService } from "./moneyService";
 import { TenantAwareQuery } from "../repositories/tenantAwareQuery";
+import { StorageService } from "./storage/storageService";
 
 export interface Vehicle {
   id: number;
@@ -22,6 +23,7 @@ export interface Vehicle {
   status: string;
   stock_status: string;
   location: string | null;
+  engine_no: string | null;
   target_profit: number | null;
   features: any;
   is_sold: boolean;
@@ -69,6 +71,7 @@ export interface CreateVehicleParams {
   status?: string;
   stock_status?: string;
   location?: string | null;
+  engine_no?: string | null;
   target_profit?: number | null;
   features?: any;
 }
@@ -116,7 +119,7 @@ export class VehicleService {
         b.name as branch_name,
         COALESCE(cost_summary.total_costs, 0) as total_costs,
         COALESCE(cost_summary.cost_count, 0) as cost_count,
-        primary_img.image_filename as primary_image_filename,
+        primary_img.image_path as primary_image_path,
         vis_latest.id as installment_sale_id,
         vis_latest.total_amount as installment_total_amount,
         vis_latest.down_payment as installment_down_payment,
@@ -141,7 +144,7 @@ export class VehicleService {
       LEFT JOIN (
         SELECT 
           vi.vehicle_id,
-          vi.image_filename,
+          vi.image_path,
           ROW_NUMBER() OVER (
             PARTITION BY vi.vehicle_id 
             ORDER BY vi.is_primary DESC, vi.display_order ASC, vi.created_at ASC
@@ -202,9 +205,9 @@ export class VehicleService {
     }
 
     if (params.search) {
-      query += " AND (v.maker LIKE ? OR v.model LIKE ? OR v.chassis_no LIKE ? OR v.plate_number LIKE ?)";
+      query += " AND (v.maker LIKE ? OR v.model LIKE ? OR v.chassis_no LIKE ? OR v.plate_number LIKE ? OR v.engine_no LIKE ?)";
       const searchParam = `%${params.search}%`;
-      queryParams.push(searchParam, searchParam, searchParam, searchParam);
+      queryParams.push(searchParam, searchParam, searchParam, searchParam, searchParam);
     }
 
     query += " ORDER BY v.created_at DESC LIMIT ? OFFSET ?";
@@ -237,14 +240,29 @@ export class VehicleService {
       }, {} as Record<number, any[]>);
     }
 
-    // Format vehicles
-    const formattedVehicles = vehiclesArray.map(vehicle => {
-      const formatted: any = {
-        ...vehicle,
-        primary_image_url: vehicle.primary_image_filename
-          ? `/uploads/vehicles/${vehicle.primary_image_filename}`
-          : null,
-      };
+    // Format vehicles and generate signed URLs for images
+    // Performance: Using Promise.all for parallel signed URL generation
+    // This ensures all URLs are generated concurrently, not sequentially
+    // For 100 vehicles, this reduces latency from ~100s (sequential) to ~1s (parallel)
+    const formattedVehicles = await Promise.all(
+      vehiclesArray.map(async (vehicle) => {
+        let primaryImageUrl: string | null = null;
+        if (vehicle.primary_image_path) {
+          try {
+            // Normalize key (remove /uploads/ prefix if exists)
+            const key = vehicle.primary_image_path.replace(/^\/uploads\//, '');
+            // Vehicle images are public, use CDN URL if configured (parallelized via Promise.all above)
+            primaryImageUrl = await StorageService.getUrl(key, true);
+          } catch (urlError) {
+            console.error(`[VehicleService] Failed to generate URL for ${vehicle.primary_image_path}:`, urlError);
+            primaryImageUrl = null;
+          }
+        }
+
+        const formatted: any = {
+          ...vehicle,
+          primary_image_url: primaryImageUrl,
+        };
 
       // Add installment info
       if (vehicle.installment_sale_id) {
@@ -263,7 +281,7 @@ export class VehicleService {
       }
 
       // Clean up temporary fields
-      delete formatted.primary_image_filename;
+      delete formatted.primary_image_path;
       delete formatted.installment_total_amount;
       delete formatted.installment_down_payment;
       delete formatted.installment_installment_count;
@@ -275,8 +293,9 @@ export class VehicleService {
       delete formatted.installment_total_paid;
       delete formatted.installment_remaining_balance;
 
-      return formatted;
-    });
+        return formatted;
+      })
+    );
 
     // Get total count
     const [countRows] = await tenantQuery.query(
@@ -394,6 +413,7 @@ export class VehicleService {
         status: params.status || "used",
         stock_status: params.stock_status || "in_stock",
         location: (params.location && params.location.trim() !== '') ? params.location : null,
+        engine_no: (params.engine_no && params.engine_no.trim() !== '') ? params.engine_no : null,
         target_profit: params.target_profit ?? null,
         features: params.features ? JSON.stringify(params.features) : null,
       });
@@ -428,16 +448,16 @@ export class VehicleService {
     const [rows] = await tenantQuery.query(
       `SELECT v.*, b.name as branch_name,
         COALESCE(
-          (SELECT CONCAT('/uploads/vehicles/', image_filename) 
+          (SELECT image_path 
            FROM vehicle_images 
            WHERE vehicle_id = v.id AND is_primary = TRUE AND tenant_id = v.tenant_id 
            LIMIT 1),
-          (SELECT CONCAT('/uploads/vehicles/', image_filename) 
+          (SELECT image_path 
            FROM vehicle_images 
            WHERE vehicle_id = v.id AND tenant_id = v.tenant_id 
            ORDER BY display_order ASC, created_at ASC
            LIMIT 1)
-        ) as primary_image_url
+        ) as primary_image_path
        FROM vehicles v 
        LEFT JOIN branches b ON v.branch_id = b.id 
        WHERE v.id = ? AND v.tenant_id = ?`,
@@ -450,6 +470,23 @@ export class VehicleService {
     }
 
     const vehicle = rowsArray[0] as any;
+    
+    // Generate URL for primary image (CDN if configured, since vehicle images are public)
+    let primaryImageUrl: string | null = null;
+    if (vehicle.primary_image_path) {
+      try {
+        // Normalize key (remove /uploads/ prefix if exists)
+        const key = vehicle.primary_image_path.replace(/^\/uploads\//, '');
+        // Vehicle images are public, use CDN URL if configured
+        primaryImageUrl = await StorageService.getUrl(key, true);
+      } catch (urlError) {
+        console.error(`[VehicleService] Failed to generate URL for ${vehicle.primary_image_path}:`, urlError);
+        primaryImageUrl = null;
+      }
+    }
+    
+    // Add primary_image_url to vehicle object
+    vehicle.primary_image_url = primaryImageUrl;
     const [costs] = await tenantQuery.query(
       "SELECT * FROM vehicle_costs WHERE vehicle_id = ? AND tenant_id = ? ORDER BY cost_date DESC",
       [vehicleId, tenantQuery.getTenantId()]

@@ -58,10 +58,12 @@ export class StorageService {
 
   /**
    * Get file URL
+   * @param key - File key/path
+   * @param isPublic - Whether file is publicly accessible (for CDN optimization)
    */
-  static async getUrl(key: string): Promise<string> {
+  static async getUrl(key: string, isPublic: boolean = false): Promise<string> {
     const provider = this.getInstance();
-    return provider.getUrl(key);
+    return provider.getUrl(key, isPublic);
   }
 
   /**
@@ -78,6 +80,18 @@ export class StorageService {
   static async getMetadata(key: string): Promise<{ size: number; contentType: string; lastModified?: Date } | null> {
     const provider = this.getInstance();
     return provider.getMetadata(key);
+  }
+
+  /**
+   * Purge CDN cache for a file
+   * Runs asynchronously and doesn't block the main request
+   */
+  static async purgeCache(key: string): Promise<boolean> {
+    const provider = this.getInstance();
+    if (provider.purgeCache) {
+      return provider.purgeCache(key);
+    }
+    return true; // Not an error if provider doesn't support purge
   }
 }
 

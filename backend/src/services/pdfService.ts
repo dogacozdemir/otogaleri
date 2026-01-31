@@ -17,6 +17,7 @@ interface SaleData {
     chassis_no: string | null;
     km: number | null;
     color: string | null;
+    engine_no: string | null;
     fuel: string | null;
     transmission: string | null;
   };
@@ -122,6 +123,7 @@ export function generateSalesContract(saleData: SaleData, res: Response): void {
     ["Şasi No", saleData.vehicle.chassis_no || "-"],
     ["Kilometre", saleData.vehicle.km ? `${saleData.vehicle.km.toLocaleString()} km` : "-"],
     ["Renk", saleData.vehicle.color || "-"],
+    ["Motor No", saleData.vehicle.engine_no || "-"],
     ["Yakıt", saleData.vehicle.fuel || "-"],
     ["Vites", saleData.vehicle.transmission || "-"],
     ["Plaka", saleData.plate_number || "Henüz tescil edilmedi"],
@@ -313,6 +315,7 @@ export function generateInvoice(saleData: SaleData, res: Response): void {
     `${saleData.vehicle.maker || ""} ${saleData.vehicle.model || ""}`,
     saleData.vehicle.production_year ? `Model Yılı: ${saleData.vehicle.production_year}` : "",
     saleData.vehicle.chassis_no ? `Şasi No: ${saleData.vehicle.chassis_no}` : "",
+    saleData.vehicle.engine_no ? `Motor No: ${saleData.vehicle.engine_no}` : "",
     saleData.plate_number ? `Plaka: ${saleData.plate_number}` : "",
   ]
     .filter(Boolean)

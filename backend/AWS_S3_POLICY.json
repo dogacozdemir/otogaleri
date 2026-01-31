@@ -1,0 +1,157 @@
+{
+  "description": "AWS S3 Infrastructure Policies for Oto Galeri Application",
+  "version": "1.0.0",
+  "lastUpdated": "2026-01-28",
+  
+  "iamPolicy": {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Sid": "AllowPutObjectForTenantIsolatedUploads",
+        "Effect": "Allow",
+        "Action": [
+          "s3:PutObject",
+          "s3:PutObjectAcl"
+        ],
+        "Resource": "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/vehicles/*",
+        "Condition": {
+          "StringEquals": {
+            "s3:x-amz-acl": "public-read"
+          }
+        }
+      },
+      {
+        "Sid": "AllowGetObjectForTenantIsolatedReads",
+        "Effect": "Allow",
+        "Action": [
+          "s3:GetObject"
+        ],
+        "Resource": "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/vehicles/*"
+      },
+      {
+        "Sid": "AllowDeleteObjectForTenantIsolatedDeletes",
+        "Effect": "Allow",
+        "Action": [
+          "s3:DeleteObject"
+        ],
+        "Resource": "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/vehicles/*"
+      },
+      {
+        "Sid": "AllowListBucketForTenantIsolation",
+        "Effect": "Allow",
+        "Action": [
+          "s3:ListBucket"
+        ],
+        "Resource": "arn:aws:s3:::akilligaleri-photos-prod",
+        "Condition": {
+          "StringLike": {
+            "s3:prefix": "tenants/*/vehicles/*"
+          }
+        }
+      },
+      {
+        "Sid": "AllowHeadObjectForMetadataChecks",
+        "Effect": "Allow",
+        "Action": [
+          "s3:GetObjectMetadata"
+        ],
+        "Resource": "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/vehicles/*"
+      }
+    ]
+  },
+
+  "corsPolicy": {
+    "CORSRules": [
+      {
+        "AllowedHeaders": [
+          "Authorization",
+          "Content-Length",
+          "Content-Type",
+          "x-amz-date",
+          "x-amz-content-sha256",
+          "x-amz-user-agent"
+        ],
+        "AllowedMethods": [
+          "GET",
+          "PUT",
+          "POST",
+          "DELETE",
+          "HEAD"
+        ],
+        "AllowedOrigins": [
+          "https://yourdomain.com",
+          "https://*.yourdomain.com",
+          "http://localhost:3000",
+          "http://localhost:5173"
+        ],
+        "ExposeHeaders": [
+          "ETag",
+          "x-amz-server-side-encryption",
+          "x-amz-request-id",
+          "x-amz-id-2"
+        ],
+        "MaxAgeSeconds": 3600
+      }
+    ]
+  },
+
+  "bucketPolicy": {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Sid": "AllowPublicReadForTenantVehicles",
+        "Effect": "Allow",
+        "Principal": "*",
+        "Action": "s3:GetObject",
+        "Resource": "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/vehicles/*",
+        "Condition": {
+          "StringEquals": {
+            "s3:x-amz-acl": "public-read"
+          }
+        }
+      }
+    ]
+  },
+
+  "notes": {
+    "iamPolicy": {
+      "description": "Minimum required permissions for application IAM user/role",
+      "usage": "Attach this policy to your IAM user or role that the application uses",
+      "replacements": [
+        "akilligaleri-photos-prod: Replace with your actual S3 bucket name"
+      ],
+      "security": [
+        "Principle of least privilege: Only grants access to tenants/*/vehicles/* path",
+        "Prevents access to other tenant data or root bucket operations",
+        "Supports multi-tenant isolation at storage level"
+      ]
+    },
+    "corsPolicy": {
+      "description": "CORS configuration for S3 bucket",
+      "usage": "Apply via AWS Console > S3 > Bucket > Permissions > CORS, or AWS CLI",
+      "awsCliCommand": "aws s3api put-bucket-cors --bucket akilligaleri-photos-prod --cors-configuration file://cors-policy.json",
+      "replacements": [
+        "yourdomain.com: Replace with your production domain",
+        "localhost:3000, localhost:5173: Add your development origins"
+      ],
+      "security": [
+        "Restricts origins to known domains",
+        "Allows necessary headers for signed URL requests",
+        "MaxAgeSeconds: 3600 (1 hour) reduces preflight requests"
+      ]
+    },
+    "bucketPolicy": {
+      "description": "Optional: Public read access for vehicle images (if using public-read ACL)",
+      "usage": "Only apply if you want public access without signed URLs",
+      "recommendation": "For better security, use signed URLs instead and remove this policy"
+    },
+    "implementation": {
+      "step1": "Create IAM user/role with the IAM policy attached",
+      "step2": "Configure AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY in .env (or use IAM role)",
+      "step3": "Apply CORS policy to S3 bucket",
+      "step4": "Update CORS AllowedOrigins with your actual domains",
+      "step5": "Test upload/download functionality",
+      "step6": "Monitor CloudTrail for access patterns"
+    }
+  }
+}
