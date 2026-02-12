@@ -74,7 +74,7 @@ export const VehicleFilters = ({
     if (stockStatusFilter) {
       const stockLabels: Record<string, string> = {
         in_stock: "Stokta",
-        on_sale: "Satışta",
+        on_sale: "Yolda",
         reserved: "Rezerve",
         sold: "Satıldı",
       };
@@ -99,7 +99,7 @@ export const VehicleFilters = ({
   };
 
   return (
-    <div className="bg-card rounded-2xl shadow-sm border border-border p-6 space-y-4">
+    <div className="bg-card rounded-2xl shadow-sm border border-border p-4 sm:p-6 space-y-4">
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Search */}
         <div className="relative flex-1">
@@ -108,7 +108,7 @@ export const VehicleFilters = ({
             placeholder="Marka, model, şasi no veya araç numarası ara..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="pl-12 h-12 rounded-xl border-border hover:border-primary focus-visible:ring-primary focus-visible:border-primary transition-colors"
+            className="pl-12 min-h-[48px] h-12 rounded-xl border-border hover:border-primary focus-visible:ring-primary focus-visible:border-primary transition-colors"
           />
         </div>
 
@@ -127,7 +127,7 @@ export const VehicleFilters = ({
                 <SelectContent>
                   <SelectItem value="all">Tümü</SelectItem>
                   <SelectItem value="in_stock">Stokta</SelectItem>
-                  <SelectItem value="on_sale">Satışta</SelectItem>
+                  <SelectItem value="on_sale">Yolda</SelectItem>
                   <SelectItem value="reserved">Rezerve</SelectItem>
                   <SelectItem value="sold">Satıldı</SelectItem>
                 </SelectContent>
@@ -231,7 +231,7 @@ export const VehicleFilters = ({
                 onClick={() => {
                   if (filter === "Satılmamış" || filter === "Satılmış") setIsSoldFilter("");
                   else if (filter === "Sıfır" || filter === "İkinci El" || filter === "Hasarlı" || filter === "Onarılmış") setStatusFilter("");
-                  else if (filter === "Stokta" || filter === "Satışta" || filter === "Rezerve" || filter === "Satıldı") setStockStatusFilter("");
+                  else if (filter === "Stokta" || filter === "Yolda" || filter === "Rezerve" || filter === "Satıldı") setStockStatusFilter("");
                   else if (filter.includes("Peşin") || filter.includes("Taksitli")) setSoldVehiclesFilter("all");
                 }} 
               />
@@ -432,7 +432,7 @@ export const VehicleFilters = ({
                   size="icon"
                   onClick={() => onViewModeChange("grid")}
                   className={cn(
-                    "h-9 w-9 rounded-lg transition-all",
+                    "min-h-[44px] min-w-[44px] h-9 w-9 sm:h-9 sm:w-9 rounded-lg transition-all",
                     viewMode === "grid" 
                       ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md" 
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -445,7 +445,7 @@ export const VehicleFilters = ({
                   size="icon"
                   onClick={() => onViewModeChange("table")}
                   className={cn(
-                    "h-9 w-9 rounded-lg transition-all",
+                    "min-h-[44px] min-w-[44px] h-9 w-9 sm:h-9 sm:w-9 rounded-lg transition-all",
                     viewMode === "table" 
                       ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md" 
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"

@@ -79,8 +79,8 @@
           "HEAD"
         ],
         "AllowedOrigins": [
-          "https://yourdomain.com",
-          "https://*.yourdomain.com",
+          "https://akilligaleri.com",
+          "https://app.akilligaleri.com",
           "http://localhost:3000",
           "http://localhost:5173"
         ],
@@ -130,9 +130,9 @@
       "description": "CORS configuration for S3 bucket",
       "usage": "Apply via AWS Console > S3 > Bucket > Permissions > CORS, or AWS CLI",
       "awsCliCommand": "aws s3api put-bucket-cors --bucket akilligaleri-photos-prod --cors-configuration file://cors-policy.json",
-      "replacements": [
-        "yourdomain.com: Replace with your production domain",
-        "localhost:3000, localhost:5173: Add your development origins"
+        "replacements": [
+        "Production: https://akilligaleri.com, https://app.akilligaleri.com",
+        "localhost:3000, localhost:5173: Development origins"
       ],
       "security": [
         "Restricts origins to known domains",

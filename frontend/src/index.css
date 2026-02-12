@@ -156,6 +156,7 @@
 
   html {
     overflow-y: scroll; /* Scrollbar'ı her zaman görünür tut - layout shift'i önler */
+    overflow-x: hidden; /* Mobilde sayfa yatay kaymasın */
   }
 
   body {
@@ -163,6 +164,19 @@
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden; /* Mobilde sayfa yatay kaymasın */
+  }
+
+  /* App root: yatay taşmayı önle */
+  #root {
+    overflow-x: hidden;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* Sayfa içeriği: geniş tablo/grid yatay taşma yapmasın */
+  .main-content-inner > * {
+    min-width: 0;
   }
 
   /* ESNAF-FOCUSED COMPONENT STYLES */

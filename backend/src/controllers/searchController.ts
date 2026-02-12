@@ -45,6 +45,7 @@ export async function globalSearch(req: AuthRequest, res: Response) {
   try {
     // Araç arama (features JSON içinde de ara)
     if (type === 'all' || type === 'vehicles') {
+      // Not: engine_no sütunu migration 014_add_engine_no.sql ile eklenir; yoksa sorgu bu sütunsuz çalışır
       const vehicleQuery = `
         SELECT DISTINCT
           v.id,
@@ -54,7 +55,6 @@ export async function globalSearch(req: AuthRequest, res: Response) {
           v.model,
           v.production_year as year,
           v.color,
-          v.engine_no,
           v.fuel,
           v.transmission,
           v.features,
@@ -67,13 +67,12 @@ export async function globalSearch(req: AuthRequest, res: Response) {
           CONCAT('/vehicles/', v.id) as url
         FROM vehicles v
         LEFT JOIN vehicle_sales vs ON v.id = vs.vehicle_id AND vs.tenant_id = ?
-        WHERE v.tenant_id = ? 
+        WHERE v.tenant_id = ?
         AND (
-          v.maker LIKE ? OR 
-          v.model LIKE ? OR 
+          v.maker LIKE ? OR
+          v.model LIKE ? OR
           v.chassis_no LIKE ? OR
           v.color LIKE ? OR
-          v.engine_no LIKE ? OR
           v.fuel LIKE ? OR
           v.transmission LIKE ? OR
           v.other LIKE ? OR
@@ -90,25 +89,24 @@ export async function globalSearch(req: AuthRequest, res: Response) {
         LIMIT ?
       `;
       const vehicleParams = [
-        tenantId, // JOIN için
-        tenantId, // WHERE için
-        searchTerm, // v.maker
-        searchTerm, // v.model
-        searchTerm, // v.chassis_no
-        searchTerm, // v.color
-        searchTerm, // v.engine_no
-        searchTerm, // v.fuel
-        searchTerm, // v.transmission
-        searchTerm, // v.other
-        searchTerm, // v.grade
-        searchTerm, // v.plate_number
-        searchTerm, // CAST(v.km AS CHAR)
-        searchTerm, // CAST(v.production_year AS CHAR)
-        searchTerm, // CAST(v.cc AS CHAR)
-        searchTerm, // CONCAT(...)
-        searchTerm, // v.features
-        searchTerm, // vs.plate_number
-        limitNum // LIMIT
+        tenantId,
+        tenantId,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        searchTerm,
+        limitNum,
       ];
       
       const [vehicles] = await dbPool.query(vehicleQuery, vehicleParams);

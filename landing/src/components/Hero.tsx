@@ -17,7 +17,7 @@ const item = {
 
 export function Hero() {
   return (
-    <section className="relative min-h-[90vh] flex flex-col items-center justify-center px-4 py-24 overflow-hidden">
+    <section className="relative min-h-[100dvh] sm:min-h-[90vh] flex flex-col items-center justify-center px-4 py-24 overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-primary-950/30 via-slate-950 to-slate-950" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(59,130,246,0.15),transparent)]" />
       <motion.div
@@ -49,9 +49,11 @@ export function Hero() {
         </motion.p>
         <motion.div variants={item} className="flex flex-wrap items-center justify-center gap-4">
           <a
-            href="#cta"
+            href="https://app.akilligaleri.com/login"
+            target="_blank"
+            rel="noopener noreferrer"
             className={cn(
-              "inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 font-semibold",
+              "inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 min-h-[48px] font-semibold",
               "bg-primary-500 text-white shadow-lg shadow-primary-500/25 hover:bg-primary-600 transition-colors"
             )}
           >
@@ -59,11 +61,11 @@ export function Hero() {
             Ücretsiz Demoyu Başlat
           </a>
           <a
-            href="https://akilligaleri.com"
+            href="https://app.akilligaleri.com"
             target="_blank"
             rel="noopener noreferrer"
             className={cn(
-              "inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 font-semibold",
+              "inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 min-h-[48px] font-semibold",
               "border border-slate-600 bg-slate-800/50 text-slate-200 hover:bg-slate-800 transition-colors"
             )}
           >

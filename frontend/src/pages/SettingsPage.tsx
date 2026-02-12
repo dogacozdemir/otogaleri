@@ -384,7 +384,7 @@ export default function SettingsPage() {
                          role === "sales" ? "Satış" :
                          role === "accounting" ? "Muhasebe" : "Diğer"}
                       </h3>
-                      <div className="overflow-x-auto">
+                      <div className="w-full min-w-0 overflow-x-auto">
                         <Table>
                           <TableHeader>
                             <TableRow>

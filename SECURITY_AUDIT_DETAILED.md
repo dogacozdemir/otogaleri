@@ -84,7 +84,8 @@ app.use(cors({
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
   'http://localhost:5173',
   'http://localhost:5175',
-  'https://yourdomain.com'
+  'https://akilligaleri.com',
+  'https://app.akilligaleri.com'
 ];
 
 app.use(cors({

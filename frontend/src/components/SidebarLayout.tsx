@@ -144,7 +144,7 @@ const SidebarLayout = () => {
     navigate("/login", { replace: true });
   }, [navigate]);
 
-  const galleryName = useMemo(() => tenant?.name ?? "Akıllı Galeri", [tenant?.name]);
+  const galleryName = "Akıllı Galeri";
   
   // Get user initials for avatar
   const getUserInitials = useCallback(() => {
@@ -188,9 +188,11 @@ const SidebarLayout = () => {
         className={`
           fixed z-40 top-0 left-0 h-screen bg-[#003d82] dark:bg-[#002952] text-white transform
           transition-all duration-300 ease-in-out shadow-xl overflow-hidden
-          ${sidebarCollapsed && !isMobile ? "w-16" : "w-64"}
+          ${isMobile ? "w-full max-w-[85vw]" : sidebarCollapsed ? "w-16" : "w-64"}
           ${open || !isMobile ? "translate-x-0" : "-translate-x-full"}
-          lg:translate-x-0
+          lg:translate-x-0 lg:w-64
+          ${sidebarCollapsed && !isMobile ? "lg:w-16" : ""}
+          pt-[env(safe-area-inset-top)]
         `}
         aria-hidden={!open && isMobile}
       >
@@ -229,7 +231,7 @@ const SidebarLayout = () => {
           </div>
           <button 
             onClick={() => setOpen(false)}
-            className="lg:hidden p-2 rounded-lg hover:bg-white/10 transition-colors"
+            className="lg:hidden min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors"
             aria-label="Sidebar'ı kapat"
           >
             <X className="w-5 h-5 text-white" />
@@ -343,26 +345,27 @@ const SidebarLayout = () => {
         </div>
       </aside>
 
-      {/* Main content - Offset for fixed sidebar */}
-      <div className={`flex flex-col flex-1 min-h-screen transition-all duration-300 ${sidebarCollapsed && !isMobile ? 'lg:ml-16' : 'lg:ml-64'}`}>
-        {/* Header - Fixed height h-20 (80px) matching sidebar */}
-        <header className="w-full bg-card/95 backdrop-blur-md shadow-sm border-b border-border sticky top-0 z-20 h-20 flex-shrink-0">
+      {/* Main content - Offset for fixed sidebar; min-w-0 prevents flex child from overflowing */}
+      <div className={`flex flex-col flex-1 min-h-screen min-w-0 transition-all duration-300 ${sidebarCollapsed && !isMobile ? 'lg:ml-16' : 'lg:ml-64'}`}>
+        {/* Header - Fixed height h-20 (80px) matching sidebar; safe area for notch */}
+        <header className="w-full bg-card/95 backdrop-blur-md shadow-sm border-b border-border sticky top-0 z-20 h-20 flex-shrink-0 pt-[env(safe-area-inset-top)]">
           <div className="w-full px-4 sm:px-6 lg:px-8 h-full">
-            <div className="flex items-center justify-between h-full max-w-[1400px] mx-auto">
+            <div className="flex items-center justify-between h-full max-w-[1400px] mx-auto gap-2">
               {/* Left Section - Menu & Brand */}
-              <div className="flex items-center space-x-3 sm:space-x-6 flex-1 min-w-0">
+              <div className="flex items-center space-x-2 sm:space-x-6 flex-1 min-w-0 overflow-hidden">
                 <button 
                   onClick={() => setOpen(true)}
-                  className="lg:hidden p-2 sm:p-3 rounded-xl bg-primary hover:bg-primary/90 flex-shrink-0 transition-colors"
+                  className="lg:hidden min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-primary hover:bg-primary/90 flex-shrink-0 transition-colors"
                   aria-label="Menüyü aç"
                 >
-                  <Menu className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+                  <Menu className="w-5 h-5 text-white" />
                 </button>
-                <div className="border-l border-border pl-3 sm:pl-6 flex-shrink-0 min-w-0">
-                  <h2 className="text-lg sm:text-xl font-bold text-foreground truncate">
-                    {isMobile ? galleryName.split(' ')[0] : galleryName}
+                {/* Şirket/galeri adı: yalnızca desktop (sm ve üzeri); mobilde gizli */}
+                <div className="hidden sm:block border-l border-border pl-3 sm:pl-6 flex-shrink min-w-0 overflow-hidden">
+                  <h2 className="text-base sm:text-xl font-bold text-foreground truncate">
+                    {galleryName}
                   </h2>
-                  <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block min-h-[16px]">
+                  <p className="text-xs sm:text-sm text-muted-foreground min-h-[16px] truncate">
                     {menuItems.find(item => item.path === location.pathname)?.description || "Profesyonel Yönetim Paneli"}
                   </p>
                 </div>
@@ -394,7 +397,7 @@ const SidebarLayout = () => {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button 
-                      className="flex items-center space-x-2 px-3 py-2 bg-primary rounded-xl shadow-sm hover:shadow-md transition-all duration-200 whitespace-nowrap"
+                      className="flex items-center justify-center sm:justify-start min-h-[44px] min-w-[44px] sm:min-w-0 sm:px-3 sm:py-2 gap-2 bg-primary rounded-xl shadow-sm hover:shadow-md transition-all duration-200 whitespace-nowrap"
                       aria-label="Hızlı işlemler menüsü"
                     >
                       <Plus className="w-5 h-5 text-white flex-shrink-0" />
@@ -459,7 +462,7 @@ const SidebarLayout = () => {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
-                      className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-primary/20 to-primary/30 rounded-full flex items-center justify-center shadow-professional-sm hover:shadow-professional-md transition-all duration-200 border-2 border-primary/30 flex-shrink-0"
+                      className="min-w-[44px] min-h-[44px] w-10 h-10 sm:w-10 sm:h-10 bg-gradient-to-br from-primary/20 to-primary/30 rounded-full flex items-center justify-center shadow-professional-sm hover:shadow-professional-md transition-all duration-200 border-2 border-primary/30 flex-shrink-0"
                       aria-label="Profil menüsü"
                     >
                       <span className="text-primary font-bold text-xs sm:text-sm">
@@ -500,9 +503,9 @@ const SidebarLayout = () => {
           </div>
         </header>
 
-        <main className="flex-1 bg-background">
-          <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
-            <div className="max-w-[1400px] mx-auto">
+        <main className="flex-1 bg-background pb-[env(safe-area-inset-bottom)] min-w-0 overflow-x-hidden">
+          <div className="w-full max-w-full min-w-0 px-4 sm:px-6 lg:px-8 py-6">
+            <div className="main-content-inner max-w-[1400px] mx-auto min-w-0 w-full">
               <Outlet />
             </div>
           </div>

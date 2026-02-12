@@ -104,9 +104,8 @@ export const corsConfig: CorsConfig = {
   /**
    * Check if origin is allowed (supports wildcard subdomains)
    * Examples:
-   * - Exact match: "https://galeri.calenius.io"
-   * - Wildcard: "*.calenius.io" matches "https://galeri.calenius.io", "https://app.calenius.io", etc.
-   * Supports galeri.calenius.io domain
+   * - Exact match: "https://akilligaleri.com", "https://app.akilligaleri.com"
+   * - Wildcard: "*.akilligaleri.com" matches app, api subdomains, etc.
    */
   isOriginAllowed: function(origin: string): boolean {
     const allowedOrigins = this.allowed;

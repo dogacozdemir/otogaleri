@@ -22,7 +22,7 @@ import {
 } from "../controllers/vehicleCostController";
 import { markVehicleAsSold } from "../controllers/vehicleSaleController";
 import { calculateVehicleProfit, convertCostsToCurrency } from "../controllers/profitController";
-import { listVehicleImages, uploadVehicleImage, deleteVehicleImage, setPrimaryImage, upload } from "../controllers/vehicleImageController";
+import { listVehicleImages, uploadVehicleImage, deleteVehicleImage, setPrimaryImage, updateImageOrder, upload } from "../controllers/vehicleImageController";
 import { bulkImportVehicles, bulkImportCosts, upload as bulkUpload } from "../controllers/bulkImportController";
 import { uploadLimiter } from "../middleware/rateLimiter";
 import {
@@ -68,6 +68,8 @@ router.post("/:id/sell", markVehicleAsSold);
 router.get("/:id/images", listVehicleImages);
 // Apply upload rate limiting to image uploads
 router.post("/:id/images", uploadLimiter, upload.single("image"), uploadVehicleImage);
+// Order must be before :image_id route so PUT /:id/images/order is not matched as image_id=order
+router.put("/:id/images/order", updateImageOrder);
 router.put("/:id/images/:image_id/primary", setPrimaryImage);
 router.delete("/:id/images/:image_id", deleteVehicleImage);
 

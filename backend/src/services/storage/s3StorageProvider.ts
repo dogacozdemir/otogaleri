@@ -170,8 +170,7 @@ export class S3StorageProvider implements IStorageProvider {
       Key: key,
       Body: buffer,
       ContentType: contentType, // Critical: Ensures S3 metadata matches actual file content
-      // Make public if requested (for public buckets)
-      ...(options.makePublic ? { ACL: "public-read" } : {}),
+      // ACL removed: Bucket owner enforced (ACLs disabled) does not support ACL; use bucket policy for public read or signed URLs
     });
 
     await this.s3Client.send(command);
@@ -206,24 +205,34 @@ export class S3StorageProvider implements IStorageProvider {
   }
 
   /**
+   * True when baseUrl is the direct S3 bucket URL (e.g. https://bucket.s3.region.amazonaws.com).
+   * Direct S3 URLs require the bucket to be public for unauthenticated access; if the bucket
+   * is private, we must return signed URLs instead to avoid 403.
+   */
+  private isDirectS3BaseUrl(baseUrl: string): boolean {
+    try {
+      const u = new URL(baseUrl);
+      // Standard S3 virtual-hosted: bucket.s3.region.amazonaws.com or bucket.s3.amazonaws.com
+      const host = u.hostname.toLowerCase();
+      return (host.includes(".s3.") && host.endsWith(".amazonaws.com")) || host === "s3.amazonaws.com";
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Get signed URL for a file (private access with expiration)
-   * If AWS_S3_BASE_URL (CDN) is configured, returns CDN URL instead of signed URL for public files
+   * If AWS_S3_BASE_URL is a CDN (e.g. CloudFront), returns that base + key for public files.
+   * If AWS_S3_BASE_URL is the direct S3 URL, always returns a signed URL so private buckets work.
    * Signed URL expiration is configurable via AWS_S3_SIGNED_URL_EXPIRES env variable (in seconds)
    */
   async getUrl(key: string, isPublic: boolean = false): Promise<string> {
-    // If custom base URL (CDN) is provided and file is public, use CDN URL
-    // This optimizes performance by serving from CDN edge locations
-    if (this.baseUrl && isPublic) {
-      // Remove leading slash if present
+    // Use base URL only when it's a CDN (e.g. CloudFront), not the direct S3 URL.
+    // Direct S3 URLs with a private bucket cause 403; signed URLs work regardless.
+    const useBaseUrl = this.baseUrl && isPublic && !this.isDirectS3BaseUrl(this.baseUrl);
+    if (useBaseUrl) {
       const cleanKey = key.startsWith('/') ? key.slice(1) : key;
       return `${this.baseUrl}/${cleanKey}`;
-    }
-
-    // For private files or when CDN is not configured, use signed URLs
-    // Note: Custom base URLs should also use signed URLs for security
-    if (this.baseUrl && !isPublic) {
-      // Still generate signed URL for security, but use custom base if configured
-      // In production, you might want to use CloudFront signed URLs instead
     }
 
     // Generate signed URL with configurable expiration

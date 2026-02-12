@@ -277,7 +277,7 @@ const GlobalSearch = ({ className, iconOnly = false }: GlobalSearchProps) => {
       <Button
         variant={iconOnly ? "ghost" : "outline"}
         size={iconOnly ? "icon" : "default"}
-        className={`${iconOnly ? 'h-9 w-9' : 'relative h-9 w-full justify-start text-sm text-muted-foreground sm:pr-12'} ${className}`}
+        className={`${iconOnly ? 'min-h-[44px] min-w-[44px] h-11 w-11 sm:h-9 sm:w-9' : 'relative min-h-[44px] sm:min-h-0 h-11 sm:h-9 w-full justify-start text-sm text-muted-foreground sm:pr-12'} ${className}`}
         onClick={() => setIsOpen(true)}
         aria-label="Ara"
       >
@@ -295,7 +295,7 @@ const GlobalSearch = ({ className, iconOnly = false }: GlobalSearchProps) => {
 
       {/* Search Dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-[600px] p-0">
+        <DialogContent className="sm:max-w-[600px] p-0" aria-describedby={undefined}>
           <DialogHeader className="p-4 pb-0">
             <DialogTitle className="sr-only">Global Arama</DialogTitle>
             <div className="relative">
@@ -311,7 +311,7 @@ const GlobalSearch = ({ className, iconOnly = false }: GlobalSearchProps) => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+                  className="absolute right-1 top-1/2 transform -translate-y-1/2 min-h-[44px] min-w-[44px] h-10 w-10 p-0"
                   onClick={clearSearch}
                 >
                   <X className="w-4 h-4" />
@@ -343,7 +343,7 @@ const GlobalSearch = ({ className, iconOnly = false }: GlobalSearchProps) => {
                         <Button
                           key={index}
                           variant="ghost"
-                          className="w-full justify-start text-sm h-8"
+                          className="w-full justify-start text-sm min-h-[44px] py-3"
                           onClick={() => handleSuggestionClick(search)}
                         >
                           <Search className="w-4 h-4 mr-2" />
@@ -385,7 +385,7 @@ const GlobalSearch = ({ className, iconOnly = false }: GlobalSearchProps) => {
                   <Button
                     key={index}
                     variant="ghost"
-                    className="w-full justify-start text-sm h-8"
+                    className="w-full justify-start text-sm min-h-[44px] py-3"
                     onClick={() => handleSuggestionClick(suggestion.suggestion)}
                   >
                     {getTypeIcon(suggestion.type)}
@@ -421,7 +421,7 @@ const GlobalSearch = ({ className, iconOnly = false }: GlobalSearchProps) => {
                             <Button
                               key={`${result.type}-${result.id}`}
                               variant="ghost"
-                              className="w-full justify-start text-sm h-auto p-3 hover:bg-accent"
+                              className="w-full justify-start text-sm min-h-[44px] p-3 hover:bg-accent"
                               onClick={() => handleResultClick(result)}
                             >
                               <div className="flex items-center w-full">

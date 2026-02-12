@@ -198,7 +198,7 @@ sudo systemctl restart nginx
 curl http://localhost:5005/health
 
 # Frontend erişilebilirliğini kontrol et
-curl -I https://galeri.calenius.io
+curl -I https://app.akilligaleri.com
 ```
 
 ## Migration Yönetimi

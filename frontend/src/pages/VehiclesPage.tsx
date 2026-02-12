@@ -56,6 +56,7 @@ import { VehiclePaymentModal, PaymentFormData } from "@/components/vehicles/Vehi
 import { VehicleQuoteModal, QuoteFormData } from "@/components/vehicles/VehicleQuoteModal";
 import { VehicleDocumentModal, DocumentFormData } from "@/components/vehicles/VehicleDocumentModal";
 import { SoldVehiclesTable } from "@/components/vehicles/SoldVehiclesTable";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { getInstallmentStatus as getInstallmentStatusUtil, getInstallmentOverdueDays as getInstallmentOverdueDaysUtil } from "@/utils/vehicleUtils";
 import { VehicleCost, CostCalculation } from "@/hooks/useVehiclesData";
 import { useQueryClient } from "@tanstack/react-query";
@@ -102,6 +103,8 @@ const VehiclesPage = () => {
   const [openBulkImport, setOpenBulkImport] = useState(false);
   const [bulkImportType, setBulkImportType] = useState<"vehicles" | "costs">("vehicles");
   const [openQuote, setOpenQuote] = useState(false);
+  const [showDeleteVehicleDialog, setShowDeleteVehicleDialog] = useState(false);
+  const [vehicleIdToDelete, setVehicleIdToDelete] = useState<number | null>(null);
   const [quoteForm, setQuoteForm] = useState<QuoteFormData>({
     vehicle_id: "",
     customer_id: "",
@@ -542,12 +545,19 @@ const VehiclesPage = () => {
     }
   };
 
-  const handleDeleteVehicle = async (id: number) => {
-    if (!confirm("Bu aracı silmek istediğinize emin misiniz?")) return;
+  const handleDeleteVehicleClick = (id: number) => {
+    setVehicleIdToDelete(id);
+    setShowDeleteVehicleDialog(true);
+  };
+
+  const handleConfirmDeleteVehicle = async () => {
+    if (vehicleIdToDelete == null) return;
     try {
-      await api.delete(`/vehicles/${id}`);
+      await api.delete(`/vehicles/${vehicleIdToDelete}`);
       toast({ title: "Silindi", description: "Araç silindi." });
       vehiclesData.fetchVehicles();
+      setShowDeleteVehicleDialog(false);
+      setVehicleIdToDelete(null);
     } catch (e: any) {
       toast({ 
         title: "Hata", 
@@ -1049,7 +1059,7 @@ const VehiclesPage = () => {
             onEditClick={openEditModal}
             onQuoteClick={openQuoteModal}
             onSellClick={openSellModal}
-            onDeleteClick={handleDeleteVehicle}
+            onDeleteClick={handleDeleteVehicleClick}
             totalCount={activeVehiclesCount}
             inStockCount={inStockCount}
           />
@@ -1307,6 +1317,22 @@ const VehiclesPage = () => {
           setQuoteForm({ ...quoteForm, [field]: value });
         }}
         onSubmit={handleCreateQuote}
+      />
+
+      {/* Araç silme onay penceresi */}
+      <ConfirmationDialog
+        open={showDeleteVehicleDialog}
+        onOpenChange={(open) => {
+          setShowDeleteVehicleDialog(open);
+          if (!open) setVehicleIdToDelete(null);
+        }}
+        onConfirm={handleConfirmDeleteVehicle}
+        title="Aracı Sil"
+        description="Bu aracı silmek istediğinize emin misiniz? Bu işlem geri alınamaz."
+        confirmText="Sil"
+        cancelText="İptal"
+        variant="destructive"
+        icon={<Trash2 className="h-6 w-6" />}
       />
     </div>
   );

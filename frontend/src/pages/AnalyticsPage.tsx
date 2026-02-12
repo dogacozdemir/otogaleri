@@ -744,7 +744,7 @@ export default function AnalyticsPage() {
             </Button>
           </div>
           {customReports.length > 0 ? (
-                      <div className="overflow-x-auto">
+                      <div className="w-full min-w-0 overflow-x-auto">
                         <table className="w-full">
                           <thead>
                             <tr className="border-b">

@@ -110,7 +110,7 @@ export function CurrencyConverterPopover() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative" aria-label="Döviz Çevirici">
+        <Button variant="ghost" size="icon" className="relative min-h-[44px] min-w-[44px]" aria-label="Döviz Çevirici">
           <BadgeDollarSign className="h-[1.2rem] w-[1.2rem]" />
           {customRate && (
             // Özel kur aktifse ikonun üzerinde küçük bir belirteç

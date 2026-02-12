@@ -82,7 +82,7 @@ export const VehicleDetailModal = ({
       'damaged': 'Hasarlı',
       'repaired': 'Tamirli',
       'in_stock': 'Stokta',
-      'on_sale': 'Satışta',
+      'on_sale': 'Yolda',
       'reserved': 'Rezerve',
       'sold': 'Satıldı'
     };
@@ -91,7 +91,7 @@ export const VehicleDetailModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl h-[90vh] p-0 flex flex-col overflow-hidden">
+      <DialogContent className="max-w-5xl h-[90vh] max-sm:h-[100dvh] p-0 flex flex-col overflow-hidden">
         {vehicle ? (
           <>
             {/* Modern Header with Image and Info */}
@@ -245,41 +245,41 @@ export const VehicleDetailModal = ({
 
             {/* Tabs Section */}
             <Tabs defaultValue="info" className="w-full flex flex-col flex-1 min-h-0 overflow-hidden">
-              <div className="px-6 pt-4 pb-0 flex-shrink-0 border-b border-border bg-background">
-                <TabsList className="grid w-full grid-cols-5 h-auto bg-transparent p-0 gap-1">
+              <div className="px-4 sm:px-6 pt-4 pb-0 flex-shrink-0 border-b border-border bg-background">
+                <TabsList className="flex w-full overflow-x-auto gap-1 bg-transparent p-0 h-auto min-h-[44px] flex-nowrap sm:grid sm:grid-cols-5 sm:overflow-visible">
                   <TabsTrigger 
                     value="info" 
-                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm rounded-xl px-4 py-2.5"
+                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm rounded-xl px-4 py-2.5 flex-shrink-0 min-h-[44px]"
                   >
-                    <Car className="h-4 w-4 mr-2" />
+                    <Car className="h-4 w-4 mr-2 flex-shrink-0" />
                     Bilgiler
                   </TabsTrigger>
                   <TabsTrigger 
                     value="images"
-                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm rounded-xl px-4 py-2.5"
+                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm rounded-xl px-4 py-2.5 flex-shrink-0 min-h-[44px]"
                   >
-                    <ImageIcon className="h-4 w-4 mr-2" />
+                    <ImageIcon className="h-4 w-4 mr-2 flex-shrink-0" />
                     Fotoğraflar
                   </TabsTrigger>
                   <TabsTrigger 
                     value="documents"
-                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm rounded-xl px-4 py-2.5"
+                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm rounded-xl px-4 py-2.5 flex-shrink-0 min-h-[44px]"
                   >
-                    <FileText className="h-4 w-4 mr-2" />
+                    <FileText className="h-4 w-4 mr-2 flex-shrink-0" />
                     Belgeler
                   </TabsTrigger>
                   <TabsTrigger 
                     value="costs"
-                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm rounded-xl px-4 py-2.5"
+                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm rounded-xl px-4 py-2.5 flex-shrink-0 min-h-[44px]"
                   >
-                    <Package className="h-4 w-4 mr-2" />
+                    <Package className="h-4 w-4 mr-2 flex-shrink-0" />
                     Harcamalar
                   </TabsTrigger>
                   <TabsTrigger 
                     value="calculate"
-                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm rounded-xl px-4 py-2.5"
+                    className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm rounded-xl px-4 py-2.5 flex-shrink-0 min-h-[44px]"
                   >
-                    <Calculator className="h-4 w-4 mr-2" />
+                    <Calculator className="h-4 w-4 mr-2 flex-shrink-0" />
                     Hesaplama
                   </TabsTrigger>
                 </TabsList>

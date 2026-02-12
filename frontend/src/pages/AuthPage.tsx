@@ -239,8 +239,8 @@ const AuthPage = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 p-4 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      <div className="w-full max-w-md">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 p-4 py-8 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+      <div className="w-full max-w-md min-h-0">
         {/* Security Badge */}
         <div className="mb-6 flex items-center justify-center gap-2 text-slate-600 dark:text-slate-400">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/20">

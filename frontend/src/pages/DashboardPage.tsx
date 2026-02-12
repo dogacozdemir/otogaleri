@@ -267,7 +267,8 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {weeklySales.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
+              <div className="h-[220px] sm:h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={weeklySales}>
                   <defs>
                     <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
@@ -290,6 +291,7 @@ export default function DashboardPage() {
                   <Bar dataKey="sales_count" fill="url(#salesGradient)" radius={[8, 8, 0, 0]} barSize={45} />
                 </BarChart>
               </ResponsiveContainer>
+              </div>
             ) : (
               <div className="text-center py-12">
                 <div className="rounded-full bg-blue-100 dark:bg-blue-900/20 p-4 w-16 h-16 mx-auto mb-3 flex items-center justify-center">
@@ -404,7 +406,8 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {weeklyInventory.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
+              <div className="h-[220px] sm:h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={weeklyInventory}>
                   <defs>
                     <linearGradient id="serviceGradient" x1="0" y1="0" x2="0" y2="1">
@@ -433,6 +436,7 @@ export default function DashboardPage() {
                   <Legend wrapperStyle={{ fontSize: "12px", paddingTop: "10px" }} />
                 </BarChart>
               </ResponsiveContainer>
+              </div>
             ) : (
               <div className="text-center py-12">
                 <div className="rounded-full bg-purple-100 dark:bg-purple-900/20 p-4 w-16 h-16 mx-auto mb-3 flex items-center justify-center">
@@ -546,10 +550,11 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           {recentSales.length > 0 ? (
-            <Table>
+            <div className="w-full min-w-0 overflow-x-auto">
+            <Table className="min-w-[500px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Araç</TableHead>
+                  <TableHead className="sticky left-0 bg-muted/50 z-10 min-w-[120px]">Araç</TableHead>
                   <TableHead>Model</TableHead>
                   <TableHead>Müşteri</TableHead>
                   <TableHead>Fiyat</TableHead>
@@ -588,7 +593,7 @@ export default function DashboardPage() {
                       className="cursor-pointer hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 transition-all duration-200 border-b border-border/50"
                       onClick={() => navigate(`/vehicles/${sale.vehicle_id}`)}
                     >
-                      <TableCell>
+                      <TableCell className="sticky left-0 bg-card z-10">
                         {imageUrl ? (
                           <div className="relative h-14 w-14 overflow-hidden rounded-xl bg-muted ring-2 ring-border/50 hover:ring-emerald-500/30 transition-all">
                             <img 
@@ -619,6 +624,7 @@ export default function DashboardPage() {
                 })}
               </TableBody>
             </Table>
+            </div>
           ) : (
             <div className="text-center py-12">
               <div className="rounded-full bg-emerald-100 dark:bg-emerald-900/20 p-4 w-16 h-16 mx-auto mb-3 flex items-center justify-center">
@@ -634,7 +640,7 @@ export default function DashboardPage() {
       {/* Alt Bölüm: Sol (Gecikmiş Taksitler + Belgeler) ve Sağ (Aktiviteler + Görevler) */}
       <div className="grid gap-6 grid-cols-12 items-stretch">
         {/* Sol Taraf: Gecikmiş Taksitler ve Süresi Dolacak Belgeler */}
-        <div className="col-span-12 lg:col-span-8 grid gap-6 grid-cols-2 items-stretch">
+        <div className="col-span-12 lg:col-span-8 grid gap-6 grid-cols-1 sm:grid-cols-2 items-stretch">
           {/* Gecikmiş Taksitler */}
           <Card className="rounded-2xl border-l-4 border-l-red-500 shadow-md hover:shadow-lg transition-all duration-300 h-full flex flex-col group">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
@@ -777,8 +783,8 @@ export default function DashboardPage() {
         </div>
 
         {/* Sağ Taraf: Aktiviteler ve Görevler (Sekmeli) */}
-        <Card className="col-span-12 lg:col-span-4 rounded-2xl border-l-4 border-l-purple-500 shadow-md hover:shadow-lg transition-all duration-300 h-full flex flex-col group">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+        <Card className="col-span-12 lg:col-span-4 rounded-2xl border-l-4 border-l-purple-500 shadow-md hover:shadow-lg transition-all duration-300 h-full flex flex-col min-h-0 group">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 flex-shrink-0">
             <div className="flex items-center gap-3">
               <div className="rounded-xl bg-purple-100 dark:bg-purple-900/20 p-2 group-hover:bg-purple-200 dark:group-hover:bg-purple-900/30 transition-colors">
                 <Activity className="h-5 w-5 text-purple-600 dark:text-purple-400" />
@@ -786,17 +792,17 @@ export default function DashboardPage() {
               <CardTitle className="text-base font-semibold text-foreground">Aktiviteler & Görevler</CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="p-0 flex-1 flex flex-col">
-            <Tabs defaultValue="activities" className="w-full flex-1 flex flex-col">
-              <TabsList className="grid w-full grid-cols-2 mx-4 mb-4 h-10 bg-muted/50">
+          <CardContent className="p-0 flex-1 flex flex-col min-h-0 overflow-hidden">
+            <Tabs defaultValue="activities" className="w-full h-full flex flex-col min-h-0">
+              <TabsList className="grid w-full grid-cols-2 mx-4 mb-2 sm:mb-4 h-10 bg-muted/50 flex-shrink-0">
                 <TabsTrigger value="activities" className="text-sm font-medium data-[state=active]:bg-purple-500 data-[state=active]:text-white transition-all">Aktiviteler</TabsTrigger>
                 <TabsTrigger value="tasks" className="text-sm font-medium data-[state=active]:bg-purple-500 data-[state=active]:text-white transition-all">Görevler</TabsTrigger>
               </TabsList>
               
               {/* Aktiviteler Timeline */}
-              <TabsContent value="activities" className="mt-0 flex-1 flex flex-col">
+              <TabsContent value="activities" className="mt-0 flex-1 flex flex-col min-h-0 overflow-hidden">
                 {recentActivities.length > 0 ? (
-                  <div className={`flex-1 ${recentActivities.length > 5 ? 'max-h-[500px] overflow-y-auto' : ''}`}>
+                  <div className={`flex-1 min-h-0 ${recentActivities.length > 5 ? 'overflow-y-auto max-h-[500px]' : 'overflow-y-auto'}`}>
                     <div className="relative px-4 pb-4">
                       {/* Timeline çizgisi */}
                       <div className="absolute left-7 top-0 bottom-0 w-0.5 bg-gradient-to-b from-purple-500 via-purple-400 to-purple-500" />
@@ -872,9 +878,9 @@ export default function DashboardPage() {
               </TabsContent>
               
               {/* Görevler */}
-              <TabsContent value="tasks" className="mt-0 flex-1 flex flex-col">
+              <TabsContent value="tasks" className="mt-0 flex-1 flex flex-col min-h-0 overflow-hidden">
                 {todayFollowups.length > 0 ? (
-                  <div className={`flex-1 ${todayFollowups.length > 5 ? 'max-h-[500px] overflow-y-auto' : ''}`}>
+                  <div className={`flex-1 min-h-0 overflow-y-auto ${todayFollowups.length > 5 ? 'max-h-[500px]' : ''}`}>
                     <div className="space-y-2 px-4 pb-4">
                       {todayFollowups.map((followup: any) => (
                         <div

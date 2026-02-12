@@ -368,7 +368,7 @@ export const VehicleAddEditModal = ({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="in_stock">Stokta</SelectItem>
-                      <SelectItem value="on_sale">Satışta</SelectItem>
+                      <SelectItem value="on_sale">Yolda</SelectItem>
                       <SelectItem value="reserved">Rezerve</SelectItem>
                       <SelectItem value="sold">Satıldı</SelectItem>
                     </SelectContent>

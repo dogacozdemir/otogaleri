@@ -158,7 +158,7 @@ export default function StaffPage() {
 
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          <div className="w-full min-w-0 overflow-x-auto">
             <table className="w-full">
               <thead className="bg-muted">
                 <tr>

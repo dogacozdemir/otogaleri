@@ -594,7 +594,7 @@ export default function QuotesPage() {
       {/* Quotes Table */}
       <Card className="bg-card rounded-xl border border-border shadow-md">
         <CardContent className="p-0">
-          <div className="rounded-xl overflow-hidden border border-border">
+          <div className="w-full min-w-0 overflow-x-auto rounded-xl border border-border">
             <Table className="table-zebra">
               <TableHeader className="bg-muted/50 sticky top-0 z-10">
                 <TableRow className="border-b border-border hover:bg-transparent">

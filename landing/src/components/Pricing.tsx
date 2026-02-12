@@ -80,7 +80,9 @@ export function Pricing() {
 
           <div className="flex flex-wrap justify-center gap-4">
             <a
-              href="mailto:info@akilligaleri.com?subject=Fiyatlandırma"
+              href="https://www.nerdyreptile.com/contact"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center justify-center rounded-xl bg-primary-500 px-6 py-3.5 font-semibold text-white shadow-lg shadow-primary-500/25 hover:bg-primary-600 transition-colors"
             >
               İletişime Geçin

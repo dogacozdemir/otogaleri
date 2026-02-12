@@ -10,7 +10,7 @@ const ThemeToggle = () => {
       variant="ghost"
       size="sm"
       onClick={toggleMode}
-      className="w-9 h-9 px-0 hover:bg-accent hover:text-accent-foreground transition-colors"
+      className="min-h-[44px] min-w-[44px] w-9 h-9 sm:w-9 sm:h-9 px-0 hover:bg-accent hover:text-accent-foreground transition-colors"
       title={mode === 'dark' ? 'Light moda geç' : 'Dark moda geç'}
     >
       {mode === 'dark' ? (

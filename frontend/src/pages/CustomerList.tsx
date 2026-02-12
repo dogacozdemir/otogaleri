@@ -263,7 +263,7 @@ const CustomerList = () => {
   const renderCustomerTable = (customers: CustomerSegment[]) => {
     return (
       <Card className="rounded-xl shadow-sm border border-border">
-      <div className="overflow-x-auto">
+      <div className="w-full min-w-0 overflow-x-auto">
         <table className="w-full">
             <thead className="bg-muted/50 border-b border-border">
             <tr>

@@ -226,9 +226,9 @@ export class VehicleService {
     if (installmentSaleIds.length > 0) {
       const [paymentRows] = await tenantQuery.query(
         `SELECT * FROM vehicle_installment_payments
-         WHERE installment_sale_id IN (${installmentSaleIds.map(() => '?').join(',')})
+         WHERE installment_sale_id IN (${installmentSaleIds.map(() => '?').join(',')}) AND tenant_id = ?
          ORDER BY installment_sale_id, payment_date ASC, installment_number ASC`,
-        installmentSaleIds
+        [...installmentSaleIds, tenantId]
       );
       const paymentsArray = paymentRows as any[];
       paymentsMap = paymentsArray.reduce((acc, payment) => {

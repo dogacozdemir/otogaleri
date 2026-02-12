@@ -1,0 +1,42 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowPutObjectForTenantIsolatedUploads",
+            "Effect": "Allow",
+            "Action": [
+                "s3:PutObject"
+            ],
+            "Resource": "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/vehicles/*"
+        },
+        {
+            "Sid": "AllowGetObjectForTenantIsolatedReads",
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject"
+            ],
+            "Resource": "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/vehicles/*"
+        },
+        {
+            "Sid": "AllowDeleteObjectForTenantIsolatedDeletes",
+            "Effect": "Allow",
+            "Action": [
+                "s3:DeleteObject"
+            ],
+            "Resource": "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/vehicles/*"
+        },
+        {
+            "Sid": "AllowListBucketForTenantIsolation",
+            "Effect": "Allow",
+            "Action": [
+                "s3:ListBucket"
+            ],
+            "Resource": "arn:aws:s3:::akilligaleri-photos-prod",
+            "Condition": {
+                "StringLike": {
+                    "s3:prefix": "tenants/*/vehicles/*"
+                }
+            }
+        }
+    ]
+}

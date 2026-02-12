@@ -240,7 +240,8 @@ export const useVehiclesData = () => {
 
   const fetchVehicleDetail = async (id: number) => {
     setSelectedVehicleId(id);
-    // Queries will automatically fetch when selectedVehicleId changes
+    // Invalidate so detail refetches (e.g. after primary image change in modal)
+    await queryClient.invalidateQueries({ queryKey: vehicleKeys.detail(id) });
   };
 
   const fetchVehicleDocuments = async (vehicleId: number) => {

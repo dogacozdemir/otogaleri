@@ -150,11 +150,11 @@ export const VehicleTable = ({
                       {vehicle.vehicle_number ? `#${vehicle.vehicle_number}` : `#${vehicle.id}`}
                     </Badge>
                   </div>
-                  {/* Overlay with actions */}
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-2">
+                  {/* Overlay with actions - always visible on touch (mobile) */}
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-2 max-sm:opacity-100 max-sm:bg-black/40">
                     <Button 
                       size="icon" 
-                      className="rounded-xl bg-card text-foreground hover:bg-muted h-11 w-11"
+                      className="rounded-xl bg-card text-foreground hover:bg-muted min-h-[44px] min-w-[44px] h-11 w-11"
                       onClick={() => onDetailClick(vehicle)}
                     >
                       <Eye className="h-5 w-5" />
@@ -162,7 +162,7 @@ export const VehicleTable = ({
                     {!vehicle.is_sold && (
                       <Button 
                         size="icon" 
-                        className="rounded-xl bg-card text-foreground hover:bg-muted h-11 w-11"
+                        className="rounded-xl bg-card text-foreground hover:bg-muted min-h-[44px] min-w-[44px] h-11 w-11"
                         onClick={() => onEditClick(vehicle)}
                       >
                         <Pencil className="h-5 w-5" />
@@ -170,7 +170,7 @@ export const VehicleTable = ({
                     )}
                     <Button 
                       size="icon" 
-                      className="rounded-xl bg-card text-destructive hover:bg-destructive/10 h-11 w-11"
+                      className="rounded-xl bg-card text-destructive hover:bg-destructive/10 min-h-[44px] min-w-[44px] h-11 w-11"
                       onClick={() => onDeleteClick(vehicle.id)}
                     >
                       <Trash2 className="h-5 w-5" />
@@ -279,11 +279,11 @@ export const VehicleTable = ({
           </div>
         </div>
       )}
-      <div className="overflow-x-auto">
-        <Table>
+      <div className="w-full min-w-0 overflow-x-auto">
+        <Table className="min-w-[640px]">
           <TableHeader>
             <TableRow className="bg-muted/50 hover:bg-muted/50">
-              <TableHead className="font-semibold text-foreground">Araç</TableHead>
+              <TableHead className="font-semibold text-foreground sticky left-0 bg-muted/50 z-10 min-w-[200px]">Araç</TableHead>
               <TableHead className="font-semibold text-foreground">Bilgiler</TableHead>
               <TableHead className="font-semibold text-foreground">Şasi No</TableHead>
               <TableHead className="font-semibold text-foreground text-right">Satış Fiyatı</TableHead>
@@ -319,7 +319,7 @@ export const VehicleTable = ({
 
                 return (
                   <TableRow key={vehicle.id} className="hover:bg-muted/50 transition-colors duration-150">
-                    <TableCell>
+                    <TableCell className="sticky left-0 bg-card z-10">
                       <div className="flex items-center gap-4">
                         <div className="h-16 w-24 rounded-xl bg-muted flex-shrink-0 overflow-hidden">
                           {imageUrl ? (
@@ -379,7 +379,7 @@ export const VehicleTable = ({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-9 w-9 text-info dark:text-info hover:text-info/80 hover:bg-info/10 rounded-lg"
+                          className="min-h-[44px] min-w-[44px] h-9 w-9 text-info dark:text-info hover:text-info/80 hover:bg-info/10 rounded-lg"
                           onClick={() => onDetailClick(vehicle)}
                         >
                           <Eye className="h-4 w-4" />
@@ -389,7 +389,7 @@ export const VehicleTable = ({
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg"
+                              className="min-h-[44px] min-w-[44px] h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg"
                               onClick={() => onEditClick(vehicle)}
                             >
                               <Pencil className="h-4 w-4" />
@@ -397,7 +397,7 @@ export const VehicleTable = ({
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-9 w-9 text-success dark:text-success hover:text-success/80 hover:bg-success/10 rounded-lg"
+                              className="min-h-[44px] min-w-[44px] h-9 w-9 text-success dark:text-success hover:text-success/80 hover:bg-success/10 rounded-lg"
                               onClick={() => onSellClick(vehicle)}
                               title="Hızlı Satış"
                             >
@@ -406,7 +406,7 @@ export const VehicleTable = ({
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-9 w-9 text-info dark:text-info hover:text-info/80 hover:bg-info/10 rounded-lg"
+                              className="min-h-[44px] min-w-[44px] h-9 w-9 text-info dark:text-info hover:text-info/80 hover:bg-info/10 rounded-lg"
                               onClick={() => onQuoteClick(vehicle)}
                               title="Teklif Oluştur"
                             >
@@ -417,7 +417,7 @@ export const VehicleTable = ({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-9 w-9 text-destructive dark:text-destructive hover:text-destructive/80 hover:bg-destructive/10 rounded-lg"
+                          className="min-h-[44px] min-w-[44px] h-9 w-9 text-destructive dark:text-destructive hover:text-destructive/80 hover:bg-destructive/10 rounded-lg"
                           onClick={() => onDeleteClick(vehicle.id)}
                           title="Sil"
                         >

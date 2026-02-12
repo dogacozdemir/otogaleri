@@ -351,6 +351,59 @@ export async function setPrimaryImage(req: AuthRequest, res: Response) {
   }
 }
 
+/**
+ * Update display order of vehicle images.
+ * Body: { imageOrders: Array<{ imageId: number, display_order: number }> }
+ */
+export async function updateImageOrder(req: AuthRequest, res: Response) {
+  const vehicle_id = req.params.vehicle_id || req.params.id;
+  const { imageOrders } = req.body as { imageOrders?: Array<{ imageId: number; display_order: number }> };
+
+  if (!Array.isArray(imageOrders) || imageOrders.length === 0) {
+    return res.status(400).json({ error: "imageOrders array is required and must not be empty" });
+  }
+
+  try {
+    for (const item of imageOrders) {
+      const { imageId, display_order } = item;
+      if (imageId == null || typeof display_order !== "number") {
+        return res.status(400).json({ error: "Each item must have imageId and display_order" });
+      }
+    }
+
+    const conn = await dbPool.getConnection();
+    await conn.beginTransaction();
+    try {
+      for (const item of imageOrders) {
+        const { imageId, display_order } = item;
+        const [rows] = await conn.query(
+          `UPDATE vehicle_images 
+           SET display_order = ? 
+           WHERE id = ? AND vehicle_id = ? AND tenant_id = ?`,
+          [display_order, imageId, vehicle_id, req.tenantId]
+        );
+        const affected = (rows as any).affectedRows;
+        if (affected === 0) {
+          await conn.rollback();
+          conn.release();
+          return res.status(404).json({ error: `Image not found or does not belong to this vehicle: ${imageId}` });
+        }
+      }
+      await conn.commit();
+      conn.release();
+    } catch (err) {
+      await conn.rollback();
+      conn.release();
+      throw err;
+    }
+
+    res.json({ message: "Order updated successfully" });
+  } catch (err) {
+    console.error("[vehicleImage] Update order error", err);
+    res.status(500).json({ error: "Failed to update image order" });
+  }
+}
+
 export async function deleteVehicleImage(req: AuthRequest, res: Response) {
   const vehicle_id = req.params.vehicle_id || req.params.id;
   const image_id = req.params.image_id;

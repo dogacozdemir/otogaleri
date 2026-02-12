@@ -37,7 +37,7 @@ otogaleri/
 ### Frontend
 
 - **Geliştirme:** `cd frontend && npm run dev` → **Vite** dev server (varsayılan **5173**).
-- **API adresi:** `VITE_API_BASE` (frontend `.env`) yoksa `http://localhost:5005/api` kullanılır.
+- **API adresi:** `VITE_API_BASE` (frontend `.env`); production: `https://api.akilligaleri.com/api`, geliştirme: `http://localhost:5005/api`.
 - **Production:** `npm run build` → `dist/` çıktısı; bu klasör bir web sunucusuna (Nginx, CloudPanel vb.) servis ettirilir.
 
 ### Landing
@@ -49,7 +49,7 @@ otogaleri/
 
 ## 3. İletişim: Frontend ↔ Backend
 
-- Frontend tüm veri işlemleri için **tek bir API base URL** kullanır: `VITE_API_BASE` veya varsayılan `http://localhost:5005/api`.
+- Frontend tüm veri işlemleri için **tek bir API base URL** kullanır: `VITE_API_BASE` (production: `https://api.akilligaleri.com/api`, geliştirme: `http://localhost:5005/api`).
 - **Axios** instance’ı (`frontend/src/api.ts`):
   - `baseURL`: bu API base.
   - Her istekte `Authorization: Bearer <token>` header’ı eklenir (token varsa).
@@ -64,8 +64,8 @@ Tüm API route’ları **`/api`** prefix’i altında mount edilir (health ve st
 
 ### Base URL
 
-- Geliştirme: `http://localhost:5005`
-- API istekleri: `http://localhost:5005/api/...`
+- Production: `https://api.akilligaleri.com` → API istekleri: `https://api.akilligaleri.com/api/...`
+- Geliştirme: `http://localhost:5005` → API istekleri: `http://localhost:5005/api/...`
 
 ### Route Özeti (server.ts’e göre)
 
