@@ -111,6 +111,7 @@ export async function getCustomerById(req: AuthRequest, res: Response) {
         SELECT 
           vi.vehicle_id,
           vi.image_path,
+          vi.image_filename,
           ROW_NUMBER() OVER (
             PARTITION BY vi.vehicle_id 
             ORDER BY vi.is_primary DESC, vi.display_order ASC, vi.created_at ASC

@@ -17,7 +17,8 @@ import {
   FileText,
   ChevronLeft,
   ChevronRight,
-  Search
+  Search,
+  Calculator
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -89,6 +90,12 @@ const menuItems = [
     path: "/inventory", 
     icon: Package,
     description: "Stok takibi ve ürün yönetimi"
+  },
+  { 
+    name: "Gümrük Hesaplama", 
+    path: "/gumruk-hesaplama", 
+    icon: Calculator,
+    description: "Japon araç gümrük kıymet hesaplama"
   },
   { 
     name: "Ayarlar", 
@@ -187,17 +194,18 @@ const SidebarLayout = () => {
       <aside
         className={`
           fixed z-40 top-0 left-0 h-screen bg-[#003d82] dark:bg-[#002952] text-white transform
+          flex flex-col
           transition-all duration-300 ease-in-out shadow-xl overflow-hidden
           ${isMobile ? "w-full max-w-[85vw]" : sidebarCollapsed ? "w-16" : "w-64"}
           ${open || !isMobile ? "translate-x-0" : "-translate-x-full"}
-          lg:translate-x-0 lg:w-64
-          ${sidebarCollapsed && !isMobile ? "lg:w-16" : ""}
+          lg:translate-x-0
+          ${sidebarCollapsed && !isMobile ? "lg:w-16" : "lg:w-64"}
           pt-[env(safe-area-inset-top)]
         `}
         aria-hidden={!open && isMobile}
       >
         {/* Header - Fixed height h-20 (80px) */}
-        <div className="h-20 flex items-center border-b border-white/10 justify-between">
+        <div className="h-20 flex-shrink-0 flex items-center border-b border-white/10 justify-between">
           <div className="flex items-center w-full">
             {!isMobile && (
               <div className="w-16 flex-shrink-0 flex items-center justify-center">
@@ -238,24 +246,9 @@ const SidebarLayout = () => {
           </button>
         </div>
         
-        {/* Navigation Menu - Scrollable with custom scrollbar */}
-        <div className="flex-1 flex flex-col min-h-0">
-          <nav className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent hover:scrollbar-thumb-white/30">
-            <style>{`
-              .scrollbar-thin::-webkit-scrollbar {
-                width: 6px;
-              }
-              .scrollbar-thin::-webkit-scrollbar-track {
-                background: transparent;
-              }
-              .scrollbar-thin::-webkit-scrollbar-thumb {
-                background: rgba(255, 255, 255, 0.2);
-                border-radius: 3px;
-              }
-              .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-                background: rgba(255, 255, 255, 0.3);
-              }
-            `}</style>
+        {/* Navigation Menu - Scroll yok, overflow hidden */}
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+          <nav className="flex-1 overflow-hidden">
             <div className="space-y-1 py-2">
               {menuItems
                 .filter(item => item.path !== "/staff" && item.path !== "/branches")
@@ -310,8 +303,8 @@ const SidebarLayout = () => {
           </nav>
         </div>
 
-        {/* Footer - Logout Section */}
-        <div className="border-t border-white/10 flex-shrink-0 py-2">
+        {/* Footer - Logout Section - Her zaman en altta */}
+        <div className="border-t border-white/10 flex-shrink-0 py-2 mt-auto">
           <div className="relative group">
             <button
               onClick={handleLogout}

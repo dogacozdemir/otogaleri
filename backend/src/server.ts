@@ -24,6 +24,8 @@ import installmentRoutes from "./routes/installmentRoutes";
 import currencyRoutes from "./routes/currencyRoutes";
 import quoteRoutes from "./routes/quoteRoutes";
 import aclRoutes from "./routes/aclRoutes";
+import japonKiymetRoutes from "./routes/japonKiymetRoutes";
+import { loadJaponKiymetCache } from "./services/japonKiymetService";
 import path from "path";
 
 const app = express();
@@ -183,6 +185,7 @@ app.use("/api/inventory", inventoryRoutes);
 app.use("/api/tenant", tenantRoutes);
 app.use("/api/installments", installmentRoutes);
 app.use("/api/currency", currencyRoutes);
+app.use("/api/japon-kiymet", japonKiymetRoutes);
 app.use("/api/quotes", quoteRoutes);
 app.use("/api/acl", aclRoutes);
 
@@ -204,6 +207,13 @@ async function start() {
     console.log("[otogaleri] Database connection OK");
   } catch (err) {
     console.error("[otogaleri] Database connection FAILED", err);
+  }
+
+  // Load japon kiymet master data into memory at startup
+  try {
+    loadJaponKiymetCache();
+  } catch (err) {
+    console.warn("[otogaleri] Japon kiymet cache load failed (non-fatal):", err);
   }
 
   app.listen(PORT, () => {

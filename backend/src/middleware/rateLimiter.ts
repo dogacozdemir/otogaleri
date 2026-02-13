@@ -96,13 +96,17 @@ export const resetPasswordLimiter = rateLimit({
 
 /**
  * File upload rate limiter
- * - 10 uploads per hour per IP
- * - Prevents abuse of file storage
+ * - 200 uploads per hour per IP (kurulum: 10 araç × 15 fotoğraf = 150+; ücretli uygulama)
+ * - RATE_LIMIT_UPLOAD_MAX ile .env'den override edilebilir
  */
+const UPLOAD_LIMIT_MAX = process.env.RATE_LIMIT_UPLOAD_MAX
+  ? Math.max(10, Math.min(500, Number(process.env.RATE_LIMIT_UPLOAD_MAX)))
+  : 200;
+
 export const uploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, // Limit each IP to 10 uploads per hour
-  message: "Too many file uploads, please try again later.",
+  max: UPLOAD_LIMIT_MAX,
+  message: "Çok fazla dosya yüklemesi. Lütfen bir saat sonra tekrar deneyin.",
   standardHeaders: true,
   legacyHeaders: false,
 });

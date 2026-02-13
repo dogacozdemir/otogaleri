@@ -927,7 +927,12 @@ const CustomerDetails: React.FC = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => window.open(`${getApiBaseUrl()}${doc.file_path}`, "_blank")}
+                                onClick={() => {
+                                  const url = doc.url || doc.file_path;
+                                  if (!url) return;
+                                  const fullUrl = url.startsWith("http") ? url : `${getApiBaseUrl()}${url}`;
+                                  window.open(fullUrl, "_blank");
+                                }}
                               >
                                 Görüntüle
                               </Button>

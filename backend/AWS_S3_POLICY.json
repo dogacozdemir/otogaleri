@@ -1,7 +1,7 @@
 {
   "description": "AWS S3 Infrastructure Policies for Oto Galeri Application",
   "version": "1.0.0",
-  "lastUpdated": "2026-01-28",
+  "lastUpdated": "2026-02-13",
   
   "iamPolicy": {
     "Version": "2012-10-17",
@@ -13,12 +13,10 @@
           "s3:PutObject",
           "s3:PutObjectAcl"
         ],
-        "Resource": "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/vehicles/*",
-        "Condition": {
-          "StringEquals": {
-            "s3:x-amz-acl": "public-read"
-          }
-        }
+        "Resource": [
+          "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/vehicles/*",
+          "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/documents/customers/*"
+        ]
       },
       {
         "Sid": "AllowGetObjectForTenantIsolatedReads",
@@ -26,7 +24,10 @@
         "Action": [
           "s3:GetObject"
         ],
-        "Resource": "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/vehicles/*"
+        "Resource": [
+          "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/vehicles/*",
+          "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/documents/customers/*"
+        ]
       },
       {
         "Sid": "AllowDeleteObjectForTenantIsolatedDeletes",
@@ -34,7 +35,10 @@
         "Action": [
           "s3:DeleteObject"
         ],
-        "Resource": "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/vehicles/*"
+        "Resource": [
+          "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/vehicles/*",
+          "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/documents/customers/*"
+        ]
       },
       {
         "Sid": "AllowListBucketForTenantIsolation",
@@ -45,7 +49,10 @@
         "Resource": "arn:aws:s3:::akilligaleri-photos-prod",
         "Condition": {
           "StringLike": {
-            "s3:prefix": "tenants/*/vehicles/*"
+            "s3:prefix": [
+              "tenants/*/vehicles/*",
+              "tenants/*/documents/customers/*"
+            ]
           }
         }
       },
@@ -55,7 +62,10 @@
         "Action": [
           "s3:GetObjectMetadata"
         ],
-        "Resource": "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/vehicles/*"
+        "Resource": [
+          "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/vehicles/*",
+          "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/documents/customers/*"
+        ]
       }
     ]
   },

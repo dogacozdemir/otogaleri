@@ -1,18 +1,18 @@
 import nodemailer from "nodemailer";
 
-// .env uyumluluğu: SMTP_* veya MAIL_* (her ikisi de desteklenir)
+// Tüm mail konfigürasyonu .env'den gelir (SMTP_* veya MAIL_*)
 const env = {
   host: process.env.MAIL_HOST || process.env.SMTP_HOST,
   port: process.env.MAIL_PORT || process.env.SMTP_PORT,
   secure: process.env.MAIL_SECURE || process.env.SMTP_SECURE,
   user: process.env.MAIL_USER || process.env.SMTP_USER,
   pass: process.env.MAIL_PASS || process.env.SMTP_PASS,
-  from: process.env.MAIL_FROM || process.env.SMTP_FROM || "noreply@otogaleri.com",
+  from: process.env.MAIL_FROM || process.env.SMTP_FROM,
 };
 
 /** Tüm giden maillerde kullanılacak gönderen adresi */
 function getDefaultFrom(): string {
-  return env.from;
+  return env.from ?? "";
 }
 
 /** AWS SES Sandbox: tüm alıcıları tek adrese yönlendirir (test modu) */
@@ -52,34 +52,41 @@ interface EmailConfig {
   };
 }
 
+const REQUIRED_MAIL_ENV = [
+  "SMTP_HOST veya MAIL_HOST",
+  "SMTP_PORT veya MAIL_PORT",
+  "SMTP_USER veya MAIL_USER",
+  "SMTP_PASS veya MAIL_PASS",
+  "SMTP_FROM veya MAIL_FROM",
+] as const;
+
+/** Mail konfigürasyonunun eksik olup olmadığını kontrol eder; eksikse hata fırlatır */
+function assertMailConfig(): void {
+  const missing: string[] = [];
+  if (!env.host) missing.push(REQUIRED_MAIL_ENV[0]);
+  if (!env.port) missing.push(REQUIRED_MAIL_ENV[1]);
+  if (!env.user || !env.pass) missing.push(REQUIRED_MAIL_ENV[2], REQUIRED_MAIL_ENV[3]);
+  if (!env.from) missing.push(REQUIRED_MAIL_ENV[4]);
+  if (missing.length > 0) {
+    throw new Error(
+      `Mail konfigürasyonu eksik. .env dosyasında şunları tanımlayın: ${[...new Set(missing)].join(", ")}. ` +
+        "Geliştirme için MAIL_DEV_LOG_ONLY=true kullanabilirsiniz."
+    );
+  }
+}
+
 /** Nodemailer transporter: SMTP_* / MAIL_* ile auth ve requireTLS */
 const createTransporter = () => {
-  const port = Number(env.port) || 587;
-  const auth =
-    env.user && env.pass
-      ? { user: env.user, pass: env.pass }
-      : undefined;
+  assertMailConfig();
 
+  const port = Number(env.port);
   const config: EmailConfig = {
-    host: env.host || "smtp.gmail.com",
+    host: env.host,
     port,
     secure: env.secure === "true",
     requireTLS: true,
-    auth,
+    auth: { user: env.user!, pass: env.pass! },
   };
-
-  if (!config.auth) {
-    return nodemailer.createTransport({
-      host: "smtp.ethereal.email",
-      port: 587,
-      secure: false,
-      requireTLS: true,
-      auth: {
-        user: "ethereal.user@ethereal.email",
-        pass: "ethereal.pass",
-      },
-    });
-  }
 
   return nodemailer.createTransport(config);
 };
@@ -198,9 +205,17 @@ Oto Galeri Yönetim Sistemi
   }
 }
 
-/** Şifre sıfırlama linki: FRONTEND_URL veya APP_URL kullanılır */
+/** Şifre sıfırlama linki: FRONTEND_URL veya APP_URL .env'den gelir */
 function getResetPasswordBaseUrl(): string {
-  const base = (process.env.FRONTEND_URL || process.env.APP_URL || "http://localhost:5173").replace(/\/$/, "");
+  const base = (process.env.FRONTEND_URL || process.env.APP_URL || "").replace(/\/$/, "");
+  if (!base) {
+    if (isDevLogOnly()) {
+      return "[FRONTEND_URL veya APP_URL .env'de tanımlayın]/reset-password";
+    }
+    throw new Error(
+      "Şifre sıfırlama linki için FRONTEND_URL veya APP_URL .env dosyasında tanımlanmalıdır."
+    );
+  }
   return `${base}/reset-password`;
 }
 
@@ -241,49 +256,72 @@ export async function sendPasswordResetEmail(
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #1a1a1a; margin: 0; padding: 0; background-color: #f5f5f5; }
-            .wrapper { max-width: 600px; margin: 0 auto; padding: 24px; }
-            .card { background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); overflow: hidden; }
-            .header { background: linear-gradient(135deg, #003d82 0%, #0054a6 100%); color: #fff; padding: 28px 24px; text-align: center; }
-            .header h1 { margin: 0; font-size: 22px; font-weight: 600; }
-            .content { padding: 32px 24px; }
-            .content p { margin: 0 0 16px; }
-            .btn { display: inline-block; padding: 14px 28px; background: #003d82; color: #fff !important; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 16px 0; }
-            .btn:hover { background: #0054a6; }
-            .muted { font-size: 13px; color: #666; margin-top: 24px; }
-            .muted a { color: #003d82; }
-            .footer { padding: 20px 24px; background: #f8f9fa; font-size: 12px; color: #666; text-align: center; }
-            .expiry { background: #fff8e6; border-left: 4px solid #F0A500; padding: 12px 16px; margin: 16px 0; border-radius: 0 8px 8px 0; font-size: 14px; }
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f7f9; }
+            .wrapper { max-width: 600px; margin: 20px auto; padding: 0 15px; }
+            .card { background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e1e8ed; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+            .header { background: #003d82; padding: 40px 20px; text-align: center; }
+            .header h1 { color: #ffffff; margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+            .content { padding: 40px 30px; }
+            .content h2 { font-size: 20px; color: #1a1a1a; margin-top: 0; }
+            .content p { color: #555; font-size: 16px; margin-bottom: 24px; }
+            .btn-container { text-align: center; margin: 30px 0; }
+            .btn { background-color: #003d82; color: #ffffff !important; padding: 16px 32px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 16px; display: inline-block; transition: background 0.3s ease; }
+            .expiry { background: #fffcf0; border: 1px solid #ffeeba; color: #856404; padding: 15px; border-radius: 8px; font-size: 14px; text-align: center; margin-bottom: 20px; }
+            .divider { height: 1px; background: #eee; margin: 30px 0; }
+            .muted { font-size: 12px; color: #888; text-align: center; line-height: 1.4; }
+            .footer { padding: 25px; background: #fdfdfd; text-align: center; border-top: 1px solid #eee; }
+            .footer p { font-size: 12px; color: #999; margin: 5px 0; }
           </style>
         </head>
         <body>
           <div class="wrapper">
             <div class="card">
               <div class="header">
-                <h1>Şifre Sıfırlama</h1>
+                <h1>Akıllı Galeri</h1>
               </div>
               <div class="content">
-                <p>Şifre sıfırlama talebinde bulundunuz. Aşağıdaki butona tıklayarak yeni şifrenizi belirleyebilirsiniz.</p>
-                <p><a href="${resetLink}" class="btn">Şifremi Sıfırla</a></p>
-                <div class="expiry">Bu link <strong>1 saat</strong> geçerlidir. Süre sonunda tekrar talep etmeniz gerekir.</div>
-                <p class="muted">Buton çalışmıyorsa aşağıdaki linki tarayıcınıza kopyalayın:</p>
-                <p class="muted"><a href="${resetLink}">${resetLink}</a></p>
+                <h2>Şifre Sıfırlama Talebi</h2>
+                <p>Merhaba,</p>
+                <p>Hesabınız için bir şifre sıfırlama talebinde bulundunuz. Yeni şifrenizi belirlemek için aşağıdaki güvenli butona tıklayabilirsiniz:</p>
+
+                <div class="btn-container">
+                  <a href="${resetLink}" class="btn">Yeni Şifre Belirle</a>
+                </div>
+
+                <div class="expiry">
+                  ⚠️ <strong>Güvenlik Notu:</strong> Bu bağlantı <strong>1 saat</strong> boyunca geçerlidir. Süre dolduğunda güvenlik gereği yeni bir talep oluşturmanız gerekecektir.
+                </div>
+
+                <div class="divider"></div>
+
+                <p class="muted">
+                  Eğer buton çalışmıyorsa, bu bağlantıyı tarayıcınıza yapıştırın:<br>
+                  <a href="${resetLink}" style="color: #003d82; word-break: break-all;">${resetLink}</a>
+                </p>
               </div>
               <div class="footer">
-                Bu talebi siz yapmadıysanız bu e-postayı yok sayabilirsiniz. Oto Galeri Yönetim Sistemi.
+                <p><strong>Akıllı Galeri Dijital Çözümler</strong></p>
+                <p>Bu e-posta otomatik olarak gönderilmiştir. Lütfen yanıtlamayınız.</p>
+                <p>Eğer bu talebi siz yapmadıysanız, hesabınızın güvende kalması için bu e-postayı silebilirsiniz.</p>
               </div>
             </div>
           </div>
         </body>
         </html>
       `,
-      text: `Şifre Sıfırlama
+      text: `Şifre Sıfırlama Talebi - Akıllı Galeri
 
-Şifre sıfırlama talebinde bulundunuz. Aşağıdaki linke tıklayarak yeni şifrenizi belirleyebilirsiniz. Bu link 1 saat geçerlidir.
+Merhaba,
+
+Hesabınız için bir şifre sıfırlama talebinde bulundunuz. Yeni şifrenizi belirlemek için aşağıdaki bağlantıya tıklayın:
 
 ${resetLink}
 
-Bu talebi siz yapmadıysanız bu e-postayı yok sayabilirsiniz. Oto Galeri Yönetim Sistemi.`,
+Güvenlik Notu: Bu bağlantı 1 saat boyunca geçerlidir. Süre dolduğunda yeni bir talep oluşturmanız gerekecektir.
+
+Bu talebi siz yapmadıysanız, hesabınızın güvende kalması için bu e-postayı silebilirsiniz.
+
+Akıllı Galeri Dijital Çözümler`,
     };
 
     const info = await transporter.sendMail(mailOptions);

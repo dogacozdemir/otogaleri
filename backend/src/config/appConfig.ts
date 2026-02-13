@@ -89,17 +89,29 @@ export interface CorsConfig {
   readonly allowed: string[];
 }
 
+const LOCALHOST_ORIGINS = [
+  'http://localhost:5173',
+  'http://localhost:5175',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5175',
+  'http://127.0.0.1:3000',
+];
+
 export const corsConfig: CorsConfig = {
-  allowedOrigins: process.env.ALLOWED_ORIGINS 
-    ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
-    : process.env.NODE_ENV === 'production' 
-      ? [] // Production'da environment variable zorunlu
-      : [
-          'http://localhost:5173',
-          'http://localhost:5175',
-          'http://127.0.0.1:5173',
-          'http://127.0.0.1:5175',
-        ],
+  allowedOrigins: (() => {
+    const fromEnv = process.env.ALLOWED_ORIGINS
+      ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim()).filter(Boolean)
+      : process.env.NODE_ENV === 'production'
+        ? [] // Production'da ALLOWED_ORIGINS zorunlu
+        : LOCALHOST_ORIGINS;
+
+    // Development: Production .env kopyalanmış olsa bile localhost'a izin ver
+    if (process.env.NODE_ENV !== 'production') {
+      return [...new Set([...fromEnv, ...LOCALHOST_ORIGINS])];
+    }
+    return fromEnv;
+  })(),
   
   /**
    * Check if origin is allowed (supports wildcard subdomains)

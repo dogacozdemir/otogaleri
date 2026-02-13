@@ -5,6 +5,7 @@ import multer from "multer";
 import sharp from "sharp";
 const FileType = require("file-type");
 import { StorageService } from "../services/storage/storageService";
+import { resolveStaffIdForTenant } from "../utils/staffUtils";
 
 // File upload configuration - use memory storage for S3 compatibility
 const storage = multer.memoryStorage();
@@ -208,6 +209,8 @@ export async function uploadVehicleImage(req: AuthRequest, res: Response) {
     );
     const nextOrder = (orderRows as any[])[0]?.next_order || 1;
 
+    const uploadedBy = req.tenantId != null ? await resolveStaffIdForTenant(req.tenantId) : null;
+
     // Upload to storage (S3 or local) - BEFORE database insert
     uploadResult = await StorageService.upload(optimizedBuffer, {
       folder: "vehicles",
@@ -230,7 +233,7 @@ export async function uploadVehicleImage(req: AuthRequest, res: Response) {
         uploadResult.size,
         uploadResult.mimeType,
         nextOrder,
-        req.userId || null,
+        uploadedBy,
       ]
     );
 

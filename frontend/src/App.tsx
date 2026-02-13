@@ -18,6 +18,7 @@ import QuotesPage from "./pages/QuotesPage";
 import AccountingPage from "./pages/AccountingPage";
 import InventoryPage from "./pages/InventoryPage";
 import SettingsPage from "./pages/SettingsPage";
+import JapaneseCalculatorPage from "./pages/JapaneseCalculatorPage";
 import SidebarLayout from "./components/SidebarLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -51,6 +52,7 @@ function App() {
             <Route path="quotes" element={<QuotesPage />} />
             <Route path="accounting" element={<AccountingPage />} />
             <Route path="inventory" element={<InventoryPage />} />
+            <Route path="gumruk-hesaplama" element={<JapaneseCalculatorPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
           </Routes>

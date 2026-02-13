@@ -9,34 +9,30 @@ export const api = axios.create({
   },
 });
 
-// Token storage helper - using sessionStorage for better XSS protection
-// sessionStorage is cleared when tab is closed, reducing XSS attack window
+// Token storage - localStorage kullanılıyor; yeni sekmede açılan sayfalar da token'a erişebilir
 const TOKEN_KEY = "otogaleri_token";
 
 function getToken(): string | null {
   try {
-    return sessionStorage.getItem(TOKEN_KEY);
-  } catch (e) {
-    // Fallback to localStorage if sessionStorage is not available
     return localStorage.getItem(TOKEN_KEY);
+  } catch (e) {
+    return null;
   }
 }
 
 function setToken(token: string): void {
   try {
-    sessionStorage.setItem(TOKEN_KEY, token);
-  } catch (e) {
-    // Fallback to localStorage if sessionStorage is not available
     localStorage.setItem(TOKEN_KEY, token);
+  } catch (e) {
+    console.warn("Token kaydedilemedi:", e);
   }
 }
 
 function removeToken(): void {
   try {
-    sessionStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(TOKEN_KEY); // Also remove from localStorage if exists
-  } catch (e) {
     localStorage.removeItem(TOKEN_KEY);
+  } catch (e) {
+    console.warn("Token silinemedi:", e);
   }
 }
 

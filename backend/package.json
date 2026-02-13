@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "nodemon src/server.ts",
+    "dev": "NODE_ENV=development nodemon src/server.ts",
     "start": "node dist/server.js",
-    "build": "tsc -p .",
+    "build": "tsc -p . && node -e \"require('fs').cpSync('src/data', 'dist/data', {recursive: true})\"",
     "migrate": "ts-node src/scripts/runMigrations.ts",
     "migrate:status": "ts-node src/scripts/runMigrations.ts --status",
     "test": "jest",
