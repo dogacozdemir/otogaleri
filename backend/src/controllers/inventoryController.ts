@@ -686,6 +686,25 @@ export async function getAnalytics(req: AuthRequest, res: Response) {
       both_count: 0,
     };
 
+    // Düşük stok ürün listesi (tenant'a özel)
+    const [lowStockItemsRows] = await dbPool.query(
+      `SELECT id, sku, name, current_stock as current, min_stock as min
+       FROM inventory_products
+       WHERE tenant_id = ? AND track_stock = 1 AND current_stock <= min_stock
+       ORDER BY current_stock ASC
+       LIMIT 10`,
+      [req.tenantId]
+    );
+    const lowStockItemsRaw = (lowStockItemsRows as any[]) || [];
+    const lowStockItems = lowStockItemsRaw.map((row: any) => ({
+      id: row.id,
+      sku: row.sku || "-",
+      name: row.name || "İsimsiz",
+      current: Number(row.current) ?? 0,
+      min: Number(row.min) ?? 0,
+      status: row.current === 0 ? "critical" : "warning",
+    }));
+
     res.json({
       totalProducts,
       lowStockCount,
@@ -693,6 +712,7 @@ export async function getAnalytics(req: AuthRequest, res: Response) {
       categoryStats: categoryRows,
       recentMovements: movementRows,
       usageStats,
+      lowStockItems,
     });
   } catch (err) {
     console.error("[inventory] Analytics error", err);

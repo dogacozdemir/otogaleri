@@ -2,7 +2,6 @@
   "description": "AWS S3 Infrastructure Policies for Oto Galeri Application",
   "version": "1.0.0",
   "lastUpdated": "2026-02-13",
-  
   "iamPolicy": {
     "Version": "2012-10-17",
     "Statement": [
@@ -15,7 +14,8 @@
         ],
         "Resource": [
           "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/vehicles/*",
-          "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/documents/customers/*"
+          "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/documents/customers/*",
+          "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/documents/vehicles/*"
         ]
       },
       {
@@ -26,7 +26,8 @@
         ],
         "Resource": [
           "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/vehicles/*",
-          "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/documents/customers/*"
+          "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/documents/customers/*",
+          "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/documents/vehicles/*"
         ]
       },
       {
@@ -37,7 +38,8 @@
         ],
         "Resource": [
           "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/vehicles/*",
-          "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/documents/customers/*"
+          "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/documents/customers/*",
+          "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/documents/vehicles/*"
         ]
       },
       {
@@ -51,7 +53,8 @@
           "StringLike": {
             "s3:prefix": [
               "tenants/*/vehicles/*",
-              "tenants/*/documents/customers/*"
+              "tenants/*/documents/customers/*",
+              "tenants/*/documents/vehicles/*"
             ]
           }
         }
@@ -64,12 +67,12 @@
         ],
         "Resource": [
           "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/vehicles/*",
-          "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/documents/customers/*"
+          "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/documents/customers/*",
+          "arn:aws:s3:::akilligaleri-photos-prod/tenants/*/documents/vehicles/*"
         ]
       }
     ]
   },
-
   "corsPolicy": {
     "CORSRules": [
       {
@@ -104,7 +107,6 @@
       }
     ]
   },
-
   "bucketPolicy": {
     "Version": "2012-10-17",
     "Statement": [
@@ -122,7 +124,6 @@
       }
     ]
   },
-
   "notes": {
     "iamPolicy": {
       "description": "Minimum required permissions for application IAM user/role",
@@ -140,7 +141,7 @@
       "description": "CORS configuration for S3 bucket",
       "usage": "Apply via AWS Console > S3 > Bucket > Permissions > CORS, or AWS CLI",
       "awsCliCommand": "aws s3api put-bucket-cors --bucket akilligaleri-photos-prod --cors-configuration file://cors-policy.json",
-        "replacements": [
+      "replacements": [
         "Production: https://akilligaleri.com, https://app.akilligaleri.com",
         "localhost:3000, localhost:5173: Development origins"
       ],

@@ -99,15 +99,13 @@ const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
                       <span className="text-base font-medium w-6">{icon}</span>
                       <span className="flex-1">{curr.label}</span>
                     </button>
-                    {curr.value !== baseCurrency && (
-                      <CurrencyRateEditor
-                        fromCurrency={curr.value}
-                        toCurrency={baseCurrency}
-                        baseCurrency={baseCurrency}
-                        customRate={isSelected && customRate !== undefined ? customRate : undefined}
-                        onRateChange={isSelected && onCustomRateChange ? onCustomRateChange : undefined}
-                      />
-                    )}
+                    <CurrencyRateEditor
+                      fromCurrency={curr.value}
+                      toCurrency={baseCurrency}
+                      baseCurrency={baseCurrency}
+                      customRate={isSelected && customRate !== undefined ? customRate : undefined}
+                      onRateChange={isSelected && onCustomRateChange ? onCustomRateChange : undefined}
+                    />
                   </div>
                 )
               })}

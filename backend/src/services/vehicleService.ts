@@ -404,6 +404,16 @@ export class VehicleService {
         model: (params.model && params.model.trim() !== '') ? params.model : null,
         production_year: params.production_year ?? null,
         arrival_date: params.arrival_date ?? null,
+        transmission: (params as any).transmission && String((params as any).transmission).trim() !== '' ? (params as any).transmission : null,
+        chassis_no: (params as any).chassis_no && String((params as any).chassis_no).trim() !== '' ? (params as any).chassis_no : null,
+        plate_number: (params as any).plate_number && String((params as any).plate_number).trim() !== '' ? (params as any).plate_number : null,
+        km: (params as any).km ?? null,
+        fuel: (params as any).fuel && String((params as any).fuel).trim() !== '' ? (params as any).fuel : null,
+        grade: (params as any).grade && String((params as any).grade).trim() !== '' ? (params as any).grade : null,
+        cc: (params as any).cc ?? null,
+        color: (params as any).color && String((params as any).color).trim() !== '' ? (params as any).color : null,
+        engine_no: (params.engine_no && params.engine_no.trim() !== '') ? params.engine_no : null,
+        other: (params as any).other && String((params as any).other).trim() !== '' ? (params as any).other : null,
         purchase_amount: params.purchase_amount ?? null,
         purchase_currency: params.purchase_currency || baseCurrency,
         purchase_fx_rate_to_base: purchaseFxRate,
@@ -413,7 +423,6 @@ export class VehicleService {
         status: params.status || "used",
         stock_status: params.stock_status || "in_stock",
         location: (params.location && params.location.trim() !== '') ? params.location : null,
-        engine_no: (params.engine_no && params.engine_no.trim() !== '') ? params.engine_no : null,
         target_profit: params.target_profit ?? null,
         features: params.features ? JSON.stringify(params.features) : null,
       });
@@ -539,6 +548,7 @@ export class VehicleService {
   /**
    * Update an existing vehicle
    * Uses TenantAwareQuery for automatic tenant_id enforcement
+   * Recalculates FX rates when purchase_currency or sale_currency changes
    */
   static async updateVehicle(
     tenantQuery: TenantAwareQuery,
@@ -549,6 +559,8 @@ export class VehicleService {
       await this.validateVehicleNumber(tenantQuery, params.vehicle_number, params.id);
     }
 
+    const baseCurrency = await this.getBaseCurrency(tenantQuery);
+
     // Build update data object
     const updateData: Record<string, any> = {};
     Object.keys(params).forEach((key) => {
@@ -556,6 +568,37 @@ export class VehicleService {
         updateData[key] = (params as any)[key];
       }
     });
+
+    // Recalculate purchase_fx_rate_to_base when purchase_currency changes
+    if (updateData.purchase_currency && updateData.purchase_currency !== baseCurrency) {
+      const purchaseDate = updateData.purchase_date || new Date().toISOString().split('T')[0];
+      updateData.purchase_fx_rate_to_base = await getOrFetchRate(
+        tenantQuery,
+        updateData.purchase_currency as SupportedCurrency,
+        baseCurrency as SupportedCurrency,
+        purchaseDate
+      );
+    } else if (updateData.purchase_currency === baseCurrency) {
+      updateData.purchase_fx_rate_to_base = 1;
+    }
+
+    // Recalculate sale_fx_rate_to_base when sale_currency changes
+    if (updateData.sale_currency && updateData.sale_currency !== baseCurrency) {
+      const rateDate = updateData.purchase_date || new Date().toISOString().split('T')[0];
+      updateData.sale_fx_rate_to_base = await getOrFetchRate(
+        tenantQuery,
+        updateData.sale_currency as SupportedCurrency,
+        baseCurrency as SupportedCurrency,
+        rateDate
+      );
+    } else if (updateData.sale_currency === baseCurrency) {
+      updateData.sale_fx_rate_to_base = 1;
+    }
+
+    // Stringify features for JSON column
+    if (updateData.features !== undefined) {
+      updateData.features = updateData.features ? JSON.stringify(updateData.features) : null;
+    }
 
     if (Object.keys(updateData).length === 0) {
       throw new Error("No fields to update");

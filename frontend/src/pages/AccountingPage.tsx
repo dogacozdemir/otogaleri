@@ -670,7 +670,7 @@ const AccountingPage = () => {
             <p className="text-sm text-muted-foreground">Son {dateFilterPeriod.toLowerCase()} gelir ve gider karşılaştırması</p>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={300} minHeight={200} initialDimension={{ width: 100, height: 200 }}>
               <LineChart data={trendData}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="date" className="text-xs" tick={{ fontSize: 12 }} />

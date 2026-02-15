@@ -928,9 +928,11 @@ const CustomerDetails: React.FC = () => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => {
+                                  // Prefer doc.url (S3 signed URL)
                                   const url = doc.url || doc.file_path;
                                   if (!url) return;
-                                  const fullUrl = url.startsWith("http") ? url : `${getApiBaseUrl()}${url}`;
+                                  const base = getApiBaseUrl().replace(/\/$/, "");
+                                  const fullUrl = url.startsWith("http") ? url : `${base}/${url.replace(/^\//, "")}`;
                                   window.open(fullUrl, "_blank");
                                 }}
                               >

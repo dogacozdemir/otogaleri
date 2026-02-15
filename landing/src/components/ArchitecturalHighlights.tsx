@@ -40,7 +40,7 @@ const cardVariants = {
 
 export function ArchitecturalHighlights() {
   return (
-    <section id="mimari" className="relative py-24 px-4 bg-slate-900/30">
+    <section id="mimari" className="relative py-24 px-4 bg-slate-100 dark:bg-slate-900/30">
       <div className="max-w-6xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -48,10 +48,10 @@ export function ArchitecturalHighlights() {
           viewport={{ once: true }}
           className="text-center mb-16"
         >
-          <h2 className="text-3xl sm:text-4xl font-bold text-slate-50 mb-4">
+          <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-slate-50 mb-4">
             Teknik Güvenlik
           </h2>
-          <p className="max-w-2xl mx-auto text-slate-400 text-lg">
+          <p className="max-w-2xl mx-auto text-slate-600 dark:text-slate-400 text-lg">
             Multi-tenant mimari, JWT ve rol tabanlı erişim ile verileriniz güvende.
           </p>
         </motion.div>
@@ -65,17 +65,17 @@ export function ArchitecturalHighlights() {
               whileInView="visible"
               viewport={{ once: true }}
               className={cn(
-                "rounded-2xl border border-slate-700 bg-slate-800/50 p-8",
-                "hover:border-primary-500/40 transition-colors"
+                "rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 p-8",
+                "hover:border-indigo-500/40 transition-colors"
               )}
             >
-              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary-500/20 text-primary-400 mb-6">
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 mb-6">
                 <item.icon className="h-7 w-7" />
               </div>
-              <h3 className="text-xl font-semibold text-slate-100 mb-3">
+              <h3 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-3">
                 {item.title}
               </h3>
-              <p className="text-slate-400 leading-relaxed">{item.description}</p>
+              <p className="text-slate-600 dark:text-slate-400 leading-relaxed">{item.description}</p>
             </motion.div>
           ))}
         </div>
@@ -91,12 +91,12 @@ export function ArchitecturalHighlights() {
               key={badge.label}
               title={badge.title}
               className={cn(
-                "flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3",
-                "hover:border-primary-500/40 hover:bg-slate-800/80 transition-colors"
+                "flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 px-4 py-3",
+                "hover:border-indigo-500/40 transition-colors"
               )}
             >
-              <badge.icon className="h-5 w-5 text-primary-400 shrink-0" />
-              <span className="text-sm font-medium text-slate-300">{badge.label}</span>
+              <badge.icon className="h-5 w-5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{badge.label}</span>
             </div>
           ))}
         </motion.div>

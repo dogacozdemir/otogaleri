@@ -1,6 +1,13 @@
 /**
  * Japon Araç Gümrük Hesaplama Servisi
- * Verginin vergisi matrah mantığına tam uyumlu.
+ *
+ * Genel Toplam = 4 kalem:
+ * 1. Kalem: Stopaj + KDV + FIF + İthalat-İhracat + GK Güç Fonu + Bandrol + Gümrük Resmi (hepsi kalem fiyat üzerinden)
+ * 2. Kalem: Kayıt parası (kalem fiyat × %4 hybrid/elektrik veya %6 benzin/dizel)
+ * 3. Kalem: Gümrük komisyonu
+ * 4. Kalem: Ağırlık katsayısı (kg × birim) veya iş aracı sabit 11.400 TL
+ *
+ * Fatura = (Gümrük bedeli + Kalem fiyat) + Vergi
  */
 
 export type FuelType = "benzinli" | "dizel" | "hybrid" | "elektrikli" | "is_araci";
@@ -17,8 +24,8 @@ export type JaponKiymetData = Record<
   >
 >;
 
-/** Kayıt parası katsayıları: [minWeight, maxWeight, katsayı] - katsayı × 1000 = TL */
-const KAYIT_KATSAYILARI: Record<Exclude<FuelType, "is_araci">, Array<[number, number, number]>> = {
+/** Ağırlığa göre katsayı tablosu: [minWeight, maxWeight, birim] - Miktar = Ağırlık (KG) × Birim */
+const AGIRLIK_KATSAYILARI: Record<Exclude<FuelType, "is_araci">, Array<[number, number, number]>> = {
   benzinli: [
     [0, 1016, 1.5],
     [1017, 1270, 2.6],
@@ -45,7 +52,8 @@ const KAYIT_KATSAYILARI: Record<Exclude<FuelType, "is_araci">, Array<[number, nu
   ],
 };
 
-const BANDROL_TL = 50;
+/** İş aracı (çift kabin, panel van) sabit ücreti - TL */
+const IS_ARACI_SABIT_TL = 11400;
 
 /** Motor gücüne göre F.İ.F oranı: <2000cc %3, 2000-3000cc %6, >3000cc %8 */
 export function getFIFRateFromCC(cc: number): number {
@@ -60,30 +68,41 @@ export function parseMotorGucuCC(motorGucu: string): number {
   return match ? parseInt(match[1], 10) : 0;
 }
 
-/** Ağırlık ve yakıt tipine göre kayıt parası katsayısı (×1000 = TL) */
-function getKayitKatsayisi(agirlikKg: number, yakıtTipi: Exclude<FuelType, "is_araci">): number {
-  const brackets = KAYIT_KATSAYILARI[yakıtTipi];
+/** Ağırlık ve yakıt tipine göre birim (katsayı) değeri */
+function getAgirlikKatsayisi(agirlikKg: number, yakıtTipi: Exclude<FuelType, "is_araci">): number {
+  const brackets = AGIRLIK_KATSAYILARI[yakıtTipi];
   for (const [min, max, katsayı] of brackets) {
     if (agirlikKg >= min && agirlikKg <= max) return katsayı;
   }
   return brackets[brackets.length - 1][2];
 }
 
-/** Kayıt parası hesapla (TL). İş aracı: sabit 11.400 TL. */
-export function calculateKayitParasi(
+/** 4. Kalem: Ağırlığa göre katsayı hesabı (TL). İş aracı: sabit 11.400 TL. Diğerleri: Ağırlık × Birim */
+function calculateAgirlikKatsayisi(
   agirlikKg: number,
   yakıtTipi: FuelType,
   isIsAraci: boolean
 ): number {
-  if (isIsAraci || yakıtTipi === "is_araci") return 11400;
-  const katsayı = getKayitKatsayisi(agirlikKg, yakıtTipi as Exclude<FuelType, "is_araci">);
-  return katsayı * 1000; // Katsayı × 1000 = TL
+  if (isIsAraci || yakıtTipi === "is_araci") return IS_ARACI_SABIT_TL;
+  const katsayı = getAgirlikKatsayisi(agirlikKg, yakıtTipi as Exclude<FuelType, "is_araci">);
+  return agirlikKg * katsayı; // Ağırlık (KG) × Birim = TL
+}
+
+/** 2. Kalem: Kayıt parası oranı. Benzin/Dizel %6, Hybrid/Elektrikli %4. İş aracı: alt yakıt tipine göre */
+function calculateKayitParasiOrani(
+  yakıtTipi: FuelType,
+  isAraciYakitTipi?: "benzinli" | "dizel" | "hybrid" | "elektrikli"
+): number {
+  if (yakıtTipi === "is_araci") {
+    const alt = isAraciYakitTipi ?? "dizel";
+    return alt === "benzinli" || alt === "dizel" ? 0.06 : 0.04;
+  }
+  if (yakıtTipi === "benzinli" || yakıtTipi === "dizel") return 0.06;
+  return 0.04; // hybrid, elektrikli
 }
 
 export interface CalculatorInput {
-  /** JSON kıymet (JPY) - vehicle select veya chassis query'den */
   kiymetJPY: number | null;
-  /** Manuel girişte kullanıcının girdiği kıymet */
   manuelKiymetJPY?: number;
   gemiParasiJPY: number;
   jpyTryKuru: number;
@@ -91,32 +110,47 @@ export interface CalculatorInput {
   agirlikKg: number;
   yakıtTipi: FuelType;
   isIsAraci: boolean;
-  kdvOrani: number; // 0-40 arası (0.10 = %10)
+  /** İş aracı ise alt yakıt tipi (benzin/dizel/hybrid/elektrik). Yoksa dizel varsayılır. */
+  isAraciYakitTipi?: "benzinli" | "dizel" | "hybrid" | "elektrikli";
+  kdvOrani: number;
   gumrukKomisyonu: number;
   ardiye: number;
 }
 
 export interface CalculatorResult {
+  /** Kalem Fiyatı (CIF) = araç kıymeti + gemi parası, TRY */
   cifTRY: number;
-  gumrukResmi: number;
-  fif: number;
-  rihtim: number;
-  gucFonu: number;
-  bandrol: number;
-  kayitParasi: number;
-  kdvMatrahi: number;
-  kdv: number;
+  /** 1. Kalem alt bileşenleri (kalem fiyat üzerinden hesaplanan, eklenmeyen) */
   stopaj: number;
+  kdv: number;
+  fif: number;
+  ithalatIhracat: number;
+  gkGucFonu: number;
+  bandrol: number;
+  gumrukResmi: number;
+  /** 1. Kalem toplamı */
+  birinciKalem: number;
+  /** 2. Kalem: Kayıt parası */
+  kayitParasi: number;
+  /** 3. Kalem: Gümrük komisyonu */
   gumrukKomisyonu: number;
-  ardiye: number;
+  /** 4. Kalem: Ağırlık katsayısı */
+  agirlikKatsayisi: number;
+  /** Genel Toplam = 1. + 2. + 3. + 4. kalem */
   genelToplam: number;
-  /** Hesaplama yapılamadıysa sebep */
+  /** Fatura: (Gümrük bedeli + Kalem fiyat) + Vergi */
+  faturaMatrah: number;
+  faturaVergi: number;
+  faturaToplam: number;
   error?: string;
 }
 
 /**
- * Hassas vergi hesaplama zinciri.
- * Sıra: CIF → Gümrük Resmi → F.İ.F → Rıhtım, Güç Fonu → KDV Matrahı → KDV, Stopaj → Genel Toplam
+ * Genel Toplam = 4 kalem:
+ * 1. Kalem: Stopaj + KDV + FIF + İthalat-İhracat + GK Güç Fonu + Bandrol + Gümrük Resmi (kalem fiyat üzerinden)
+ * 2. Kalem: Kayıt parası (kalem fiyat × %4 hybrid/elektrik veya %6 benzin/dizel)
+ * 3. Kalem: Gümrük komisyonu
+ * 4. Kalem: Ağırlık katsayısı (kg × birim) veya iş aracı sabit 11.400 TL
  */
 export function calculateCustomsTax(input: CalculatorInput): CalculatorResult {
   const {
@@ -128,9 +162,9 @@ export function calculateCustomsTax(input: CalculatorInput): CalculatorResult {
     agirlikKg,
     yakıtTipi,
     isIsAraci,
+    isAraciYakitTipi,
     kdvOrani,
     gumrukKomisyonu,
-    ardiye,
   } = input;
 
   const baseKiymetJPY = kiymetJPY ?? manuelKiymetJPY ?? 0;
@@ -150,79 +184,91 @@ export function calculateCustomsTax(input: CalculatorInput): CalculatorResult {
     return zeroResult({ error: "Lütfen ağırlık bilgisini giriniz (kg)." });
   }
 
-  // 1. CIF Bedeli (TRY)
-  const toplamJPY = baseKiymetJPY + gemiParasiJPY;
-  const cifTRY = toplamJPY * jpyTryKuru;
+  // Kalem Fiyatı (CIF) = araç kıymeti + gemi parası
+  const kalemFiyat = (baseKiymetJPY + gemiParasiJPY) * jpyTryKuru;
 
-  // 2. Gümrük Resmi: CIF × %10
-  const gumrukResmi = cifTRY * 0.1;
+  // 1. Kalem: Kalem fiyat üzerinden hesaplanan kalemler (eklenmez, toplanır)
+  const stopaj = kalemFiyat * 0.04; // %4
+  const kdv = kalemFiyat * kdvOrani; // Kullanıcı seçimi
+  const fifOrani = getFIFRateFromCC(motorGucuCC);
+  const fif = kalemFiyat * fifOrani;
+  const ithalatIhracat = kalemFiyat * 0.044; // %4.4
+  const gkGucFonu = kalemFiyat * 0.025; // %2.5
+  const bandrol = 50; // Sabit
+  const gumrukResmi = kalemFiyat * 0.1; // %10
+  const birinciKalem = stopaj + kdv + fif + ithalatIhracat + gkGucFonu + bandrol + gumrukResmi;
 
-  // 3. F.İ.F: Motor gücüne göre × CIF
-  const fifRate = getFIFRateFromCC(motorGucuCC);
-  const fif = cifTRY * fifRate;
+  // 2. Kalem: Kayıt parası
+  const kayitParasiOrani = calculateKayitParasiOrani(yakıtTipi, isAraciYakitTipi);
+  const kayitParasi = kalemFiyat * kayitParasiOrani;
 
-  // 4. Rıhtım (%4.4) ve Güç Fonu (%2.5): CIF üzerinden
-  const rihtim = cifTRY * 0.044;
-  const gucFonu = cifTRY * 0.025;
+  // 3. Kalem: Gümrük komisyonu
+  const gumrukKomisyonuTL = gumrukKomisyonu;
 
-  // 5. Bandrol ve Kayıt Parası
-  const bandrol = BANDROL_TL;
-  const kayitParasi = calculateKayitParasi(agirlikKg, yakıtTipi, isIsAraci);
+  // 4. Kalem: Ağırlık katsayısı
+  const agirlikKatsayisi = calculateAgirlikKatsayisi(agirlikKg, yakıtTipi, isIsAraci);
 
-  // 6. KDV Matrahı = CIF + Gümrük Resmi + F.İ.F + Rıhtım + Güç Fonu + Bandrol + Kayıt Parası
-  const kdvMatrahi =
-    cifTRY + gumrukResmi + fif + rihtim + gucFonu + bandrol + kayitParasi;
+  // Genel Toplam = 1. + 2. + 3. + 4. kalem
+  const genelToplam = birinciKalem + kayitParasi + gumrukKomisyonuTL + agirlikKatsayisi;
 
-  // 7. Stopaj (%4): CIF üzerinden - KDV matrahına DAHİL DEĞİL
-  const stopaj = cifTRY * 0.04;
-
-  // 8. KDV: KDV Matrahı × Slider oranı
-  const kdv = kdvMatrahi * kdvOrani;
-
-  // 9. Genel Toplam = KDV Matrahı + KDV + Stopaj + Gümrük Komisyonu + Ardiye
-  const genelToplam =
-    kdvMatrahi + kdv + stopaj + gumrukKomisyonu + ardiye;
+  // Fatura = (CIF + 1. kalem) + KDV
+  const faturaMatrah = kalemFiyat + birinciKalem;
+  const faturaVergi = faturaMatrah * kdvOrani;
+  const faturaToplam = faturaMatrah + faturaVergi;
 
   return {
-    cifTRY,
-    gumrukResmi,
-    fif,
-    rihtim,
-    gucFonu,
-    bandrol,
-    kayitParasi,
-    kdvMatrahi,
-    kdv,
+    cifTRY: kalemFiyat,
     stopaj,
-    gumrukKomisyonu,
-    ardiye,
+    kdv,
+    fif,
+    ithalatIhracat,
+    gkGucFonu,
+    bandrol,
+    gumrukResmi,
+    birinciKalem,
+    kayitParasi,
+    gumrukKomisyonu: gumrukKomisyonuTL,
+    agirlikKatsayisi,
     genelToplam,
+    faturaMatrah,
+    faturaVergi,
+    faturaToplam,
   };
 }
 
 function zeroResult(extra: { error?: string }): CalculatorResult {
   return {
     cifTRY: 0,
-    gumrukResmi: 0,
-    fif: 0,
-    rihtim: 0,
-    gucFonu: 0,
-    bandrol: 0,
-    kayitParasi: 0,
-    kdvMatrahi: 0,
-    kdv: 0,
     stopaj: 0,
+    kdv: 0,
+    fif: 0,
+    ithalatIhracat: 0,
+    gkGucFonu: 0,
+    bandrol: 0,
+    gumrukResmi: 0,
+    birinciKalem: 0,
+    kayitParasi: 0,
     gumrukKomisyonu: 0,
-    ardiye: 0,
+    agirlikKatsayisi: 0,
     genelToplam: 0,
+    faturaMatrah: 0,
+    faturaVergi: 0,
+    faturaToplam: 0,
     ...extra,
   };
 }
 
+/** Eski calculateKayitParasi - ağırlık katsayısı için (geriye uyumluluk, artık kullanılmıyor) */
+export function calculateKayitParasi(
+  agirlikKg: number,
+  yakıtTipi: FuelType,
+  isIsAraci: boolean
+): number {
+  return calculateAgirlikKatsayisi(agirlikKg, yakıtTipi, isIsAraci);
+}
+
 /**
  * Şasi numarasında kod ara – JSON'daki TÜM kodları tara.
- * chassis.includes(kod) mantığıyla metin içi arama.
- * En uzun eşleşen kodu döndür (daha spesifik).
  */
 export function findChassisMatchInJson(
   chassis: string,
@@ -253,9 +299,6 @@ export function findChassisMatchInJson(
   return bestMatch;
 }
 
-/**
- * Model için ilk (veya tek) kodu döndür – kullanıcı Kod seçmez.
- */
 export function getFirstCodeForModel(
   data: JaponKiymetData,
   marka: string,

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Vehicle } from "@/hooks/useVehiclesData";
 import {
   Dialog,
@@ -55,6 +56,13 @@ export const VehicleDetailModal = ({
   onDeletePayment,
   onOpenPaymentModal,
 }: VehicleDetailModalProps) => {
+  // Modal açıldığında belgeleri yükle (yeni belge eklemeden önce mevcut belgeler görünsün)
+  useEffect(() => {
+    if (open && vehicle?.id) {
+      onFetchDocuments(vehicle.id);
+    }
+  }, [open, vehicle?.id]); // onFetchDocuments stable from parent
+
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'new': return 'default';

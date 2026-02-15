@@ -88,10 +88,16 @@ const VehicleImageUpload: React.FC<VehicleImageUploadProps> = ({ vehicleId, onUp
       return `Dosya boyutu çok büyük. Maksimum ${MAX_FILE_SIZE / 1024 / 1024}MB olmalıdır.`;
     }
 
-    // Dosya tipi kontrolü
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      return 'Sadece JPG, PNG veya WEBP formatları desteklenmektedir.';
+    // Dosya tipi kontrolü - yaygın formatlar (JFIF, GIF, TIFF, AVIF dahil)
+    const allowedTypes = [
+      'image/jpeg', 'image/jpg', 'image/jfif', 'image/pjpeg',
+      'image/png', 'image/webp', 'image/gif', 'image/tiff', 'image/avif',
+    ];
+    const allowedExtensions = /\.(jpeg|jpg|jfif|png|webp|gif|tiff|tif|avif)$/i;
+    const hasValidType = allowedTypes.includes(file.type);
+    const hasValidExtension = allowedExtensions.test(file.name);
+    if (!hasValidType && !hasValidExtension) {
+      return 'Desteklenen formatlar: JPG, JFIF, PNG, WEBP, GIF, TIFF, AVIF';
     }
 
     // Duplicate kontrolü
@@ -507,7 +513,7 @@ const VehicleImageUpload: React.FC<VehicleImageUploadProps> = ({ vehicleId, onUp
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/jpeg,image/jpg,image/png,image/webp"
+          accept="image/jpeg,image/jpg,image/jfif,image/png,image/webp,image/gif,image/tiff,image/avif,.jfif,.gif,.tiff,.tif,.avif"
           multiple
           onChange={handleFileSelect}
           className="hidden"
@@ -526,7 +532,7 @@ const VehicleImageUpload: React.FC<VehicleImageUploadProps> = ({ vehicleId, onUp
               {isDragging ? 'Dosyaları buraya bırakın' : 'Dosyaları sürükleyip bırakın veya tıklayın'}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Maksimum {MAX_FILES} dosya, her biri en fazla {MAX_FILE_SIZE / 1024 / 1024}MB (JPG, PNG, WEBP)
+              Maksimum {MAX_FILES} dosya, her biri en fazla {MAX_FILE_SIZE / 1024 / 1024}MB (JPG, JFIF, PNG, WEBP, GIF, TIFF, AVIF)
             </p>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import zxcvbn from "zxcvbn";
 import { api, setToken } from "../api";
 import { Button } from "@/components/ui/button";
@@ -28,10 +28,17 @@ const PASSWORD_REQUIREMENTS: PasswordRequirement[] = [
 const AuthPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [activeTab, setActiveTab] = useState("login");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Tab URL ile senkron: /register veya /signup -> Kayıt Ol, diğerleri -> Giriş Yap
+  const activeTab = location.pathname === "/register" || location.pathname === "/signup" ? "register" : "login";
+
+  const setActiveTab = (tab: string) => {
+    navigate(tab === "register" ? "/register" : "/login", { replace: true });
+  };
 
   // Form state
   const [loginEmail, setLoginEmail] = useState("");
@@ -266,7 +273,7 @@ const AuthPage = () => {
           </CardHeader>
 
           <CardContent>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v)} className="w-full">
               <TabsList className="grid w-full grid-cols-2 bg-slate-100 dark:bg-slate-700 p-1">
                 <TabsTrigger
                   value="login"

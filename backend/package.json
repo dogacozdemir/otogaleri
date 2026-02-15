@@ -8,6 +8,7 @@
     "build": "tsc -p . && node -e \"require('fs').cpSync('src/data', 'dist/data', {recursive: true})\"",
     "migrate": "ts-node src/scripts/runMigrations.ts",
     "migrate:status": "ts-node src/scripts/runMigrations.ts --status",
+    "seed:dogac": "ts-node src/scripts/seedDogac.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",

@@ -43,7 +43,7 @@ export const BrandProfitChart = ({ data, onViewDetails }: BrandProfitChartProps)
         )
       }
     >
-      <ResponsiveContainer width="100%" height={350} minHeight={350}>
+      <ResponsiveContainer width="100%" height={350} minHeight={350} initialDimension={{ width: 100, height: 200 }}>
         <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
           <XAxis

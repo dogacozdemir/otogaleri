@@ -84,7 +84,7 @@ const VehiclesPage = () => {
   const vehiclesData = useVehiclesData();
   
   // Local state for modals and forms (not yet extracted) - single viewMode for both Mevcut and Satılan tabs
-  const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid');
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
 
   // Modal states
   const [openAdd, setOpenAdd] = useState(false);
@@ -133,8 +133,9 @@ const VehiclesPage = () => {
   // vehicleCosts and costCalculation are now managed by useVehiclesData hook
   // const [vehicleCosts, setVehicleCosts] = useState<VehicleCost[]>([]);
   // const [costCalculation, setCostCalculation] = useState<CostCalculation | null>(null);
-  const [vehicleDocuments, setVehicleDocuments] = useState<any[]>([]);
   const [showDocumentDialog, setShowDocumentDialog] = useState(false);
+  // Araç belgeleri - müşteri sayfasıyla aynı pattern: manuel fetch + state
+  const [vehicleDocuments, setVehicleDocuments] = useState<any[]>([]);
   const [documentForm, setDocumentForm] = useState<DocumentFormData>({
     document_type: "contract",
     document_name: "",
@@ -316,15 +317,6 @@ const VehiclesPage = () => {
   // Note: fetchVehicleDetail is now provided by useVehiclesData hook
   // We use vehiclesData.fetchVehicleDetail directly
 
-  const fetchVehicleDocuments = async (vehicleId: number) => {
-    try {
-      const response = await api.get(`/documents/vehicles/${vehicleId}`);
-      setVehicleDocuments(response.data || []);
-    } catch (error) {
-      console.error("Vehicle documents fetch error:", error);
-    }
-  };
-
   const fetchCostCalculation = async (id: number) => {
     // Use the hook's fetchCostCalculation which invalidates the query
     await vehiclesData.fetchCostCalculation(id);
@@ -413,13 +405,11 @@ const VehiclesPage = () => {
     try {
       const payload: any = {};
       const contractPdf = vehicleForm.contract_pdf;
+      const skipKeys = ['contract_pdf', 'delivery_date', 'delivery_time'];
       
       Object.keys(vehicleForm).forEach(key => {
+        if (skipKeys.includes(key)) return;
         const value = vehicleForm[key as keyof typeof vehicleForm];
-        if (key === 'contract_pdf') {
-          // PDF'i ayrı işleyeceğiz
-          return;
-        }
         if (key === 'paid') {
           // paid alanını purchase_amount olarak gönder
           if (value) {
@@ -498,7 +488,10 @@ const VehiclesPage = () => {
     if (!vehiclesData.selectedVehicle) return;
     try {
       const payload: any = {};
+      // delivery_date ve delivery_time DB'de yok - purchase_date purchase_currency bloğunda set ediliyor
+      const skipKeys = ['contract_pdf', 'delivery_date', 'delivery_time'];
       Object.keys(vehicleForm).forEach(key => {
+        if (skipKeys.includes(key)) return;
         const value = vehicleForm[key as keyof typeof vehicleForm];
         if (key === 'paid') {
           // paid alanını purchase_amount olarak gönder
@@ -537,9 +530,10 @@ const VehiclesPage = () => {
       resetVehicleForm();
       vehiclesData.fetchVehicles();
     } catch (e: any) {
+      const errMsg = e?.response?.data?.error || e?.response?.data?.message || e?.response?.data?.details?.[0]?.message || "Araç güncellenemedi.";
       toast({ 
         title: "Hata", 
-        description: e?.response?.data?.message || "Araç güncellenemedi.", 
+        description: typeof errMsg === 'string' ? errMsg : (Array.isArray(errMsg) ? errMsg.join(', ') : "Araç güncellenemedi."), 
         variant: "destructive" 
       });
     }
@@ -567,13 +561,21 @@ const VehiclesPage = () => {
     }
   };
 
+  // Müşteri sayfasındaki fetchCustomerDocuments ile aynı pattern
+  const fetchVehicleDocuments = async (vehicleId: number) => {
+    try {
+      const res = await api.get(`/documents/vehicles/${vehicleId}`);
+      setVehicleDocuments(res.data || []);
+    } catch (e) {
+      console.error("Documents fetch error:", e);
+      setVehicleDocuments([]);
+    }
+  };
+
   const openDetailModal = async (vehicle: Vehicle) => {
     try {
-      // Önce selectedVehicle'ı set et
       vehiclesData.setSelectedVehicle(vehicle);
-      // Modal'ı aç
       setOpenDetail(true);
-      // Detayları arka planda yükle
       vehiclesData.fetchVehicleDetail(vehicle.id).catch((error: any) => {
         console.error("Error fetching vehicle detail:", error);
         toast({
@@ -582,6 +584,8 @@ const VehiclesPage = () => {
           variant: "default"
         });
       });
+      // Belgeleri hemen yükle - müşteri sayfasındaki gibi
+      fetchVehicleDocuments(vehicle.id);
     } catch (error: any) {
       console.error("Error opening detail modal:", error);
       toast({
@@ -628,8 +632,8 @@ const VehiclesPage = () => {
       sale_currency: vehicle.sale_currency || "TRY",
       paid: (vehicle.purchase_amount || vehicle.paid)?.toString() || "",
       purchase_currency: vehicle.purchase_currency || "TRY",
-      delivery_date: vehicle.delivery_date || "",
-      delivery_time: vehicle.delivery_time || "",
+      delivery_date: (vehicle as any).purchase_date ? String((vehicle as any).purchase_date).split('T')[0] : (vehicle as any).delivery_date || "",
+      delivery_time: (vehicle as any).delivery_time || "",
       status: vehicle.status || "used",
       stock_status: vehicle.stock_status || "in_stock",
       location: vehicle.location || "",

@@ -34,7 +34,7 @@ const barHeights = [65, 85, 45, 70, 55, 90, 60];
 
 export function DashboardPreview() {
   return (
-    <section id="demo" className="relative py-24 px-4">
+    <section id="demo" className="relative py-24 px-4 bg-white dark:bg-slate-950">
       <div className="max-w-5xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -42,10 +42,10 @@ export function DashboardPreview() {
           viewport={{ once: true }}
           className="text-center mb-16"
         >
-          <h2 className="text-3xl sm:text-4xl font-bold text-slate-50 mb-4">
+          <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-slate-50 mb-4">
             Dashboard Önizleme
           </h2>
-          <p className="max-w-2xl mx-auto text-slate-400 text-lg">
+          <p className="max-w-2xl mx-auto text-slate-600 dark:text-slate-400 text-lg">
             Tüm kurlarla KPI kartları, taksit tahsilatı ve gümrük durumu tek ekranda.
           </p>
         </motion.div>
@@ -54,9 +54,14 @@ export function DashboardPreview() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           className={cn(
-            "rounded-2xl border border-slate-700 bg-slate-900/80 p-6 sm:p-8",
-            "shadow-2xl shadow-black/30"
+            "relative rounded-2xl border border-slate-200/80 dark:border-slate-700 p-6 sm:p-8",
+            "bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl",
+            "shadow-2xl shadow-slate-300/40 dark:shadow-black/40",
+            "ring-1 ring-white/60 dark:ring-slate-700/50"
           )}
+          style={{
+            boxShadow: "0 0 0 1px rgba(255,255,255,0.6), 0 25px 50px -12px rgba(99, 102, 241, 0.2), 0 0 80px -20px rgba(99, 102, 241, 0.15)",
+          }}
         >
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
             {kpis.map((kpi, i) => (
@@ -66,16 +71,16 @@ export function DashboardPreview() {
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.06 }}
-                className="rounded-xl border border-slate-700 bg-slate-800/50 p-4"
+                className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 p-4"
               >
-                <div className="flex items-center gap-2 text-slate-400 text-sm mb-1">
-                  <kpi.icon className="h-4 w-4" />
+                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 text-sm mb-1">
+                  <kpi.icon className="h-4 w-4" aria-hidden />
                   {kpi.label}
                 </div>
-                <div className="text-xl font-bold text-slate-100">
+                <div className="text-xl font-bold text-slate-900 dark:text-slate-100">
                   {kpi.value}
                   {kpi.sub && (
-                    <span className="text-slate-500 font-normal text-sm ml-1">
+                    <span className="text-slate-600 dark:text-slate-500 font-normal text-sm ml-1">
                       {kpi.sub}
                     </span>
                   )}
@@ -88,7 +93,7 @@ export function DashboardPreview() {
               </motion.div>
             ))}
           </div>
-          <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-6">
+          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100/50 dark:bg-slate-800/30 p-6">
             <div className="flex items-end justify-between gap-2 h-40">
               {barHeights.map((h, i) => (
                 <motion.div
@@ -97,7 +102,7 @@ export function DashboardPreview() {
                   whileInView={{ height: `${h}%` }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.2 + i * 0.05, duration: 0.5 }}
-                  className="flex-1 rounded-t bg-gradient-to-t from-primary-600 to-primary-400 min-h-[8px] max-w-[48px] mx-auto"
+                  className="flex-1 rounded-t bg-gradient-to-t from-indigo-600 to-indigo-400 min-h-[8px] max-w-[48px] mx-auto"
                 />
               ))}
             </div>
@@ -111,7 +116,7 @@ export function DashboardPreview() {
               <span>Paz</span>
             </div>
           </div>
-          <p className="text-center text-slate-500 text-sm mt-6">
+          <p className="text-center text-slate-600 dark:text-slate-500 text-sm mt-6">
             Haftalık tahsilat • Döviz bazlı kar/zarar • Gümrük durumu
           </p>
         </motion.div>

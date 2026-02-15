@@ -14,6 +14,7 @@ import {
   Package,
   ArrowUp,
   ArrowDown,
+  ArrowRight,
   Activity,
   CreditCard,
   CheckCircle
@@ -110,7 +111,15 @@ export default function DashboardPage() {
 
       // Takip görevlerini ve gecikmiş taksitleri birleştir
       const followups = followupsRes.data || [];
-      const overdueInstallments = overdueInstallmentsRes.data || [];
+      const overdueInstallmentsRaw = overdueInstallmentsRes.data || [];
+      // Backend JOIN'leri aynı installment_sale_id için birden fazla satır döndürebilir - deduplicate
+      const seenSaleIds = new Set<number>();
+      const overdueInstallments = overdueInstallmentsRaw.filter((i: any) => {
+        const id = i.installment_sale_id;
+        if (seenSaleIds.has(id)) return false;
+        seenSaleIds.add(id);
+        return true;
+      });
       
       // Gecikmiş taksitleri takip görevi formatına çevir
       const installmentFollowups = overdueInstallments.map((installment: any) => ({
@@ -267,8 +276,8 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {weeklySales.length > 0 ? (
-              <div className="h-[220px] sm:h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
+              <div className="h-[220px] sm:h-[300px] min-h-[200px] w-full">
+              <ResponsiveContainer width="100%" height="100%" minHeight={200} initialDimension={{ width: 100, height: 200 }}>
                 <BarChart data={weeklySales}>
                   <defs>
                     <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
@@ -323,7 +332,7 @@ export default function DashboardPage() {
               
               return (
                 <>
-                  <ResponsiveContainer width="100%" height={250}>
+                  <ResponsiveContainer width="100%" height={250} minHeight={200} initialDimension={{ width: 100, height: 200 }}>
                     <PieChart>
                       <Pie
                         data={salesPerformanceData}
@@ -406,8 +415,8 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {weeklyInventory.length > 0 ? (
-              <div className="h-[220px] sm:h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
+              <div className="h-[220px] sm:h-[300px] min-h-[200px] w-full">
+              <ResponsiveContainer width="100%" height="100%" minHeight={200} initialDimension={{ width: 100, height: 200 }}>
                 <BarChart data={weeklyInventory}>
                   <defs>
                     <linearGradient id="serviceGradient" x1="0" y1="0" x2="0" y2="1">
@@ -469,7 +478,7 @@ export default function DashboardPage() {
               
               return (
                 <>
-                  <ResponsiveContainer width="100%" height={250}>
+                  <ResponsiveContainer width="100%" height={250} minHeight={200} initialDimension={{ width: 100, height: 200 }}>
                     <PieChart>
                       <Pie
                         data={stockData}
@@ -550,6 +559,7 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           {recentSales.length > 0 ? (
+            <div className="space-y-4">
             <div className="w-full min-w-0 overflow-x-auto">
             <Table className="min-w-[500px]">
               <TableHeader>
@@ -562,7 +572,7 @@ export default function DashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentSales.map((sale: any) => {
+                {recentSales.slice(0, 5).map((sale: any) => {
                   const imageUrl = sale.image 
                     ? `${getApiBaseUrl()}${sale.image}` 
                     : null;
@@ -624,6 +634,17 @@ export default function DashboardPage() {
                 })}
               </TableBody>
             </Table>
+            </div>
+            {recentSales.length > 5 && (
+              <Button
+                variant="outline"
+                className="w-full rounded-xl border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors"
+                onClick={() => navigate("/vehicles")}
+              >
+                Daha fazla gör
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            )}
             </div>
           ) : (
             <div className="text-center py-12">
@@ -783,7 +804,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Sağ Taraf: Aktiviteler ve Görevler (Sekmeli) */}
-        <Card className="col-span-12 lg:col-span-4 rounded-2xl border-l-4 border-l-purple-500 shadow-md hover:shadow-lg transition-all duration-300 h-full flex flex-col min-h-0 group">
+        <Card className="col-span-12 lg:col-span-4 rounded-2xl border-l-4 border-l-purple-500 shadow-md hover:shadow-lg transition-all duration-300 h-full flex flex-col min-h-0 overflow-hidden group">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 flex-shrink-0">
             <div className="flex items-center gap-3">
               <div className="rounded-xl bg-purple-100 dark:bg-purple-900/20 p-2 group-hover:bg-purple-200 dark:group-hover:bg-purple-900/30 transition-colors">
@@ -793,14 +814,14 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="p-0 flex-1 flex flex-col min-h-0 overflow-hidden">
-            <Tabs defaultValue="activities" className="w-full h-full flex flex-col min-h-0">
-              <TabsList className="grid w-full grid-cols-2 mx-4 mb-2 sm:mb-4 h-10 bg-muted/50 flex-shrink-0">
+            <Tabs defaultValue="activities" className="w-full flex-1 flex flex-col min-h-0 overflow-hidden min-w-0">
+              <TabsList className="grid w-full grid-cols-2 mx-4 mb-2 sm:mb-4 h-10 bg-muted/50 flex-shrink-0 shrink-0">
                 <TabsTrigger value="activities" className="text-sm font-medium data-[state=active]:bg-purple-500 data-[state=active]:text-white transition-all">Aktiviteler</TabsTrigger>
                 <TabsTrigger value="tasks" className="text-sm font-medium data-[state=active]:bg-purple-500 data-[state=active]:text-white transition-all">Görevler</TabsTrigger>
               </TabsList>
               
               {/* Aktiviteler Timeline */}
-              <TabsContent value="activities" className="mt-0 flex-1 flex flex-col min-h-0 overflow-hidden">
+              <TabsContent value="activities" forceMount className="mt-0 flex-1 flex flex-col min-h-0 overflow-hidden data-[state=inactive]:hidden data-[state=inactive]:pointer-events-none">
                 {recentActivities.length > 0 ? (
                   <div className={`flex-1 min-h-0 ${recentActivities.length > 5 ? 'overflow-y-auto max-h-[500px]' : 'overflow-y-auto'}`}>
                     <div className="relative px-4 pb-4">
@@ -878,9 +899,9 @@ export default function DashboardPage() {
               </TabsContent>
               
               {/* Görevler */}
-              <TabsContent value="tasks" className="mt-0 flex-1 flex flex-col min-h-0 overflow-hidden">
+              <TabsContent value="tasks" forceMount className="mt-0 flex-1 flex flex-col min-h-0 overflow-hidden data-[state=inactive]:hidden data-[state=inactive]:pointer-events-none">
                 {todayFollowups.length > 0 ? (
-                  <div className={`flex-1 min-h-0 overflow-y-auto ${todayFollowups.length > 5 ? 'max-h-[500px]' : ''}`}>
+                  <div className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden ${todayFollowups.length > 5 ? 'max-h-[500px]' : ''}`}>
                     <div className="space-y-2 px-4 pb-4">
                       {todayFollowups.map((followup: any) => (
                         <div

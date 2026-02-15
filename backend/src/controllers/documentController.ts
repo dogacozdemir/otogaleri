@@ -253,17 +253,146 @@ export async function getVehicleDocuments(req: AuthRequest, res: Response) {
   }
 
   try {
+    // Vehicle existence check - same pattern as getCustomerDocuments
+    const [vehicleRows] = await dbPool.query(
+      "SELECT id FROM vehicles WHERE id = ? AND tenant_id = ?",
+      [vehicle_id, req.tenantId]
+    );
+    const vehicleRowsArray = vehicleRows as any[];
+    if (vehicleRowsArray.length === 0) {
+      return res.status(404).json({ error: "Vehicle not found" });
+    }
+
     const [documents] = await dbPool.query(
       `SELECT * FROM vehicle_documents 
        WHERE vehicle_id = ? AND tenant_id = ? 
-       ORDER BY id DESC`,
+       ORDER BY uploaded_at DESC`,
       [vehicle_id, req.tenantId]
     );
 
-    res.json(documents);
+    const docsArray = (documents as any[]);
+    const docsWithUrls = await Promise.all(
+      docsArray.map(async (doc) => {
+        // Same as getCustomerDocuments - exact key extraction and getUrl
+        const key = doc.file_path?.startsWith("/uploads/") ? doc.file_path.replace(/^\/uploads\//, "") : doc.file_path;
+        const url = key ? await StorageService.getUrl(key, true) : null;
+        return { ...doc, url };
+      })
+    );
+
+    res.json(docsWithUrls);
   } catch (error) {
     console.error("[document] Get vehicle documents error:", error);
     res.status(500).json({ error: "Failed to fetch vehicle documents" });
+  }
+}
+
+export async function uploadVehicleDocument(req: AuthRequest, res: Response) {
+  const vehicle_id = req.params.vehicle_id;
+
+  if (!vehicle_id || !req.file) {
+    return res.status(400).json({ error: "Vehicle ID and file are required" });
+  }
+
+  const document_type = (req.body.document_type || "other") as string;
+  const document_name = (req.body.document_name || req.file.originalname || "Belge") as string;
+  const expiry_date = req.body.expiry_date || null;
+  const notes = req.body.notes || null;
+
+  const validTypes = ["contract", "registration", "insurance", "inspection", "customs", "invoice", "other"];
+  if (!validTypes.includes(document_type)) {
+    return res.status(400).json({ error: "Invalid document_type" });
+  }
+
+  try {
+    const [vehicleRows] = await dbPool.query(
+      "SELECT id FROM vehicles WHERE id = ? AND tenant_id = ?",
+      [vehicle_id, req.tenantId]
+    );
+    const vehicleRowsArray = vehicleRows as any[];
+    if (vehicleRowsArray.length === 0) {
+      return res.status(404).json({ error: "Vehicle not found" });
+    }
+
+    const ext = req.file.originalname.split(".").pop() || "bin";
+    const filename = req.file.originalname || `doc_${Date.now()}.${ext}`;
+
+    const uploadResult = await StorageService.upload(req.file.buffer, {
+      folder: "documents/vehicles",
+      tenantId: req.tenantId,
+      filename: `${vehicle_id}/${Date.now()}_${filename.replace(/[^a-zA-Z0-9.-]/g, "_")}`,
+      contentType: req.file.mimetype,
+      makePublic: true,
+    });
+
+    const uploadedBy = req.tenantId != null ? await resolveStaffIdForTenant(req.tenantId) : null;
+
+    const [result] = await dbPool.query(
+      `INSERT INTO vehicle_documents (
+        tenant_id, vehicle_id, document_type, document_name, file_path,
+        file_size, mime_type, uploaded_by, expiry_date, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        req.tenantId,
+        vehicle_id,
+        document_type,
+        document_name,
+        uploadResult.key,
+        req.file.size,
+        req.file.mimetype,
+        uploadedBy,
+        expiry_date || null,
+        notes || null,
+      ]
+    );
+
+    const docId = (result as any).insertId;
+    const [rows] = await dbPool.query("SELECT * FROM vehicle_documents WHERE id = ?", [docId]);
+    const doc = (rows as any[])[0];
+    const key = doc.file_path?.startsWith("/uploads/") ? doc.file_path.replace(/^\/uploads\//, "") : doc.file_path;
+    const url = key ? await StorageService.getUrl(key, true) : null;
+
+    res.status(201).json({ ...doc, url });
+  } catch (error) {
+    console.error("[document] Upload vehicle document error:", error);
+    res.status(500).json({ error: "Failed to upload document" });
+  }
+}
+
+export async function deleteVehicleDocument(req: AuthRequest, res: Response) {
+  const document_id = req.params.document_id;
+
+  if (!document_id) {
+    return res.status(400).json({ error: "Document ID is required" });
+  }
+
+  try {
+    const [rows] = await dbPool.query(
+      "SELECT id, file_path FROM vehicle_documents WHERE id = ? AND tenant_id = ?",
+      [document_id, req.tenantId]
+    );
+    const docsArray = rows as any[];
+    if (docsArray.length === 0) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+
+    const doc = docsArray[0];
+    const key = doc.file_path?.startsWith("/uploads/") ? doc.file_path.replace(/^\/uploads\//, "") : doc.file_path;
+
+    await dbPool.query("DELETE FROM vehicle_documents WHERE id = ? AND tenant_id = ?", [document_id, req.tenantId]);
+
+    if (key) {
+      try {
+        await StorageService.delete(key);
+      } catch (storageErr) {
+        console.warn("[document] Failed to delete vehicle document from storage:", storageErr);
+      }
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("[document] Delete vehicle document error:", error);
+    res.status(500).json({ error: "Failed to delete document" });
   }
 }
 

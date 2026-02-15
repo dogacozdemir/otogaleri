@@ -1,6 +1,12 @@
 import { motion } from "framer-motion";
-import { Rocket, ExternalLink } from "lucide-react";
+import { Rocket, Play, CreditCard, XCircle, Headphones } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const trustBadges = [
+  { icon: CreditCard, text: "Kredi Kartı Gerekmez" },
+  { icon: XCircle, text: "İstediğiniz Zaman İptal" },
+  { icon: Headphones, text: "Ücretsiz Kurulum Desteği" },
+];
 
 const container = {
   hidden: { opacity: 0 },
@@ -17,66 +23,123 @@ const item = {
 
 export function Hero() {
   return (
-    <section className="relative min-h-[100dvh] sm:min-h-[90vh] flex flex-col items-center justify-center px-4 py-24 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-b from-primary-950/30 via-slate-950 to-slate-950" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(59,130,246,0.15),transparent)]" />
-      <motion.div
-        variants={container}
-        initial="hidden"
-        animate="show"
-        className="relative z-10 max-w-4xl mx-auto text-center space-y-8"
-      >
-        <motion.div variants={item} className="inline-flex items-center gap-2 rounded-full border border-primary-500/30 bg-primary-500/10 px-4 py-1.5 text-sm text-primary-300">
-          KKTC • Adaya Özel Platform
-        </motion.div>
-        <motion.h1
-          variants={item}
-          className={cn(
-            "text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight",
-            "text-slate-50"
-          )}
-        >
-          KKTC Galeri Sektöründe{" "}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-400 to-primary-600">
-            Dijital Dönüşüm
-          </span>
-        </motion.h1>
-        <motion.p
-          variants={item}
-          className="max-w-2xl mx-auto text-lg sm:text-xl text-slate-400 leading-relaxed"
-        >
-          Tüm kurlarla (£, $, €, ₺, ¥) rahatça işlem yapıp takip edebileceğiniz, senetli satış ve gümrükleme süreçleri için adaya özel geliştirilmiş tek SaaS çözümü.
-        </motion.p>
-        <motion.div variants={item} className="flex flex-wrap items-center justify-center gap-4">
-          <a
-            href="https://app.akilligaleri.com/login"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cn(
-              "inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 min-h-[48px] font-semibold",
-              "bg-primary-500 text-white shadow-lg shadow-primary-500/25 hover:bg-primary-600 transition-colors"
-            )}
+    <section className="relative min-h-[100dvh] sm:min-h-[90vh] flex flex-col items-center justify-center px-4 py-24 overflow-hidden bg-slate-50 dark:bg-slate-950">
+      <div className="absolute inset-0 bg-gradient-to-b from-indigo-50/50 via-slate-50 to-slate-50 dark:from-indigo-950/20 dark:via-slate-950 dark:to-slate-950" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(79,70,229,0.12),transparent)] dark:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(79,70,229,0.15),transparent)]" />
+
+      <div className="relative z-10 max-w-6xl mx-auto w-full">
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+          <motion.div
+            variants={container}
+            initial="hidden"
+            animate="show"
+            className="text-center lg:text-left space-y-6"
           >
-            <Rocket className="h-5 w-5" />
-            Ücretsiz Demoyu Başlat
-          </a>
-          <a
-            href="https://app.akilligaleri.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cn(
-              "inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 min-h-[48px] font-semibold",
-              "border border-slate-600 bg-slate-800/50 text-slate-200 hover:bg-slate-800 transition-colors"
-            )}
+            <motion.div
+              variants={item}
+              className="inline-flex items-center gap-2 rounded-full border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 px-3 py-1.5 text-sm font-medium text-indigo-700 dark:text-indigo-300 mb-2"
+            >
+              KKTC • Adaya Özel Platform
+            </motion.div>
+            <motion.h1
+              variants={item}
+              className={cn(
+                "text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight",
+                "text-slate-900 dark:text-slate-50"
+              )}
+            >
+              Galerinizi Dijital Çağa Taşıyın,{" "}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-indigo-400">
+                Satışlarınıza Odaklanın.
+              </span>
+            </motion.h1>
+
+            <motion.p
+              variants={item}
+              className="max-w-xl text-lg sm:text-xl text-slate-600 dark:text-slate-400 leading-relaxed mx-auto lg:mx-0"
+            >
+              Tüm kurlarla (£, $, €, ₺, ¥) rahatça işlem yapıp takip edebileceğiniz, senetli satış ve gümrükleme süreçleri için adaya özel geliştirilmiş tek SaaS çözümü.
+            </motion.p>
+            <motion.p
+              variants={item}
+              className="max-w-xl text-sm text-slate-600 dark:text-slate-500 leading-relaxed mx-auto lg:mx-0"
+            >
+              Mobil uyumlu arayüz ile stok ve araç ekleme tek ekrandan.
+            </motion.p>
+
+            <motion.div
+              variants={item}
+              className="flex flex-wrap items-center justify-center lg:justify-start gap-4"
+            >
+              <a
+                href="https://app.akilligaleri.com/register"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(
+                  "inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 min-h-[48px] font-semibold",
+                  "bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 hover:bg-indigo-700 transition-colors"
+                )}
+              >
+                <Rocket className="h-5 w-5" aria-hidden />
+                Ücretsiz Deneyin
+              </a>
+              <a
+                href="#ozellikler"
+                className={cn(
+                  "inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 min-h-[48px] font-semibold",
+                  "border-2 border-slate-300 dark:border-slate-600 bg-slate-100/50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+                )}
+              >
+                <Play className="h-5 w-5" aria-hidden />
+                Nasıl Çalışır?
+              </a>
+            </motion.div>
+            <motion.div
+              variants={item}
+              className="flex flex-wrap items-center justify-center lg:justify-start gap-6 pt-2"
+            >
+              {trustBadges.map((badge) => (
+                <span
+                  key={badge.text}
+                  className="inline-flex items-center gap-2 text-slate-600 dark:text-slate-400 text-sm"
+                >
+                  <badge.icon className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" aria-hidden />
+                  <span>{badge.text}</span>
+                </span>
+              ))}
+            </motion.div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.6 }}
+            className="relative"
           >
-            <ExternalLink className="h-5 w-5" />
-            akilligaleri.com&apos;u İnceleyin
-          </a>
-          <p className="text-slate-500 text-sm pt-2">
-            Mobil uyumlu arayüz ile stok ve araç ekleme tek ekrandan.
-          </p>
-        </motion.div>
-      </motion.div>
+            <div
+              className={cn(
+                "rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden",
+                "bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900",
+                "aspect-[16/10] flex items-center justify-center"
+              )}
+              role="img"
+              aria-label="Galeri envanter yönetimi dashboard önizlemesi"
+            >
+              <div className="text-center p-8">
+                <div className="inline-flex items-center gap-2 rounded-lg bg-slate-200/80 dark:bg-slate-700/50 px-4 py-2.5 mb-4">
+                  <div className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
+                  <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                    Dashboard Mockup
+                  </span>
+                </div>
+                <p className="text-slate-600 dark:text-slate-500 text-sm">
+                  Görsel buraya eklenecek
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
     </section>
   );
 }

@@ -10,15 +10,20 @@ import { resolveStaffIdForTenant } from "../utils/staffUtils";
 // File upload configuration - use memory storage for S3 compatibility
 const storage = multer.memoryStorage();
 
-// Strict MIME type validation - only allow specific image types
+// Strict MIME type validation - teknolojiden uzak kullanıcılar için yaygın formatlar
 const ALLOWED_MIME_TYPES = [
   'image/jpeg',
   'image/jpg',
+  'image/jfif',   // JFIF (JPEG varyantı)
+  'image/pjpeg',  // Legacy JPEG
   'image/png',
   'image/webp',
+  'image/gif',
+  'image/tiff',   // Tarayıcı bazen image/tiff kullanır
+  'image/avif',   // Modern sıkıştırılmış format
 ];
 
-const ALLOWED_EXTENSIONS = /\.(jpeg|jpg|png|webp)$/i;
+const ALLOWED_EXTENSIONS = /\.(jpeg|jpg|jfif|png|webp|gif|tiff|tif|avif)$/i;
 
 // Maximum file size (configurable via env, default 10MB)
 const MAX_FILE_SIZE = process.env.MAX_UPLOAD_SIZE 
@@ -39,7 +44,7 @@ export const upload = multer({
 
     // Extension check
     if (!ALLOWED_EXTENSIONS.test(file.originalname)) {
-      return cb(new Error(`Invalid file extension. Only .jpeg, .jpg, .png, .webp are allowed.`));
+      return cb(new Error(`Geçersiz dosya uzantısı. Desteklenen: .jpeg, .jpg, .jfif, .png, .webp, .gif, .tiff, .tif, .avif`));
     }
 
     // Additional security: Check file size before processing
@@ -152,12 +157,16 @@ export async function uploadVehicleImage(req: AuthRequest, res: Response) {
       });
     }
 
-    // Map detected MIME types to allowed types
+    // Map detected MIME types to allowed types (JPEG varyantları aynı içeriğe sahip)
     const mimeTypeMap: Record<string, string[]> = {
-      'image/jpeg': ['image/jpeg', 'image/jpg'],
-      'image/jpg': ['image/jpeg', 'image/jpg'],
+      'image/jpeg': ['image/jpeg', 'image/jpg', 'image/jfif', 'image/pjpeg'],
+      'image/jpg': ['image/jpeg', 'image/jpg', 'image/jfif', 'image/pjpeg'],
+      'image/jfif': ['image/jpeg', 'image/jpg', 'image/jfif', 'image/pjpeg'],
       'image/png': ['image/png'],
       'image/webp': ['image/webp'],
+      'image/gif': ['image/gif'],
+      'image/tiff': ['image/tiff'],
+      'image/avif': ['image/avif'],
     };
 
     const allowedForDetected = mimeTypeMap[detectedType.mime] || [];

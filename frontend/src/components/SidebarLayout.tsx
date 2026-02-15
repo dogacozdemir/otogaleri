@@ -32,6 +32,7 @@ import {
 import ThemeToggle from "./ThemeToggle";
 import GlobalSearch from "./GlobalSearch";
 import CurrencyConverterPopover from "./CurrencyConverterPopover";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTenant } from "@/contexts/TenantContext";
 import { getToken, removeToken } from "@/api";
@@ -113,6 +114,9 @@ const SidebarLayout = () => {
   const isMobile = useIsMobile();
   const { tenant } = useTenant();
   
+  // Logout confirmation dialog
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
   // Sidebar collapse state with localStorage persistence
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -307,7 +311,7 @@ const SidebarLayout = () => {
         <div className="border-t border-white/10 flex-shrink-0 py-2 mt-auto">
           <div className="relative group">
             <button
-              onClick={handleLogout}
+              onClick={() => setShowLogoutConfirm(true)}
               className="w-full flex items-center py-2.5 text-white/95 hover:text-white hover:bg-white/10 rounded-xl relative transition-colors duration-200"
               title={sidebarCollapsed && !isMobile ? "Güvenli Çıkış" : undefined}
               aria-label="Güvenli çıkış yap"
@@ -478,7 +482,7 @@ const SidebarLayout = () => {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      onClick={handleLogout}
+                      onClick={() => setShowLogoutConfirm(true)}
                       className="cursor-pointer text-destructive focus:text-destructive"
                     >
                       <div className="w-8 h-8 bg-destructive/10 rounded-lg flex items-center justify-center mr-3">
@@ -513,6 +517,19 @@ const SidebarLayout = () => {
           onClick={() => setOpen(false)}
         />
       )}
+
+      {/* Logout Confirmation Dialog */}
+      <ConfirmationDialog
+        open={showLogoutConfirm}
+        onOpenChange={setShowLogoutConfirm}
+        onConfirm={handleLogout}
+        title="Çıkış yapmak istiyor musunuz?"
+        description="Oturumunuz güvenli bir şekilde sonlandırılacak."
+        confirmText="Evet"
+        cancelText="Hayır"
+        variant="destructive"
+        icon={<LogOut className="h-6 w-6" />}
+      />
     </div>
   );
 };

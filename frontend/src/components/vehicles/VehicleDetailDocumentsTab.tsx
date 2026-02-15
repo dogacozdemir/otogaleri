@@ -84,9 +84,17 @@ export const VehicleDetailDocumentsTab = ({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => window.open(`${getApiBaseUrl()}${doc.file_path}`, "_blank")}
+                    onClick={() => {
+                      // Müşteri belgeleriyle aynı: doc.url (S3 signed URL) veya file_path
+                      const url = doc.url || doc.file_path;
+                      if (!url) return;
+                      const base = getApiBaseUrl().replace(/\/$/, "");
+                      const fullUrl = url.startsWith("http") ? url : `${base}/${url.replace(/^\//, "")}`;
+                      window.open(fullUrl, "_blank");
+                    }}
                   >
-                    <Eye className="w-4 h-4" />
+                    <Eye className="w-4 h-4 mr-1" />
+                    Görüntüle
                   </Button>
                   <Button
                     variant="ghost"

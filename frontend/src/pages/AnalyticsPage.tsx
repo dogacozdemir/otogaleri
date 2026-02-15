@@ -393,14 +393,8 @@ export default function AnalyticsPage() {
         { type: "Her İkisi", value: (usageStats.both_count || 0) * 1000, count: usageStats.both_count || 0, color: "#f59e0b" },
       ]);
 
-      // Low stock items - Mock data, backend'de gerçek veri gerekli
-      setLowStockItems([
-        { sku: "MP-1024", name: "Yağ Filtresi", current: 12, min: 20, status: "critical" },
-        { sku: "KB-5612", name: "Ön Tampon", current: 3, min: 5, status: "critical" },
-        { sku: "EL-8934", name: "Far Ampülü", current: 28, min: 30, status: "warning" },
-        { sku: "FR-2341", name: "Fren Balatası", current: 15, min: 18, status: "warning" },
-        { sku: "MP-7823", name: "Hava Filtresi", current: 22, min: 25, status: "warning" },
-      ]);
+      // Low stock items - API'den tenant'a özel gerçek veri
+      setLowStockItems(analytics.lowStockItems || []);
     } catch (err) {
       console.error("Failed to fetch inventory analytics", err);
       toast({
@@ -605,7 +599,7 @@ export default function AnalyticsPage() {
                 <CardTitle className="text-lg">Gelir Trendi (Haftalık)</CardTitle>
                 </CardHeader>
                 <CardContent>
-                <ResponsiveContainer width="100%" height={350}>
+                <ResponsiveContainer width="100%" height={350} minHeight={200} initialDimension={{ width: 100, height: 200 }}>
                   <LineChart data={weeklyRevenue}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="week" stroke="#6b7280" style={{ fontSize: "12px" }} />
@@ -706,7 +700,7 @@ export default function AnalyticsPage() {
                 <TabsContent value="detailed" className="mt-6">
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold">Marka Bazlı Kar Analizi</h3>
-                    <ResponsiveContainer width="100%" height={350}>
+                    <ResponsiveContainer width="100%" height={350} minHeight={200} initialDimension={{ width: 100, height: 200 }}>
                       <BarChart data={brandProfit}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                         <XAxis dataKey="brand" stroke="#6b7280" style={{ fontSize: "12px" }} />
@@ -922,7 +916,7 @@ export default function AnalyticsPage() {
                 <CardTitle className="text-lg">Envanter Değeri ve Kullanım Trendi</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={350}>
+                <ResponsiveContainer width="100%" height={350} minHeight={200} initialDimension={{ width: 100, height: 200 }}>
                   <AreaChart data={inventoryData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="week" stroke="#6b7280" style={{ fontSize: "12px" }} />
@@ -970,7 +964,7 @@ export default function AnalyticsPage() {
                 <CardTitle className="text-lg">Kullanım Tipi Dağılımı</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
+                <ResponsiveContainer width="100%" height={250} minHeight={200} initialDimension={{ width: 100, height: 200 }}>
                   <PieChart>
                     <Pie
                       data={usageTypeData}
@@ -1021,7 +1015,7 @@ export default function AnalyticsPage() {
               </CardHeader>
               <CardContent>
                 {categoryBreakdown.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={350}>
+                  <ResponsiveContainer width="100%" height={350} minHeight={200} initialDimension={{ width: 100, height: 200 }}>
                     <BarChart data={categoryBreakdown} layout="vertical">
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                       <XAxis
@@ -1064,8 +1058,11 @@ export default function AnalyticsPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {lowStockItems.map((item) => (
-                    <div key={item.sku} className="space-y-2">
+                  {lowStockItems.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">Düşük stok ürünü bulunamadı</p>
+                  ) : (
+                  lowStockItems.map((item, idx) => (
+                    <div key={item.id ?? item.sku ?? idx} className="space-y-2">
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-xs text-muted-foreground">{item.sku}</span>
@@ -1084,12 +1081,13 @@ export default function AnalyticsPage() {
                         <div
                           className={`h-full ${item.status === "critical" ? "bg-destructive" : "bg-warning"}`}
                           style={{
-                            width: `${Math.min((item.current / item.min) * 100, 100)}%`,
+                            width: `${item.min > 0 ? Math.min((item.current / item.min) * 100, 100) : 0}%`,
                           }}
                         />
                       </div>
                     </div>
-                  ))}
+                  ))
+                  )}
                 </div>
               </CardContent>
             </Card>
