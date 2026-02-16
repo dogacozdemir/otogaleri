@@ -1,18 +1,20 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LaunchBanner } from "./LaunchBanner";
 
 const navLinks = [
-  { href: "#ozellikler", label: "Özellikler" },
-  { href: "#mimari", label: "Teknik Güvenlik" },
-  { href: "#faydalar", label: "Lokal Faydalar" },
-  { href: "#demo", label: "Demo" },
-  { href: "#fiyat", label: "Fiyat" },
-  { href: "#referanslar", label: "Referanslar" },
-  { href: "#sss", label: "SSS" },
-  { href: "#footer", label: "İletişim" },
+  { href: "/#ozellikler", label: "Özellikler" },
+  { href: "/#mimari", label: "Teknik Güvenlik" },
+  { href: "/#faydalar", label: "Lokal Faydalar" },
+  { href: "/#demo", label: "Demo" },
+  { href: "/#fiyat", label: "Fiyat" },
+  { href: "/#referanslar", label: "Referanslar" },
+  { href: "/#sss", label: "SSS" },
+  { href: "/#footer", label: "İletişim" },
+  { href: "/blog", label: "Blog" },
 ];
 
 export function Header() {
@@ -22,18 +24,18 @@ export function Header() {
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-slate-200/10 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md pt-[env(safe-area-inset-top)]">
       <LaunchBanner />
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-        <a href="#" className="text-xl font-bold text-slate-900 dark:text-slate-50">
+        <Link to="/" className="text-xl font-bold text-slate-900 dark:text-slate-50">
           Akıllı Galeri
-        </a>
+        </Link>
         <nav className="hidden sm:flex items-center gap-6">
           {navLinks.map((link) => (
-            <a
+            <Link
               key={link.href}
-              href={link.href}
+              to={link.href}
               className="text-sm text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors min-h-[44px] flex items-center"
             >
               {link.label}
-            </a>
+            </Link>
           ))}
         </nav>
         <div className="flex items-center gap-2 sm:gap-3">
@@ -91,14 +93,14 @@ export function Header() {
               </div>
               <nav className="flex flex-col p-4 gap-1 overflow-y-auto">
                 {navLinks.map((link) => (
-                  <a
+                  <Link
                     key={link.href}
-                    href={link.href}
+                    to={link.href}
                     onClick={() => setMobileMenuOpen(false)}
                     className="min-h-[44px] flex items-center px-4 rounded-xl text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                   >
                     {link.label}
-                  </a>
+                  </Link>
                 ))}
                 <a
                   href="https://app.akilligaleri.com/register"

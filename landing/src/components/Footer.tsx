@@ -1,15 +1,17 @@
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Mail, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const links = [
-  { label: "Özellikler", href: "#ozellikler" },
-  { label: "Teknik Güvenlik", href: "#mimari" },
-  { label: "Lokal Faydalar", href: "#faydalar" },
-  { label: "Demo", href: "#demo" },
-  { label: "Fiyat", href: "#fiyat" },
-  { label: "Referanslar", href: "#referanslar" },
-  { label: "SSS", href: "#sss" },
+  { label: "Özellikler", href: "/#ozellikler" },
+  { label: "Teknik Güvenlik", href: "/#mimari" },
+  { label: "Lokal Faydalar", href: "/#faydalar" },
+  { label: "Demo", href: "/#demo" },
+  { label: "Fiyat", href: "/#fiyat" },
+  { label: "Referanslar", href: "/#referanslar" },
+  { label: "SSS", href: "/#sss" },
+  { label: "Blog", href: "/blog" },
 ];
 
 export function Footer() {
@@ -55,13 +57,13 @@ export function Footer() {
             className="flex flex-wrap gap-6"
           >
             {links.map((link) => (
-              <a
+              <Link
                 key={link.label}
-                href={link.href}
+                to={link.href}
                 className="text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors text-sm"
               >
                 {link.label}
-              </a>
+              </Link>
             ))}
           </motion.nav>
         </div>

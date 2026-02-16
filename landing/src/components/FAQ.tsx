@@ -22,7 +22,7 @@ const faqs = [
   {
     question: "Fiyat sabit mi, gizli ücret var mı?",
     answer:
-      "Evet, fiyat sabittir: Aylık £100 veya yıllık £1.000 (£200 tasarruf). Kurulum ücretsizdir. Ek kullanıcı veya özel entegrasyon gibi esnek ihtiyaçlar için iletişime geçebilirsiniz.",
+      "Evet, fiyat sabittir: Aylık £99 veya yıllık £990 (£198 tasarruf). Kurulum ücretsizdir. Ek kullanıcı veya özel entegrasyon gibi esnek ihtiyaçlar için iletişime geçebilirsiniz.",
   },
   {
     question: "Verilerim yedekleniyor mu?",

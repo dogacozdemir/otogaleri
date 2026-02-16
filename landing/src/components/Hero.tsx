@@ -49,7 +49,7 @@ export function Hero() {
                 "text-slate-900 dark:text-slate-50"
               )}
             >
-              Galerinizi Dijital Çağa Taşıyın,{" "}
+              KKTC Galerinizi Dijital Çağa Taşıyın,{" "}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-indigo-400">
                 Satışlarınıza Odaklanın.
               </span>

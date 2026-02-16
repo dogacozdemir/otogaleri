@@ -98,7 +98,7 @@ export function Pricing() {
             <div className="flex flex-col items-center">
               {isYearly && (
                 <span className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-500/20 px-4 py-1.5 text-sm font-bold text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-500/30 mb-4">
-                  £200 Tasarruf / 2 Ay Bedava
+                  £198 Tasarruf / 2 Ay Bedava
                 </span>
               )}
               <motion.div
