@@ -37,7 +37,18 @@ export const CreateVehicleSchema = z.object({
   km: z.coerce.number().int().nonnegative().optional().nullable(),
   fuel: sanitizedString,
   grade: sanitizedString,
-  cc: z.coerce.number().int().nonnegative().optional().nullable(),
+  cc: z.preprocess(
+    (val) => {
+      if (val == null || val === "") return null;
+      if (typeof val === "number") return Number.isNaN(val) ? null : val;
+      const str = String(val).trim().replace(/[.,\s]/g, "");
+      if (!str) return null;
+      const num = parseInt(str, 10);
+      return Number.isNaN(num) ? null : num;
+    },
+    z.number().int().nonnegative().optional().nullable()
+  ),
+  weight: z.coerce.number().int().nonnegative().optional().nullable(),
   color: sanitizedString,
   engine_no: sanitizedString,
   other: sanitizedString,
@@ -70,7 +81,18 @@ export const UpdateVehicleSchema = z.object({
   km: z.coerce.number().int().nonnegative().optional().nullable(),
   fuel: sanitizedString,
   grade: sanitizedString,
-  cc: z.coerce.number().int().nonnegative().optional().nullable(),
+  cc: z.preprocess(
+    (val) => {
+      if (val == null || val === "") return null;
+      if (typeof val === "number") return Number.isNaN(val) ? null : val;
+      const str = String(val).trim().replace(/[.,\s]/g, "");
+      if (!str) return null;
+      const num = parseInt(str, 10);
+      return Number.isNaN(num) ? null : num;
+    },
+    z.number().int().nonnegative().optional().nullable()
+  ),
+  weight: z.coerce.number().int().nonnegative().optional().nullable(),
   color: sanitizedString,
   engine_no: sanitizedString,
   other: sanitizedString,

@@ -113,12 +113,13 @@ export const useVehicleCalculationQuery = (vehicleId: number | null) => {
         name: cost.cost_name || cost.name || 'Harcama',
         amount: cost.amount || 0, // Orijinal tutar (kendi para biriminde)
         currency: cost.currency || "TRY", // Para birimi
-        amount_base: cost.amount_base || (cost.amount * (cost.fx_rate_to_base || 1)), // Base currency'deki tutar
+        amount_base: cost.amount_base ?? (cost.amount * ((cost.fx_rate_to_base != null && cost.fx_rate_to_base > 0) ? cost.fx_rate_to_base : 1)), // Base currency'deki tutar
         cost_date: cost.cost_date, // Harcama tarihi
         custom_rate: cost.custom_rate, // Manuel kur (varsa)
         fx_rate_to_base: cost.fx_rate_to_base // Base currency'ye çevrim kuru
       }));
       
+      const fs = data.financialSummary;
       const transformedData: CostCalculation = {
         vehicle: data.vehicle || {
           id: vehicleId,
@@ -130,14 +131,14 @@ export const useVehicleCalculationQuery = (vehicleId: number | null) => {
           purchase_fx_rate_to_base: null
         },
         costItems: costItems,
-        customItems: [], // Backend'de custom items ayrımı yok, şimdilik boş
-        generalTotal: data.totals?.total_costs_base || 0,
+        customItems: [],
+        generalTotal: data.totals?.total_costs_base || fs?.totalCostBase || 0,
         salePrice: data.totals?.sale_amount_base || data.vehicle?.sale_price || 0,
-        profit: data.totals?.profit_base || 0,
-        profitMargin: data.totals?.profit_margin_percent,
-        roi: data.totals?.roi_percent,
+        profit: data.totals?.profit_base || fs?.grossProfit || 0,
+        profitMargin: data.totals?.profit_margin_percent ?? fs?.profitMargin,
+        roi: data.totals?.roi_percent ?? fs?.roi,
         targetProfit: data.target_profit,
-        profitVsTarget: data.target_profit ? (data.totals?.profit_base || 0) - data.target_profit : null
+        profitVsTarget: fs?.targetProfitVariance ?? (data.target_profit ? (data.totals?.profit_base || 0) - data.target_profit : null)
       };
       
       return transformedData;

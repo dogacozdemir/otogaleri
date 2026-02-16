@@ -5,6 +5,7 @@ import { uploadLimiter } from "../middleware/rateLimiter";
 import {
   generateSalesContractPDF,
   generateInvoicePDF,
+  getExpiringDocuments,
   getExpiringVehicleDocuments,
   getVehicleDocuments,
   uploadVehicleDocument,
@@ -22,6 +23,7 @@ router.use(tenantGuard);
 
 router.get("/sales-contract/:sale_id", generateSalesContractPDF);
 router.get("/invoice/:sale_id", generateInvoicePDF);
+router.get("/expiring", getExpiringDocuments);
 router.get("/vehicles/expiring", getExpiringVehicleDocuments);
 router.get("/vehicles/:vehicle_id", getVehicleDocuments);
 router.post("/vehicles/:vehicle_id", uploadLimiter, documentUpload.single("file"), uploadVehicleDocument);

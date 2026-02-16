@@ -156,10 +156,11 @@ export async function getCustomerById(req: AuthRequest, res: Response) {
             installment_sale_id,
             SUM(amount * fx_rate_to_base) as total_paid
           FROM vehicle_installment_payments
+          WHERE tenant_id = ?
           GROUP BY installment_sale_id
         ) payment_summary ON payment_summary.installment_sale_id = vis_latest.id
         WHERE vis_latest.rn = 1`,
-        [...vehicleIds, tenantQuery.getTenantId()]
+        [...vehicleIds, tenantQuery.getTenantId(), tenantQuery.getTenantId()]
       );
       
       const installmentsArray = installmentRows as any[];
@@ -169,9 +170,9 @@ export async function getCustomerById(req: AuthRequest, res: Response) {
       if (installmentSaleIds.length > 0) {
         const [paymentRows] = await tenantQuery.query(
           `SELECT * FROM vehicle_installment_payments
-           WHERE installment_sale_id IN (${installmentSaleIds.map(() => '?').join(',')})
+           WHERE installment_sale_id IN (${installmentSaleIds.map(() => '?').join(',')}) AND tenant_id = ?
            ORDER BY installment_sale_id, payment_date ASC, installment_number ASC`,
-          installmentSaleIds
+          [...installmentSaleIds, tenantQuery.getTenantId()]
         );
         const paymentsArray = paymentRows as any[];
         paymentsMap = paymentsArray.reduce((acc, payment) => {

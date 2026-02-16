@@ -2,6 +2,7 @@ import { Response } from "express";
 import { AuthRequest } from "../middleware/auth";
 import { dbPool } from "../config/database";
 import { StorageService } from "../services/storage/storageService";
+import { safeDivide } from "../utils/safeDivide";
 
 export async function getBrandProfit(req: AuthRequest, res: Response) {
   const { limit = 10, start_date, end_date } = req.query;
@@ -20,29 +21,40 @@ export async function getBrandProfit(req: AuthRequest, res: Response) {
         v.maker as brand,
         COUNT(DISTINCT v.id) as vehicle_count,
         COUNT(DISTINCT CASE WHEN v.is_sold = TRUE THEN v.id END) as sold_count,
-        COALESCE(SUM(CASE WHEN vs.id IS NOT NULL THEN vs.sale_amount * vs.sale_fx_rate_to_base ELSE 0 END), 0) as total_revenue,
+        COALESCE(SUM(CASE WHEN vs.id IS NOT NULL THEN vs.sale_amount * COALESCE(NULLIF(vs.sale_fx_rate_to_base, 0), 1) ELSE 0 END), 0) as total_revenue,
         COALESCE(SUM(CASE WHEN vs.id IS NOT NULL THEN 
-          (v.purchase_amount * COALESCE(v.purchase_fx_rate_to_base, 1) + COALESCE(cost_summary.total_costs, 0))
+          COALESCE(cost_summary.total_costs, 0) + 
+          CASE WHEN NOT EXISTS (SELECT 1 FROM vehicle_costs vc2 WHERE vc2.vehicle_id = v.id AND vc2.tenant_id = v.tenant_id AND vc2.is_system_cost = 1 AND vc2.category = 'purchase')
+               AND COALESCE(v.purchase_amount, 0) > 0
+            THEN COALESCE(v.purchase_amount, 0) * COALESCE(NULLIF(v.purchase_fx_rate_to_base, 0), 1)
+            ELSE 0 END
         ELSE 0 END), 0) as total_costs,
         COALESCE(SUM(CASE WHEN vs.id IS NOT NULL THEN 
-          (vs.sale_amount * vs.sale_fx_rate_to_base) - 
-          (v.purchase_amount * COALESCE(v.purchase_fx_rate_to_base, 1) + COALESCE(cost_summary.total_costs, 0))
+          (vs.sale_amount * COALESCE(NULLIF(vs.sale_fx_rate_to_base, 0), 1)) - (
+            COALESCE(cost_summary.total_costs, 0) + 
+            CASE WHEN NOT EXISTS (SELECT 1 FROM vehicle_costs vc2 WHERE vc2.vehicle_id = v.id AND vc2.tenant_id = v.tenant_id AND vc2.is_system_cost = 1 AND vc2.category = 'purchase')
+                 AND COALESCE(v.purchase_amount, 0) > 0
+              THEN COALESCE(v.purchase_amount, 0) * COALESCE(NULLIF(v.purchase_fx_rate_to_base, 0), 1)
+              ELSE 0 END
+          )
         ELSE 0 END), 0) as total_profit
       FROM vehicles v
       LEFT JOIN vehicle_sales vs ON v.id = vs.vehicle_id AND vs.tenant_id = ?
       LEFT JOIN (
         SELECT 
           vehicle_id,
-          SUM(amount * fx_rate_to_base) as total_costs
+          tenant_id,
+          SUM(amount * COALESCE(NULLIF(fx_rate_to_base, 0), 1)) as total_costs
         FROM vehicle_costs
-        GROUP BY vehicle_id
-      ) cost_summary ON cost_summary.vehicle_id = v.id
+        WHERE tenant_id = ?
+        GROUP BY vehicle_id, tenant_id
+      ) cost_summary ON cost_summary.vehicle_id = v.id AND cost_summary.tenant_id = v.tenant_id
       WHERE v.tenant_id = ? ${dateFilter}
       GROUP BY v.maker
       HAVING vehicle_count > 0
       ORDER BY total_profit DESC
       LIMIT ?`,
-      [req.tenantId, ...params, Number(limit)]
+      [req.tenantId, req.tenantId, ...params, Number(limit)]
     );
 
     const rowsArray = rows as any[];
@@ -85,29 +97,40 @@ export async function getModelProfit(req: AuthRequest, res: Response) {
         v.model,
         COUNT(DISTINCT v.id) as vehicle_count,
         COUNT(DISTINCT CASE WHEN v.is_sold = TRUE THEN v.id END) as sold_count,
-        COALESCE(SUM(CASE WHEN vs.id IS NOT NULL THEN vs.sale_amount * vs.sale_fx_rate_to_base ELSE 0 END), 0) as total_revenue,
+        COALESCE(SUM(CASE WHEN vs.id IS NOT NULL THEN vs.sale_amount * COALESCE(NULLIF(vs.sale_fx_rate_to_base, 0), 1) ELSE 0 END), 0) as total_revenue,
         COALESCE(SUM(CASE WHEN vs.id IS NOT NULL THEN 
-          (v.purchase_amount * COALESCE(v.purchase_fx_rate_to_base, 1) + COALESCE(cost_summary.total_costs, 0))
+          COALESCE(cost_summary.total_costs, 0) + 
+          CASE WHEN NOT EXISTS (SELECT 1 FROM vehicle_costs vc2 WHERE vc2.vehicle_id = v.id AND vc2.tenant_id = v.tenant_id AND vc2.is_system_cost = 1 AND vc2.category = 'purchase')
+               AND COALESCE(v.purchase_amount, 0) > 0
+            THEN COALESCE(v.purchase_amount, 0) * COALESCE(NULLIF(v.purchase_fx_rate_to_base, 0), 1)
+            ELSE 0 END
         ELSE 0 END), 0) as total_costs,
         COALESCE(SUM(CASE WHEN vs.id IS NOT NULL THEN 
-          (vs.sale_amount * vs.sale_fx_rate_to_base) - 
-          (v.purchase_amount * COALESCE(v.purchase_fx_rate_to_base, 1) + COALESCE(cost_summary.total_costs, 0))
+          (vs.sale_amount * COALESCE(NULLIF(vs.sale_fx_rate_to_base, 0), 1)) - (
+            COALESCE(cost_summary.total_costs, 0) + 
+            CASE WHEN NOT EXISTS (SELECT 1 FROM vehicle_costs vc2 WHERE vc2.vehicle_id = v.id AND vc2.tenant_id = v.tenant_id AND vc2.is_system_cost = 1 AND vc2.category = 'purchase')
+                 AND COALESCE(v.purchase_amount, 0) > 0
+              THEN COALESCE(v.purchase_amount, 0) * COALESCE(NULLIF(v.purchase_fx_rate_to_base, 0), 1)
+              ELSE 0 END
+          )
         ELSE 0 END), 0) as total_profit
       FROM vehicles v
       LEFT JOIN vehicle_sales vs ON v.id = vs.vehicle_id AND vs.tenant_id = ?
       LEFT JOIN (
         SELECT 
           vehicle_id,
-          SUM(amount * fx_rate_to_base) as total_costs
+          tenant_id,
+          SUM(amount * COALESCE(NULLIF(fx_rate_to_base, 0), 1)) as total_costs
         FROM vehicle_costs
-        GROUP BY vehicle_id
-      ) cost_summary ON cost_summary.vehicle_id = v.id
+        WHERE tenant_id = ?
+        GROUP BY vehicle_id, tenant_id
+      ) cost_summary ON cost_summary.vehicle_id = v.id AND cost_summary.tenant_id = v.tenant_id
       WHERE v.tenant_id = ? ${brandFilter} ${dateFilter}
       GROUP BY v.maker, v.model
       HAVING vehicle_count > 0
       ORDER BY total_profit DESC
       LIMIT ?`,
-      [req.tenantId, ...params, Number(limit)]
+      [req.tenantId, req.tenantId, ...params, Number(limit)]
     );
 
     const rowsArray = rows as any[];
@@ -182,12 +205,21 @@ export async function getTopProfitable(req: AuthRequest, res: Response) {
         vs.id as sale_id,
         vs.sale_amount,
         vs.sale_currency,
-        vs.sale_amount * vs.sale_fx_rate_to_base as sale_price,
-        (v.purchase_amount * COALESCE(v.purchase_fx_rate_to_base, 1) + 
-         COALESCE((SELECT SUM(amount * fx_rate_to_base) FROM vehicle_costs WHERE vehicle_id = v.id), 0)) as total_costs,
-        (vs.sale_amount * vs.sale_fx_rate_to_base) - 
-        (v.purchase_amount * COALESCE(v.purchase_fx_rate_to_base, 1) + 
-         COALESCE((SELECT SUM(amount * fx_rate_to_base) FROM vehicle_costs WHERE vehicle_id = v.id), 0)) as profit,
+        vs.sale_amount * COALESCE(NULLIF(vs.sale_fx_rate_to_base, 0), 1) as sale_price,
+        (
+          COALESCE((SELECT SUM(amount * COALESCE(NULLIF(fx_rate_to_base, 0), 1)) FROM vehicle_costs WHERE vehicle_id = v.id AND tenant_id = v.tenant_id), 0) +
+          CASE WHEN NOT EXISTS (SELECT 1 FROM vehicle_costs vc2 WHERE vc2.vehicle_id = v.id AND vc2.tenant_id = v.tenant_id AND vc2.is_system_cost = 1 AND vc2.category = 'purchase')
+               AND COALESCE(v.purchase_amount, 0) > 0
+            THEN COALESCE(v.purchase_amount, 0) * COALESCE(NULLIF(v.purchase_fx_rate_to_base, 0), 1)
+            ELSE 0 END
+        ) as total_costs,
+        (vs.sale_amount * COALESCE(NULLIF(vs.sale_fx_rate_to_base, 0), 1)) - (
+          COALESCE((SELECT SUM(amount * COALESCE(NULLIF(fx_rate_to_base, 0), 1)) FROM vehicle_costs WHERE vehicle_id = v.id AND tenant_id = v.tenant_id), 0) +
+          CASE WHEN NOT EXISTS (SELECT 1 FROM vehicle_costs vc2 WHERE vc2.vehicle_id = v.id AND vc2.tenant_id = v.tenant_id AND vc2.is_system_cost = 1 AND vc2.category = 'purchase')
+               AND COALESCE(v.purchase_amount, 0) > 0
+            THEN COALESCE(v.purchase_amount, 0) * COALESCE(NULLIF(v.purchase_fx_rate_to_base, 0), 1)
+            ELSE 0 END
+        ) as profit,
         vs.sale_date,
         vs.customer_name,
         vs.staff_id
@@ -223,12 +255,21 @@ export async function getMonthlyComparison(req: AuthRequest, res: Response) {
       `SELECT 
         DATE_FORMAT(vs.sale_date, '%Y-%m') as month,
         COUNT(*) as sales_count,
-        COALESCE(SUM(vs.sale_amount * vs.sale_fx_rate_to_base), 0) as total_revenue,
-        COALESCE(SUM(v.purchase_amount * COALESCE(v.purchase_fx_rate_to_base, 1) + 
-         COALESCE((SELECT SUM(amount * fx_rate_to_base) FROM vehicle_costs WHERE vehicle_id = v.id), 0)), 0) as total_costs,
-        COALESCE(SUM((vs.sale_amount * vs.sale_fx_rate_to_base) - 
-         (v.purchase_amount * COALESCE(v.purchase_fx_rate_to_base, 1) + 
-          COALESCE((SELECT SUM(amount * fx_rate_to_base) FROM vehicle_costs WHERE vehicle_id = v.id), 0))), 0) as total_profit
+        COALESCE(SUM(vs.sale_amount * COALESCE(NULLIF(vs.sale_fx_rate_to_base, 0), 1)), 0) as total_revenue,
+        COALESCE(SUM(
+          COALESCE((SELECT SUM(amount * COALESCE(NULLIF(fx_rate_to_base, 0), 1)) FROM vehicle_costs WHERE vehicle_id = v.id AND tenant_id = v.tenant_id), 0) +
+          CASE WHEN NOT EXISTS (SELECT 1 FROM vehicle_costs vc2 WHERE vc2.vehicle_id = v.id AND vc2.tenant_id = v.tenant_id AND vc2.is_system_cost = 1 AND vc2.category = 'purchase')
+               AND COALESCE(v.purchase_amount, 0) > 0
+            THEN COALESCE(v.purchase_amount, 0) * COALESCE(NULLIF(v.purchase_fx_rate_to_base, 0), 1)
+            ELSE 0 END
+        ), 0) as total_costs,
+        COALESCE(SUM(vs.sale_amount * COALESCE(NULLIF(vs.sale_fx_rate_to_base, 0), 1)), 0) - COALESCE(SUM(
+          COALESCE((SELECT SUM(amount * COALESCE(NULLIF(fx_rate_to_base, 0), 1)) FROM vehicle_costs WHERE vehicle_id = v.id AND tenant_id = v.tenant_id), 0) +
+          CASE WHEN NOT EXISTS (SELECT 1 FROM vehicle_costs vc2 WHERE vc2.vehicle_id = v.id AND vc2.tenant_id = v.tenant_id AND vc2.is_system_cost = 1 AND vc2.category = 'purchase')
+               AND COALESCE(v.purchase_amount, 0) > 0
+            THEN COALESCE(v.purchase_amount, 0) * COALESCE(NULLIF(v.purchase_fx_rate_to_base, 0), 1)
+            ELSE 0 END
+        ), 0) as total_profit
       FROM vehicle_sales vs
       JOIN vehicles v ON vs.vehicle_id = v.id
       WHERE vs.tenant_id = ? 
@@ -263,7 +304,7 @@ export async function getCategoryCosts(req: AuthRequest, res: Response) {
       SELECT 
         COALESCE(category, 'other') as category,
         COUNT(*) as cost_count,
-        COALESCE(SUM(amount * fx_rate_to_base), 0) as total_amount
+        COALESCE(SUM(amount * COALESCE(NULLIF(fx_rate_to_base, 0), 1)), 0) as total_amount
       FROM vehicle_costs
       WHERE tenant_id = ?
     `;
@@ -316,8 +357,8 @@ export async function getActiveInstallmentCount(req: AuthRequest, res: Response)
        WHERE vis.tenant_id = ? 
          AND vis.status = 'active'
          AND (
-           (vis.total_amount * vis.fx_rate_to_base) - 
-           (SELECT COALESCE(SUM(amount * fx_rate_to_base), 0)
+           (vis.total_amount * COALESCE(NULLIF(vis.fx_rate_to_base, 0), 1)) - 
+           (SELECT COALESCE(SUM(amount * COALESCE(NULLIF(fx_rate_to_base, 0), 1)), 0)
             FROM vehicle_installment_payments
             WHERE installment_sale_id = vis.id)
          ) > 0`,
@@ -361,7 +402,7 @@ export async function getMonthlySales(req: AuthRequest, res: Response) {
     const currentSales = Number(currentMonthData?.sales_count || 0);
     const lastSales = Number(lastMonthData?.sales_count || 0);
     const changePercent = lastSales > 0 
-      ? ((currentSales - lastSales) / lastSales * 100).toFixed(1)
+      ? (safeDivide(currentSales - lastSales, lastSales) * 100).toFixed(1)
       : currentSales > 0 ? "100" : "0";
 
     res.json({
@@ -501,9 +542,8 @@ export async function getWeeklyRevenue(req: AuthRequest, res: Response) {
       // Bu hafta içindeki gelir ve maliyetleri hesapla
       const [revenueRows] = await dbPool.query(
         `SELECT 
-          COALESCE(SUM(vs.sale_amount * vs.sale_fx_rate_to_base), 0) as revenue,
-          COALESCE(SUM(v.purchase_amount * COALESCE(v.purchase_fx_rate_to_base, 1) + 
-           COALESCE((SELECT SUM(amount * fx_rate_to_base) FROM vehicle_costs WHERE vehicle_id = v.id), 0)), 0) as cost
+          COALESCE(SUM(vs.sale_amount * COALESCE(NULLIF(vs.sale_fx_rate_to_base, 0), 1)), 0) as revenue,
+          COALESCE(SUM(COALESCE((SELECT SUM(amount * COALESCE(NULLIF(fx_rate_to_base, 0), 1)) FROM vehicle_costs WHERE vehicle_id = v.id AND tenant_id = v.tenant_id), 0)), 0) as cost
          FROM vehicle_sales vs
          JOIN vehicles v ON vs.vehicle_id = v.id
          WHERE vs.tenant_id = ?
@@ -634,6 +674,7 @@ export async function getRecentActivities(req: AuthRequest, res: Response) {
         vip.id,
         vip.payment_date,
         vip.amount,
+        vip.fx_rate_to_base,
         vis.vehicle_id,
         v.maker,
         v.model,
@@ -682,14 +723,18 @@ export async function getRecentActivities(req: AuthRequest, res: Response) {
         subtitle: 'Yeni araç',
         details: `${v.year} - ${v.maker} ${v.model}`
       })),
-      ...(paymentsRows as any[]).map((p: any) => ({
+      ...(paymentsRows as any[]).map((p: any) => {
+        const fx = p.fx_rate_to_base != null && p.fx_rate_to_base > 0 ? p.fx_rate_to_base : 1;
+        const amountBase = parseFloat(p.amount) * parseFloat(fx);
+        return {
         id: `payment-${p.id}`,
         type: 'payment',
         date: p.payment_date,
         title: `Taksit ödemesi alındı`,
         subtitle: p.customer_name || 'Müşteri',
-        details: `${p.maker} ${p.model} - ${parseFloat(p.amount).toLocaleString('tr-TR')}`
-      })),
+        details: `${p.maker} ${p.model} - ${amountBase.toLocaleString('tr-TR')}`
+      };
+      }),
       ...(customersRows as any[]).map((c: any) => ({
         id: `customer-${c.id}`,
         type: 'customer',
@@ -759,7 +804,9 @@ export async function getRecentSales(req: AuthRequest, res: Response) {
         return { ...row, imageUrl };
       })
     );
-    const formattedRows = withUrls.map((row: any) => ({
+    const formattedRows = withUrls.map((row: any) => {
+      const fx = row.sale_fx_rate_to_base != null && row.sale_fx_rate_to_base > 0 ? row.sale_fx_rate_to_base : 1;
+      return {
       id: row.id,
       vehicle_id: row.vehicle_id,
       sale_date: row.sale_date,
@@ -768,11 +815,12 @@ export async function getRecentSales(req: AuthRequest, res: Response) {
       model: row.model,
       year: row.year,
       image: row.imageUrl,
-      price: row.sale_amount,
+      price: parseFloat(row.sale_amount) * parseFloat(fx),
       currency: row.sale_currency,
       payment_type: row.payment_type,
       installment_sale_id: row.installment_sale_id,
-    }));
+    };
+    });
 
     res.json(formattedRows);
   } catch (err) {

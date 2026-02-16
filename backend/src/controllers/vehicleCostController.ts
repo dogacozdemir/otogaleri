@@ -20,7 +20,44 @@ export async function listVehicleCosts(req: AuthRequest, res: Response) {
 
   try {
     const [rows] = await dbPool.query(query, params);
-    res.json(rows);
+    const costs = rows as any[];
+
+    // Convert each cost to current tenant default (historical: use rate at cost_date)
+    const [tenantRows] = await dbPool.query("SELECT default_currency FROM tenants WHERE id = ?", [req.tenantId]);
+    const baseCurrency = (tenantRows as any[])[0]?.default_currency || "TRY";
+
+    if (req.tenantQuery && costs.length > 0) {
+      const rateCache: Record<string, number> = {};
+      for (const cost of costs) {
+        const amt = Number(cost.amount || 0) * (Number(cost.fx_rate_to_base) || 1);
+        const storedBase = cost.base_currency_at_transaction || baseCurrency;
+        const costDate = cost.cost_date || new Date().toISOString().split("T")[0];
+        let amountInCurrentBase = amt;
+        if (storedBase !== baseCurrency) {
+          const cacheKey = `${storedBase}-${baseCurrency}-${costDate}`;
+          if (!(cacheKey in rateCache)) {
+            try {
+              rateCache[cacheKey] = await getOrFetchRate(
+                req.tenantQuery!,
+                storedBase as SupportedCurrency,
+                baseCurrency as SupportedCurrency,
+                costDate
+              );
+            } catch {
+              rateCache[cacheKey] = 1;
+            }
+          }
+          amountInCurrentBase = amt * rateCache[cacheKey];
+        }
+        cost.amount_in_current_base = amountInCurrentBase;
+      }
+    } else {
+      for (const cost of costs) {
+        cost.amount_in_current_base = Number(cost.amount || 0) * (Number(cost.fx_rate_to_base) || 1);
+      }
+    }
+
+    res.json(costs);
   } catch (err) {
     console.error("[vehicleCost] List error", err);
     res.status(500).json({ error: "Failed to list costs" });
@@ -61,14 +98,19 @@ export async function addVehicleCost(req: AuthRequest, res: Response) {
       }
     }
 
+    if (fxRate <= 0) {
+      return res.status(400).json({ error: "Kur değeri 0'dan büyük olmalıdır." });
+    }
+
     const amountBase = Number(amount) * fxRate;
     
     // Store custom_rate if provided, otherwise store null
     const storedCustomRate = (custom_rate !== undefined && custom_rate !== null) ? Number(custom_rate) : null;
 
     const [result] = await dbPool.query(
-      "INSERT INTO vehicle_costs (tenant_id, vehicle_id, cost_name, amount, currency, fx_rate_to_base, cost_date, category, custom_rate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [req.tenantId, vehicle_id, cost_name, amount, costCurrency, fxRate, formattedDate, category || "other", storedCustomRate]
+      `INSERT INTO vehicle_costs (tenant_id, vehicle_id, cost_name, amount, currency, fx_rate_to_base, cost_date, category, custom_rate, base_currency_at_transaction, is_system_cost) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+      [req.tenantId, vehicle_id, cost_name, amount, costCurrency, fxRate, formattedDate, category || "other", storedCustomRate, baseCurrency]
     );
 
     const costId = (result as any).insertId;
@@ -128,12 +170,16 @@ export async function updateVehicleCost(req: AuthRequest, res: Response) {
       }
     }
     
+    if (fxRate <= 0) {
+      return res.status(400).json({ error: "Kur değeri 0'dan büyük olmalıdır." });
+    }
+
     // Store custom_rate if provided, otherwise store null
     const storedCustomRate = (custom_rate !== undefined && custom_rate !== null) ? Number(custom_rate) : null;
 
     await dbPool.query(
-      "UPDATE vehicle_costs SET cost_name = ?, amount = ?, currency = ?, fx_rate_to_base = ?, cost_date = ?, category = ?, custom_rate = ? WHERE id = ? AND vehicle_id = ? AND tenant_id = ?",
-      [cost_name, amount, costCurrency, fxRate, formattedDate, category, storedCustomRate, cost_id, vehicle_id, req.tenantId]
+      `UPDATE vehicle_costs SET cost_name = ?, amount = ?, currency = ?, fx_rate_to_base = ?, cost_date = ?, category = ?, custom_rate = ?, base_currency_at_transaction = ? WHERE id = ? AND vehicle_id = ? AND tenant_id = ?`,
+      [cost_name, amount, costCurrency, fxRate, formattedDate, category, storedCustomRate, baseCurrency, cost_id, vehicle_id, req.tenantId]
     );
 
     const [rows] = await dbPool.query("SELECT * FROM vehicle_costs WHERE id = ?", [cost_id]);

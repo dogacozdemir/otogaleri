@@ -64,6 +64,8 @@ export const VehicleDocumentModal = ({
                 <SelectItem value="inspection">Muayene</SelectItem>
                 <SelectItem value="customs">Gümrük</SelectItem>
                 <SelectItem value="invoice">Fatura</SelectItem>
+                <SelectItem value="eksper">Eksper</SelectItem>
+                <SelectItem value="grade">Grade</SelectItem>
                 <SelectItem value="other">Diğer</SelectItem>
               </SelectContent>
             </Select>

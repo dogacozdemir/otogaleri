@@ -5,6 +5,7 @@ import { Calculator, Info, Edit } from "lucide-react";
 import { formatCurrency } from "@/lib/formatters";
 import { useCurrency } from "@/hooks/useCurrency";
 import { useTenant } from "@/contexts/TenantContext";
+import { useViewCurrency } from "@/contexts/ViewCurrencyContext";
 import { api } from "@/api";
 import { useState, useEffect } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -50,18 +51,19 @@ export const VehicleDetailCalculateTab = ({
 }: VehicleDetailCalculateTabProps) => {
   const { formatCurrencyWithCurrency } = useCurrency();
   const { tenant } = useTenant();
-  const targetCurrency = tenant?.default_currency || "TRY";
+  const { viewCurrency } = useViewCurrency();
+  const targetCurrency = viewCurrency;
   const [conversionResult, setConversionResult] = useState<ConversionResult | null>(null);
   const [loadingConversion, setLoadingConversion] = useState(false);
   const [editingCostId, setEditingCostId] = useState<number | null>(null);
   const [customRateValue, setCustomRateValue] = useState<string>("");
 
-  // Convert costs to target currency when costCalculation changes
+  // Convert costs to target currency when costCalculation or viewCurrency changes
   useEffect(() => {
     if (costCalculation && costCalculation.costItems && Array.isArray(costCalculation.costItems) && costCalculation.costItems.length > 0) {
       convertCostsToTargetCurrency();
     }
-  }, [costCalculation, targetCurrency]);
+  }, [costCalculation, targetCurrency, viewCurrency]);
 
   const convertCostsToTargetCurrency = async () => {
     if (!costCalculation || !vehicle.id) return;
@@ -283,10 +285,7 @@ export const VehicleDetailCalculateTab = ({
                       </>
                     ) : (
                       <span className="font-bold">
-                        {formatCurrencyWithCurrency(
-                          costCalculation.generalTotal,
-                          targetCurrency
-                        )}
+                        {currency(costCalculation.generalTotal)}
                       </span>
                     )}
                   </div>

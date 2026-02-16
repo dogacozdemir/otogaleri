@@ -97,11 +97,15 @@ async function runMigration(
     // Remove USE statement if present (we already have database selected)
     const cleanedSQL = sql.replace(/USE\s+\w+;?\s*/gi, "");
     
-    // Split by semicolon and filter empty statements
-    const statements = cleanedSQL
-      .split(";")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0 && !s.startsWith("--"));
+    // Split by semicolon - but avoid splitting inside comments or strings
+    // For migrations with PREPARE/EXECUTE, run as single block to preserve session variables
+    const hasPrepareExecute = /PREPARE\s+\w+\s+FROM/i.test(cleanedSQL);
+    const statements = hasPrepareExecute
+      ? [cleanedSQL]  // Run whole migration as one (multipleStatements handles it)
+      : cleanedSQL
+          .split(";")
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0 && !s.startsWith("--"));
     
     for (const statement of statements) {
       if (statement.length > 0) {
@@ -142,8 +146,9 @@ async function main() {
     const files = await readdir(migrationsDir);
     
     // Filter and sort migration files (numeric prefix for ordering)
+    // Exclude: ALL_MIGRATIONS_AT_ONCE (manual), seed_data (initial data only, TRUNCATE fails with FKs)
     const migrationFiles = files
-      .filter((file) => file.endsWith(".sql"))
+      .filter((file) => file.endsWith(".sql") && !file.startsWith("ALL_") && file !== "seed_data.sql")
       .sort((a, b) => {
         // Extract numeric prefix if exists
         const aNum = parseInt(a.match(/^(\d+)_/)?.[1] || "999999");

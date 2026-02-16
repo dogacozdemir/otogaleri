@@ -47,6 +47,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2, Play } from "lucide-react";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
+import { safeDivide } from "@/lib/safeDivide";
 
 const formatDateTime = (dateString: string | null | undefined): string => {
   if (!dateString) return "-";
@@ -193,7 +194,7 @@ export default function AnalyticsPage() {
               if (vehicle.sale_id && convertedMap.has(vehicle.sale_id)) {
                 const convertedSalePrice = convertedMap.get(vehicle.sale_id)!;
                 if (salePriceBase > 0) {
-                  const conversionRate = convertedSalePrice / salePriceBase;
+                  const conversionRate = safeDivide(convertedSalePrice, salePriceBase);
                   convertedProfit = profitBase * conversionRate;
                 }
                 

@@ -34,6 +34,8 @@ import { tr } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { getApiBaseUrl } from "@/lib/utils";
 import { useCurrency } from "@/hooks/useCurrency";
+import { useViewCurrency } from "@/contexts/ViewCurrencyContext";
+import { useViewCurrencyConversion } from "@/hooks/useViewCurrencyConversion";
 import { useTenant } from "@/contexts/TenantContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -80,6 +82,7 @@ interface VehicleSale {
     status: 'active' | 'completed' | 'cancelled';
     total_paid: number;
     remaining_balance: number;
+    fx_rate_to_base?: number | null;
     payments: Array<{
       id: number;
       payment_type: 'down_payment' | 'installment';
@@ -98,9 +101,11 @@ const CustomerDetails: React.FC = () => {
   const { toast } = useToast();
   const { formatCurrency } = useCurrency();
   const { tenant } = useTenant();
-  const targetCurrency = tenant?.default_currency || "TRY";
+  const { viewCurrency, baseCurrency } = useViewCurrency();
+  const { formatInViewCurrency } = useViewCurrencyConversion();
+  const displayAmount = (amount: number | null | undefined) =>
+    viewCurrency !== baseCurrency ? formatInViewCurrency(amount ?? 0) : formatCurrency(amount ?? 0);
   const [customer, setCustomer] = useState<Customer | null>(null);
-  const [convertedTotalSpent, setConvertedTotalSpent] = useState<number | null>(null);
   const [sales, setSales] = useState<VehicleSale[]>([]);
   const [quotes, setQuotes] = useState<any[]>([]);
   const [notFound, setNotFound] = useState(false);
@@ -148,41 +153,6 @@ const CustomerDetails: React.FC = () => {
           sale_count: Number(apiCustomer.sale_count) || 0,
         } as Customer);
         setSales(apiSales);
-        
-        // Convert customer's total spent to target currency
-        if (apiSales && apiSales.length > 0) {
-          try {
-            // Get all sale dates for conversion
-            const saleDates = apiSales
-              .map((sale: any) => sale.sale_date)
-              .filter(Boolean);
-            
-            if (saleDates.length > 0) {
-              const minDate = saleDates.reduce((a: string, b: string) => a < b ? a : b);
-              const maxDate = saleDates.reduce((a: string, b: string) => a > b ? a : b);
-              
-              // Convert all customer's sales to target currency
-              const convertRes = await api.post("/accounting/convert-incomes", {
-                target_currency: targetCurrency,
-                startDate: minDate,
-                endDate: maxDate,
-              });
-              
-              // Filter conversion details for this customer's sales (vehicle_sales.id matches)
-              const customerSaleIds = apiSales.map((s: any) => s.id).filter((id: any) => id !== null && id !== undefined);
-              const customerConvertedTotal = convertRes.data.conversion_details
-                .filter((detail: any) => detail.type === 'vehicle_sale' && customerSaleIds.includes(detail.id))
-                .reduce((sum: number, detail: any) => sum + (Number(detail.converted_amount) || 0), 0);
-              
-              setConvertedTotalSpent(customerConvertedTotal);
-            }
-          } catch (convertError) {
-            console.error("Failed to convert customer total spent:", convertError);
-            setConvertedTotalSpent(null);
-          }
-        } else {
-          setConvertedTotalSpent(null);
-        }
         setEditForm({
           name: apiCustomer.name || "",
           phone: apiCustomer.phone || "",
@@ -355,9 +325,8 @@ const CustomerDetails: React.FC = () => {
     );
   }
 
-  const displayTotalSpent = convertedTotalSpent !== null ? convertedTotalSpent : customer.total_spent_base;
-  const segment = getCustomerSegment(displayTotalSpent, customer.sale_count);
-  const averageSaleAmount = customer.sale_count > 0 ? displayTotalSpent / customer.sale_count : 0;
+  const segment = getCustomerSegment(customer.total_spent_base, customer.sale_count);
+  const averageSaleAmount = customer.sale_count > 0 ? customer.total_spent_base / customer.sale_count : 0;
 
   return (
     <div className="p-6 space-y-6 bg-background min-h-screen">
@@ -389,7 +358,7 @@ const CustomerDetails: React.FC = () => {
             <div>
               <p className="text-sm text-muted-foreground font-medium mb-2">Toplam Harcama</p>
               <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                {formatCurrency(convertedTotalSpent !== null ? convertedTotalSpent : customer.total_spent_base)}
+                {displayAmount(customer.total_spent_base)}
               </p>
             </div>
           </CardContent>
@@ -408,7 +377,7 @@ const CustomerDetails: React.FC = () => {
           <CardContent className="p-6">
             <div>
               <p className="text-sm text-muted-foreground font-medium mb-2">Ortalama Satış</p>
-              <p className="text-2xl font-bold text-primary">{formatCurrency(averageSaleAmount)}</p>
+              <p className="text-2xl font-bold text-primary">{displayAmount(averageSaleAmount)}</p>
             </div>
           </CardContent>
         </Card>
@@ -565,7 +534,7 @@ const CustomerDetails: React.FC = () => {
                               )}
                             </div>
                             <Badge className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
-                              {formatCurrency(sale.sale_amount * sale.sale_fx_rate_to_base)}
+                              {displayAmount(sale.sale_amount * (sale.sale_fx_rate_to_base || 1))}
                             </Badge>
                           </div>
                           <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 space-x-4 flex-wrap gap-2">
@@ -620,7 +589,7 @@ const CustomerDetails: React.FC = () => {
                                   {sale.installment.status === 'active' && sale.installment.remaining_balance > 0 && (
                                     <>
                                       <Badge variant="outline" className="bg-orange-100 text-orange-800">
-                                        Kalan Borç: {formatCurrency(sale.installment.remaining_balance)}
+                                        Kalan Borç: {displayAmount(sale.installment.remaining_balance)}
                                       </Badge>
                                       {sale.installment_sale_id && (
                                         <Button
@@ -660,15 +629,15 @@ const CustomerDetails: React.FC = () => {
                                 </div>
                               </div>
                               <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div><strong>Toplam Satış Fiyatı:</strong> {formatCurrency(sale.installment.total_amount)}</div>
-                                <div><strong>Peşinat:</strong> {formatCurrency(sale.installment.down_payment)}</div>
+                                <div><strong>Toplam Satış Fiyatı:</strong> {displayAmount(sale.installment.total_amount * (sale.installment.fx_rate_to_base || 1))}</div>
+                                <div><strong>Peşinat:</strong> {displayAmount(sale.installment.down_payment * (sale.installment.fx_rate_to_base || 1))}</div>
                                 <div><strong>Taksit Sayısı:</strong> {sale.installment.installment_count}</div>
-                                <div><strong>Taksit Tutarı:</strong> {formatCurrency(sale.installment.installment_amount)}</div>
-                                <div><strong>Ödenen Toplam:</strong> {formatCurrency(sale.installment.total_paid)}</div>
+                                <div><strong>Taksit Tutarı:</strong> {displayAmount(sale.installment.installment_amount * (sale.installment.fx_rate_to_base || 1))}</div>
+                                <div><strong>Ödenen Toplam:</strong> {displayAmount(sale.installment.total_paid)}</div>
                                 <div><strong>Kalan Borç:</strong> 
                                   <span className={sale.installment.remaining_balance > 0 ? "text-orange-600 font-semibold ml-2" : "text-green-600 font-semibold ml-2"}>
                                     {sale.installment.remaining_balance > 0 
-                                      ? formatCurrency(sale.installment.remaining_balance) 
+                                      ? displayAmount(sale.installment.remaining_balance) 
                                       : "Tamamlandı"}
                                   </span>
                                 </div>
@@ -700,7 +669,7 @@ const CustomerDetails: React.FC = () => {
                                               ? payment.installment_number 
                                               : '-'}
                                           </TableCell>
-                                          <TableCell>{formatCurrency(payment.amount)}</TableCell>
+                                          <TableCell>{displayAmount(payment.amount * (payment.fx_rate_to_base || 1))}</TableCell>
                                           <TableCell>{payment.notes || '-'}</TableCell>
                                         </TableRow>
                                       ))
@@ -777,7 +746,7 @@ const CustomerDetails: React.FC = () => {
                                   <strong>Araç:</strong> {quote.maker} {quote.model} {quote.production_year}
                                 </p>
                                 <p className="text-lg font-bold text-primary mb-1">
-                                  {formatCurrency(quote.sale_price * quote.fx_rate_to_base)}
+                                  {displayAmount(quote.sale_price * (quote.fx_rate_to_base || 1))}
                                 </p>
                                 <div className="flex gap-4 text-xs text-muted-foreground/60">
                                   <span>

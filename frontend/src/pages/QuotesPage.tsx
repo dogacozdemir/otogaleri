@@ -33,6 +33,7 @@ import {
   Eye,
   ArrowRight,
   Calendar,
+  AlertTriangle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/formatters";
@@ -40,6 +41,8 @@ import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { useCurrency } from "@/hooks/useCurrency";
 import { useTenant } from "@/contexts/TenantContext";
+import { getApiBaseUrl } from "@/lib/utils";
+import { QuoteDetailModal } from "@/components/quotes/QuoteDetailModal";
 
 type Quote = {
   id: number;
@@ -49,6 +52,7 @@ type Quote = {
   quote_date: string;
   valid_until: string;
   sale_price: number;
+  discount_amount?: number | null;
   currency: string;
   fx_rate_to_base: number;
   down_payment: number | null;
@@ -61,6 +65,14 @@ type Quote = {
   production_year: number | null;
   chassis_no: string | null;
   vehicle_number: number | null;
+  transmission?: string | null;
+  km?: number | null;
+  fuel?: string | null;
+  cc?: number | null;
+  color?: string | null;
+  primary_image_url?: string | null;
+  vehicle_sale_price?: number | null;
+  updated_at?: string;
   customer_name_full: string | null;
   customer_phone_full: string | null;
   created_by_name: string | null;
@@ -74,12 +86,19 @@ type Vehicle = {
   production_year: number | null;
   chassis_no: string | null;
   sale_price: number | null;
+  transmission?: string | null;
+  km?: number | null;
+  fuel?: string | null;
+  cc?: number | null;
+  color?: string | null;
+  primary_image_url?: string | null;
 };
 
 type Customer = {
   id: number;
   name: string;
   phone: string | null;
+  email?: string | null;
 };
 
 export default function QuotesPage() {
@@ -100,6 +119,22 @@ export default function QuotesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
+  const [quoteSettings, setQuoteSettings] = useState<{
+    gallery_logo_url?: string | null;
+    terms_conditions?: string | null;
+    contact_phone?: string | null;
+    contact_whatsapp?: string | null;
+    contact_address?: string | null;
+  } | null>(null);
+  const [detailQuote, setDetailQuote] = useState<Quote | null>(null);
+  const [openNewCustomerDialog, setOpenNewCustomerDialog] = useState(false);
+  const [newCustomerForm, setNewCustomerForm] = useState({
+    name: "",
+    surname: "",
+    phone: "",
+    email: "",
+  });
+  const [creatingCustomer, setCreatingCustomer] = useState(false);
 
   const [quoteForm, setQuoteForm] = useState({
     vehicle_id: "",
@@ -107,6 +142,8 @@ export default function QuotesPage() {
     quote_date: new Date().toISOString().split("T")[0],
     valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
     sale_price: "",
+    discount_amount: "",
+    discount_type: "fixed" as "fixed" | "percent",
     currency: "TRY",
     down_payment: "",
     installment_count: "",
@@ -120,6 +157,18 @@ export default function QuotesPage() {
     fetchVehicles();
     fetchCustomers();
   }, [pagination.page, statusFilter, query]);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const { data } = await api.get("/quotes/settings");
+        setQuoteSettings(data);
+      } catch {
+        setQuoteSettings(null);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   const fetchQuotes = async () => {
     setLoading(true);
@@ -162,6 +211,49 @@ export default function QuotesPage() {
     }
   };
 
+  const handleCreateCustomer = async () => {
+    const fullName = [newCustomerForm.name.trim(), newCustomerForm.surname.trim()].filter(Boolean).join(" ");
+    if (!fullName) {
+      toast({
+        title: "Uyarı",
+        description: "İsim zorunludur.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setCreatingCustomer(true);
+    try {
+      const { data } = await api.post("/customers", {
+        name: fullName,
+        phone: newCustomerForm.phone.trim() || null,
+        email: newCustomerForm.email.trim() || null,
+      });
+      setCustomers((prev) => [...prev, data]);
+      setQuoteForm((prev) => ({ ...prev, customer_id: data.id.toString() }));
+      setOpenNewCustomerDialog(false);
+      setNewCustomerForm({ name: "", surname: "", phone: "", email: "" });
+      toast({ title: "Başarılı", description: "Müşteri eklendi." });
+    } catch (error: any) {
+      toast({
+        title: "Hata",
+        description: error?.response?.data?.error || "Müşteri eklenemedi.",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingCustomer(false);
+    }
+  };
+
+  const computeDiscountAmount = (): number | null => {
+    const salePrice = parseFloat(quoteForm.sale_price) || 0;
+    const discountVal = parseFloat(quoteForm.discount_amount) || 0;
+    if (discountVal <= 0) return null;
+    if (quoteForm.discount_type === "percent") {
+      return Math.min(salePrice * (discountVal / 100), salePrice);
+    }
+    return Math.min(discountVal, salePrice);
+  };
+
   const handleCreateQuote = async () => {
     if (!quoteForm.vehicle_id || !quoteForm.sale_price) {
       toast({
@@ -173,10 +265,13 @@ export default function QuotesPage() {
     }
 
     try {
+      const discountAmount = computeDiscountAmount();
       const payload = {
         ...quoteForm,
+        discount_amount: discountAmount,
         customer_id: quoteForm.customer_id === "none" ? "" : quoteForm.customer_id,
       };
+      delete (payload as any).discount_type;
       await api.post("/quotes", payload);
       toast({
         title: "Başarılı",
@@ -198,10 +293,13 @@ export default function QuotesPage() {
     if (!selectedQuote) return;
 
     try {
+      const discountAmount = computeDiscountAmount();
       const payload = {
         ...quoteForm,
+        discount_amount: discountAmount,
         customer_id: quoteForm.customer_id === "none" ? "" : quoteForm.customer_id,
       };
+      delete (payload as any).discount_type;
       await api.put(`/quotes/${selectedQuote.id}`, payload);
       toast({
         title: "Başarılı",
@@ -302,6 +400,8 @@ export default function QuotesPage() {
       quote_date: new Date().toISOString().split("T")[0],
       valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
       sale_price: "",
+      discount_amount: "",
+      discount_type: "fixed",
       currency: "TRY",
       down_payment: "",
       installment_count: "",
@@ -319,6 +419,8 @@ export default function QuotesPage() {
       quote_date: quote.quote_date,
       valid_until: quote.valid_until,
       sale_price: quote.sale_price.toString(),
+      discount_amount: quote.discount_amount?.toString() || "",
+      discount_type: "fixed",
       currency: quote.currency,
       down_payment: quote.down_payment?.toString() || "",
       installment_count: quote.installment_count?.toString() || "",
@@ -332,7 +434,7 @@ export default function QuotesPage() {
   const openDetailModal = async (quote: Quote) => {
     try {
       const response = await api.get(`/quotes/${quote.id}`);
-      setSelectedQuote(response.data);
+      setDetailQuote(response.data);
       setOpenDetail(true);
     } catch (error: any) {
       toast({
@@ -345,17 +447,17 @@ export default function QuotesPage() {
 
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { label: string; className: string }> = {
-      draft: { label: "Taslak", className: "bg-muted-foreground text-muted" },
-      sent: { label: "Gönderildi", className: "bg-info text-info-foreground" },
-      approved: { label: "Onaylandı", className: "bg-success text-success-foreground" },
-      rejected: { label: "Reddedildi", className: "bg-destructive text-destructive-foreground" },
-      expired: { label: "Süresi Doldu", className: "bg-warning text-warning-foreground" },
+      draft: { label: "Taslak", className: "bg-slate-500 text-white border-slate-600" },
+      sent: { label: "Gönderildi", className: "bg-amber-500 text-white border-amber-600" },
+      approved: { label: "Onaylandı", className: "bg-emerald-600 text-white border-emerald-700" },
+      rejected: { label: "Reddedildi", className: "bg-red-600 text-white border-red-700" },
+      expired: { label: "Süresi Doldu", className: "bg-orange-500 text-white border-orange-600" },
       converted: { label: "Satışa Dönüştü", className: "bg-primary text-primary-foreground" },
     };
 
     const config = statusConfig[status] || statusConfig.draft;
     return (
-      <Badge className={`${config.className} rounded-xl px-2 py-0.5 text-xs`}>
+      <Badge className={`${config.className} rounded-xl px-2 py-0.5 text-xs font-medium`}>
         {config.label}
       </Badge>
     );
@@ -436,12 +538,22 @@ export default function QuotesPage() {
                   <label className="text-sm font-medium text-foreground mb-2 block">Müşteri</label>
                   <Select
                     value={quoteForm.customer_id || "none"}
-                    onValueChange={(value) => setQuoteForm({ ...quoteForm, customer_id: value === "none" ? "" : value })}
+                    onValueChange={(value) => {
+                      if (value === "__new__") {
+                        setOpenNewCustomerDialog(true);
+                        return;
+                      }
+                      setQuoteForm({ ...quoteForm, customer_id: value === "none" ? "" : value });
+                    }}
                   >
                     <SelectTrigger className="rounded-xl">
                       <SelectValue placeholder="Müşteri seçin (opsiyonel)" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="__new__" className="font-medium text-primary">
+                        <Plus className="h-4 w-4 inline mr-2" />
+                        Yeni müşteri ekle
+                      </SelectItem>
                       <SelectItem value="none">Müşteri seçilmedi</SelectItem>
                       {customers.map((customer) => (
                         <SelectItem key={customer.id} value={customer.id.toString()}>
@@ -476,6 +588,31 @@ export default function QuotesPage() {
                   />
                 </div>
               </div>
+              {quoteForm.vehicle_id && (() => {
+                const v = vehicles.find((x) => x.id === Number(quoteForm.vehicle_id));
+                if (!v) return null;
+                const imgUrl = v.primary_image_url
+                  ? (v.primary_image_url.startsWith("http") ? v.primary_image_url : `${getApiBaseUrl()}${v.primary_image_url}`)
+                  : null;
+                return (
+                  <Card className="p-3 border border-border/50 bg-muted/30">
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Önizleme</p>
+                    <div className="flex gap-3">
+                      {imgUrl && (
+                        <img src={imgUrl} alt="" className="w-20 h-16 object-cover rounded-lg" />
+                      )}
+                      <div className="text-sm">
+                        <p className="font-semibold">{v.maker} {v.model} {v.production_year}</p>
+                        <p className="text-muted-foreground text-xs">
+                          {v.transmission && `${v.transmission} • `}
+                          {v.km != null && `${(v.km).toLocaleString("tr-TR")} km`}
+                          {v.fuel && ` • ${v.fuel}`}
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })()}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-foreground mb-2 block">
@@ -488,6 +625,20 @@ export default function QuotesPage() {
                     placeholder="0.00"
                     className="rounded-xl"
                   />
+                  {quoteForm.vehicle_id && (() => {
+                    const v = vehicles.find((x) => x.id === Number(quoteForm.vehicle_id));
+                    const listPrice = v?.sale_price;
+                    const quotePrice = parseFloat(quoteForm.sale_price) || 0;
+                    if (listPrice != null && quotePrice > 0 && Math.abs(listPrice - quotePrice) > 0.01) {
+                      return (
+                        <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          {"Stok fiyatı (" + formatCurrency(listPrice, quoteForm.currency, locale) + ") ile farklı."}
+                        </p>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
                 <div>
                   <label className="text-sm font-medium text-foreground mb-2 block">Para Birimi</label>
@@ -508,6 +659,40 @@ export default function QuotesPage() {
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-foreground mb-2 block">İndirim</label>
+                  <div className="flex gap-2">
+                    <Select
+                      value={quoteForm.discount_type}
+                      onValueChange={(v: "fixed" | "percent") => setQuoteForm({ ...quoteForm, discount_type: v })}
+                    >
+                      <SelectTrigger className="w-20 rounded-xl">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="fixed">₺</SelectItem>
+                        <SelectItem value="percent">%</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={quoteForm.discount_amount}
+                      onChange={(e) => setQuoteForm({ ...quoteForm, discount_amount: e.target.value })}
+                      placeholder="0"
+                      className="rounded-xl flex-1"
+                    />
+                  </div>
+                  {quoteForm.discount_amount && quoteForm.sale_price && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Toplam: {formatCurrency(
+                        Math.max(0, (parseFloat(quoteForm.sale_price) || 0) - (computeDiscountAmount() ?? 0)),
+                        quoteForm.currency,
+                        locale
+                      )}
+                    </p>
+                  )}
+                </div>
                 <div>
                   <label className="text-sm font-medium text-foreground mb-2 block">Peşinat</label>
                   <Input
@@ -639,7 +824,11 @@ export default function QuotesPage() {
                         {quote.customer_name_full || "-"}
                       </TableCell>
                       <TableCell className="text-foreground font-medium">
-                        {formatCurrency(quote.sale_price, quote.currency, locale)}
+                        {formatCurrency(
+                          Math.max(0, quote.sale_price - (quote.discount_amount ?? 0)),
+                          quote.currency,
+                          locale
+                        )}
                       </TableCell>
                       <TableCell className="text-foreground">
                         {format(new Date(quote.quote_date), "dd MMM yyyy", { locale: tr })}
@@ -762,12 +951,22 @@ export default function QuotesPage() {
                 <label className="text-sm font-medium text-foreground mb-2 block">Müşteri</label>
                 <Select
                   value={quoteForm.customer_id || "none"}
-                  onValueChange={(value) => setQuoteForm({ ...quoteForm, customer_id: value === "none" ? "" : value })}
+                  onValueChange={(value) => {
+                    if (value === "__new__") {
+                      setOpenNewCustomerDialog(true);
+                      return;
+                    }
+                    setQuoteForm({ ...quoteForm, customer_id: value === "none" ? "" : value });
+                  }}
                 >
                   <SelectTrigger className="rounded-xl">
                     <SelectValue placeholder="Müşteri seçin" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="__new__" className="font-medium text-primary">
+                      <Plus className="h-4 w-4 inline mr-2" />
+                      Yeni müşteri ekle
+                    </SelectItem>
                     <SelectItem value="none">Müşteri seçilmedi</SelectItem>
                     {customers.map((customer) => (
                       <SelectItem key={customer.id} value={customer.id.toString()}>
@@ -807,6 +1006,31 @@ export default function QuotesPage() {
                   onChange={(e) => setQuoteForm({ ...quoteForm, sale_price: e.target.value })}
                   className="rounded-xl"
                 />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground mb-2 block">İndirim</label>
+                <div className="flex gap-2">
+                  <Select
+                    value={quoteForm.discount_type}
+                    onValueChange={(v: "fixed" | "percent") => setQuoteForm({ ...quoteForm, discount_type: v })}
+                  >
+                    <SelectTrigger className="w-20 rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fixed">₺</SelectItem>
+                      <SelectItem value="percent">%</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={quoteForm.discount_amount}
+                    onChange={(e) => setQuoteForm({ ...quoteForm, discount_amount: e.target.value })}
+                    placeholder="0"
+                    className="rounded-xl flex-1"
+                  />
+                </div>
               </div>
               <div>
                 <label className="text-sm font-medium text-foreground mb-2 block">Para Birimi</label>
@@ -895,6 +1119,89 @@ export default function QuotesPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Quote Detail / PDF Modal */}
+      <QuoteDetailModal
+        open={openDetail}
+        onOpenChange={setOpenDetail}
+        quote={detailQuote}
+        settings={quoteSettings}
+        locale={locale}
+      />
+
+      {/* Yeni Müşteri Ekle Dialog */}
+      <Dialog open={openNewCustomerDialog} onOpenChange={setOpenNewCustomerDialog}>
+        <DialogContent className="max-w-md bg-card rounded-xl border border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Yeni Müşteri Ekle</DialogTitle>
+            <DialogDescription className="text-muted-foreground/70">
+              Teklif için yeni müşteri oluşturun. Yalnızca isim zorunludur.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-foreground mb-2 block">
+                  İsim <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  value={newCustomerForm.name}
+                  onChange={(e) => setNewCustomerForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="Ad"
+                  className="rounded-xl"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-foreground mb-2 block">Soyisim</label>
+                <Input
+                  value={newCustomerForm.surname}
+                  onChange={(e) => setNewCustomerForm((f) => ({ ...f, surname: e.target.value }))}
+                  placeholder="Soyad"
+                  className="rounded-xl"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground mb-2 block">Telefon</label>
+              <Input
+                value={newCustomerForm.phone}
+                onChange={(e) => setNewCustomerForm((f) => ({ ...f, phone: e.target.value }))}
+                placeholder="05XX XXX XX XX"
+                className="rounded-xl"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground mb-2 block">E-posta</label>
+              <Input
+                type="email"
+                value={newCustomerForm.email}
+                onChange={(e) => setNewCustomerForm((f) => ({ ...f, email: e.target.value }))}
+                placeholder="ornek@email.com"
+                className="rounded-xl"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setOpenNewCustomerDialog(false);
+                setNewCustomerForm({ name: "", surname: "", phone: "", email: "" });
+              }}
+              className="rounded-xl"
+            >
+              İptal
+            </Button>
+            <Button
+              onClick={handleCreateCustomer}
+              disabled={creatingCustomer}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl"
+            >
+              {creatingCustomer ? "Ekleniyor..." : "Ekle"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Convert to Sale Dialog */}
       <Dialog open={openConvert} onOpenChange={setOpenConvert}>
         <DialogContent className="max-w-md bg-card rounded-xl border border-border">
@@ -913,7 +1220,12 @@ export default function QuotesPage() {
                 <strong>Araç:</strong> {selectedQuote.maker} {selectedQuote.model}
               </p>
               <p className="text-sm text-foreground">
-                <strong>Fiyat:</strong> {formatCurrency(selectedQuote.sale_price, selectedQuote.currency, locale)}
+                <strong>Fiyat:</strong>{" "}
+                {formatCurrency(
+                  Math.max(0, selectedQuote.sale_price - (selectedQuote.discount_amount ?? 0)),
+                  selectedQuote.currency,
+                  locale
+                )}
               </p>
             </div>
           )}

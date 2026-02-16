@@ -31,11 +31,13 @@ export type Vehicle = {
   fuel: string | null;
   grade: string | null;
   cc: number | null;
+  weight?: number | null;
   color: string | null;
   engine_no: string | null;
   other: string | null;
   sale_price: number | null;
   sale_currency?: string | null;
+  sale_fx_rate_to_base?: number | null;
   paid: number | null;
   purchase_amount?: number | null;
   purchase_currency?: string | null;
@@ -91,6 +93,7 @@ export type VehicleCost = {
   currency?: string;
   category?: string;
   cost_date?: string;
+  fx_rate_to_base?: number;
 };
 
 export type CostCalculation = {
@@ -145,14 +148,27 @@ export const useVehiclesData = () => {
   // Selected vehicle state
   const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(null);
 
-  // TanStack Query hooks
+  // TanStack Query hooks - mevcut = stoktaki (in_stock), satılan = sold
   const vehiclesQuery = useVehiclesQuery({
     page: pagination.page,
     limit: 50,
     search: query,
-    is_sold: isSoldFilter,
+    is_sold: activeTab === "vehicles" ? "false" : "true",
     status: statusFilter,
-    stock_status: stockStatusFilter,
+    stock_status: activeTab === "vehicles" ? "in_stock" : stockStatusFilter,
+  });
+
+  // Badge counts: mevcut = stoktaki araç, satılan = satılan araç
+  const inStockCountQuery = useVehiclesQuery({
+    page: 1,
+    limit: 1,
+    is_sold: "false",
+    stock_status: "in_stock",
+  });
+  const soldCountQuery = useVehiclesQuery({
+    page: 1,
+    limit: 1,
+    is_sold: "true",
   });
 
   const vehicleDetailQuery = useVehicleDetailQuery(selectedVehicleId);
@@ -165,10 +181,10 @@ export const useVehiclesData = () => {
   const updateVehicleMutation = useUpdateVehicleMutation();
   const deleteVehicleMutation = useDeleteVehicleMutation();
 
-  // Reset pagination when filters change
+  // Reset pagination when filters or tab change
   useEffect(() => {
     setPagination(prev => ({ ...prev, page: 1 }));
-  }, [isSoldFilter, statusFilter, stockStatusFilter]);
+  }, [activeTab, statusFilter, stockStatusFilter]);
 
   // Handle location state for selected vehicle
   useEffect(() => {
@@ -233,6 +249,10 @@ export const useVehiclesData = () => {
     return filtered;
   }, [soldVehicles, soldVehiclesFilter, query]);
 
+  // Badge counts: mevcut = stoktaki, satılan = satılan
+  const activeVehiclesCount = inStockCountQuery.data?.pagination?.total ?? 0;
+  const soldVehiclesCount = soldCountQuery.data?.pagination?.total ?? 0;
+
   // API functions (wrappers for backward compatibility)
   const fetchVehicles = async () => {
     await vehiclesQuery.refetch();
@@ -268,6 +288,10 @@ export const useVehiclesData = () => {
     filteredVehicles,
     soldVehicles,
     filteredSoldVehicles,
+
+    // Badge counts (always correct regardless of tab)
+    activeVehiclesCount,
+    soldVehiclesCount,
     
     // Filter states
     query,

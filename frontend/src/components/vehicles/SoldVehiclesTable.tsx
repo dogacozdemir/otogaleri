@@ -17,6 +17,7 @@ interface SoldVehiclesTableProps {
   viewMode: 'table' | 'grid';
   currency: (amount: number | null) => string;
   onDetailClick: (vehicle: Vehicle) => void;
+  totalCount?: number;
 }
 
 export const SoldVehiclesTable = ({
@@ -25,11 +26,23 @@ export const SoldVehiclesTable = ({
   viewMode,
   currency,
   onDetailClick,
+  totalCount,
 }: SoldVehiclesTableProps) => {
   const { formatCurrencyWithCurrency } = useCurrency();
   if (viewMode === 'table') {
     return (
       <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+        {totalCount !== undefined && (
+          <div className="px-6 py-4 border-b border-border bg-gradient-to-r from-muted/50 to-muted">
+            <div className="flex items-center gap-6 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-primary" />
+                <span className="text-gray-600">Toplam: </span>
+                <span className="font-semibold text-foreground">{totalCount} araç</span>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="w-full min-w-0 overflow-x-auto">
           <Table>
             <TableHeader>

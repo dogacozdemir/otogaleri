@@ -74,6 +74,7 @@ export interface CreateVehicleParams {
   engine_no?: string | null;
   target_profit?: number | null;
   features?: any;
+  weight?: number | null;
 }
 
 export interface UpdateVehicleParams extends Partial<CreateVehicleParams> {
@@ -91,6 +92,60 @@ export interface VehicleDetail extends Vehicle {
  * All methods require tenantId for multi-tenancy safety
  */
 export class VehicleService {
+  /**
+   * Sync vehicle purchase_amount to vehicle_costs as system-generated entry (single source of truth).
+   * Prevents double counting - profit calculation uses only vehicle_costs.
+   */
+  private static async syncPurchaseCostToVehicleCosts(
+    tenantQuery: TenantAwareQuery,
+    vehicleId: number,
+    vehicle: { purchase_amount?: number | null; purchase_currency?: string; purchase_fx_rate_to_base?: number; purchase_date?: string | null }
+  ): Promise<void> {
+    const tenantId = tenantQuery.getTenantId();
+    const purchaseAmount = vehicle.purchase_amount ? Number(vehicle.purchase_amount) : 0;
+    const purchaseCurrency = vehicle.purchase_currency || "TRY";
+    const purchaseDate = vehicle.purchase_date || new Date().toISOString().split("T")[0];
+    const fxRate = vehicle.purchase_fx_rate_to_base ?? 1;
+
+    const [tenantRows] = await tenantQuery.executeRaw(
+      "SELECT default_currency FROM tenants WHERE id = ?",
+      [tenantId],
+      false
+    );
+    const baseCurrency = (tenantRows as any[])[0]?.default_currency || "TRY";
+
+    const [existing] = await tenantQuery.query(
+      "SELECT id FROM vehicle_costs WHERE vehicle_id = ? AND tenant_id = ? AND is_system_cost = 1",
+      [vehicleId, tenantId]
+    );
+    const existingRow = (existing as any[])[0];
+
+    if (purchaseAmount <= 0) {
+      if (existingRow) {
+        await tenantQuery.query(
+          "DELETE FROM vehicle_costs WHERE id = ? AND tenant_id = ?",
+          [existingRow.id, tenantId]
+        );
+      }
+      return;
+    }
+
+    const costName = "Alış fiyatı (sistem)";
+    if (existingRow) {
+      await tenantQuery.query(
+        `UPDATE vehicle_costs SET cost_name = ?, amount = ?, currency = ?, fx_rate_to_base = ?, cost_date = ?, 
+         base_currency_at_transaction = ? WHERE id = ? AND tenant_id = ?`,
+        [costName, purchaseAmount, purchaseCurrency, fxRate, purchaseDate, baseCurrency, existingRow.id, tenantId]
+      );
+    } else {
+      await tenantQuery.query(
+        `INSERT INTO vehicle_costs (tenant_id, vehicle_id, cost_name, amount, currency, fx_rate_to_base, cost_date, category, custom_rate, base_currency_at_transaction, is_system_cost) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'purchase', NULL, ?, 1)`,
+        [tenantId, vehicleId, costName, purchaseAmount, purchaseCurrency, fxRate, purchaseDate, baseCurrency]
+      );
+    }
+  }
+
   /**
    * Get tenant's base currency
    */
@@ -136,11 +191,13 @@ export class VehicleService {
       LEFT JOIN (
         SELECT 
           vehicle_id,
-          SUM(amount * fx_rate_to_base) as total_costs,
+          tenant_id,
+          SUM(amount * COALESCE(NULLIF(fx_rate_to_base, 0), 1)) as total_costs,
           COUNT(*) as cost_count
         FROM vehicle_costs
-        GROUP BY vehicle_id
-      ) cost_summary ON cost_summary.vehicle_id = v.id
+        WHERE tenant_id = ?
+        GROUP BY vehicle_id, tenant_id
+      ) cost_summary ON cost_summary.vehicle_id = v.id AND cost_summary.tenant_id = v.tenant_id
       LEFT JOIN (
         SELECT 
           vi.vehicle_id,
@@ -178,9 +235,9 @@ export class VehicleService {
       ) vis_latest ON vis_latest.vehicle_id = v.id AND vis_latest.rn = 1
       WHERE v.tenant_id = ?
     `;
-    // Add tenant_id parameters for subqueries and main query (3 total: 2 subqueries + 1 main WHERE)
+    // Add tenant_id parameters for subqueries and main query (4 total: cost_summary + primary_img + vis_latest + main WHERE)
     const tenantId = tenantQuery.getTenantId();
-    const queryParams: any[] = [tenantId, tenantId, tenantId];
+    const queryParams: any[] = [tenantId, tenantId, tenantId, tenantId];
 
     // Apply filters
     if (params.is_sold === "true") {
@@ -216,6 +273,129 @@ export class VehicleService {
     // Use tenantQuery.query() - it will enforce tenant_id automatically via strict mode
     const [rows] = await tenantQuery.query(query, queryParams);
     const vehiclesArray = rows as any[];
+
+    // Convert total_costs to current tenant default (historical: each cost uses rate at cost_date)
+    const baseCurrency = await this.getBaseCurrency(tenantQuery);
+    const vehicleIds = vehiclesArray.map((v: any) => v.id);
+    if (vehicleIds.length > 0) {
+      const [costRows] = await tenantQuery.query(
+        `SELECT vehicle_id, amount, fx_rate_to_base, cost_date, base_currency_at_transaction 
+         FROM vehicle_costs 
+         WHERE vehicle_id IN (${vehicleIds.map(() => '?').join(',')}) AND tenant_id = ?`,
+        [...vehicleIds, tenantId]
+      );
+      const costsByVehicle = (costRows as any[]).reduce((acc: Record<number, any[]>, c: any) => {
+        if (!acc[c.vehicle_id]) acc[c.vehicle_id] = [];
+        acc[c.vehicle_id].push(c);
+        return acc;
+      }, {});
+      const rateCache: Record<string, number> = {};
+      for (const vehicle of vehiclesArray) {
+        const costs = costsByVehicle[vehicle.id] || [];
+        let totalInCurrentBase = 0;
+        for (const cost of costs) {
+          const amt = Number(cost.amount || 0) * (Number(cost.fx_rate_to_base) || 1);
+          const storedBase = cost.base_currency_at_transaction || baseCurrency;
+          const costDate = cost.cost_date || new Date().toISOString().slice(0, 10);
+          if (storedBase === baseCurrency) {
+            totalInCurrentBase += amt;
+          } else {
+            const cacheKey = `${storedBase}-${baseCurrency}-${costDate}`;
+            if (!(cacheKey in rateCache)) {
+              try {
+                rateCache[cacheKey] = await getOrFetchRate(
+                  tenantQuery,
+                  storedBase as SupportedCurrency,
+                  baseCurrency as SupportedCurrency,
+                  costDate
+                );
+              } catch {
+                rateCache[cacheKey] = 1;
+              }
+            }
+            totalInCurrentBase += amt * rateCache[cacheKey];
+          }
+        }
+        vehicle.total_costs = totalInCurrentBase;
+      }
+
+      // For sold vehicles: convert sale_amount to current base (historical: use rate at sale_date)
+      const soldVehicleIds = vehiclesArray.filter((v: any) => v.is_sold).map((v: any) => v.id);
+      if (soldVehicleIds.length > 0) {
+        const [saleRows] = await tenantQuery.query(
+          `SELECT vehicle_id, sale_amount, sale_fx_rate_to_base, sale_date, base_currency_at_sale 
+           FROM vehicle_sales 
+           WHERE vehicle_id IN (${soldVehicleIds.map(() => '?').join(',')}) AND tenant_id = ?
+           ORDER BY sale_date DESC`,
+          [...soldVehicleIds, tenantId]
+        );
+        const saleByVehicle = (saleRows as any[]).reduce((acc: Record<number, any>, r: any) => {
+          if (!acc[r.vehicle_id]) acc[r.vehicle_id] = r;
+          return acc;
+        }, {});
+        for (const vehicle of vehiclesArray) {
+          if (!vehicle.is_sold) continue;
+          const sale = saleByVehicle[vehicle.id] || {
+            sale_amount: vehicle.sale_price,
+            sale_fx_rate_to_base: vehicle.sale_fx_rate_to_base || 1,
+            sale_date: vehicle.sale_date,
+            base_currency_at_sale: baseCurrency,
+          };
+          const amt = Number(sale.sale_amount || 0) * (Number(sale.sale_fx_rate_to_base) || 1);
+          const storedBase = sale.base_currency_at_sale || baseCurrency;
+          const saleDate = sale.sale_date || new Date().toISOString().slice(0, 10);
+          if (storedBase === baseCurrency) {
+            vehicle.sale_amount_in_current_base = amt;
+          } else {
+            const cacheKey = `sale-${storedBase}-${baseCurrency}-${saleDate}`;
+            if (!(cacheKey in rateCache)) {
+              try {
+                rateCache[cacheKey] = await getOrFetchRate(
+                  tenantQuery,
+                  storedBase as SupportedCurrency,
+                  baseCurrency as SupportedCurrency,
+                  saleDate
+                );
+              } catch {
+                rateCache[cacheKey] = 1;
+              }
+            }
+            vehicle.sale_amount_in_current_base = amt * rateCache[cacheKey];
+          }
+        }
+      }
+
+      // For unsold vehicles: convert sale_price (asking price) to current base for profit calculation
+      // Uses today's rate since there's no sale date yet
+      const today = new Date().toISOString().slice(0, 10);
+      for (const vehicle of vehiclesArray) {
+        if (vehicle.is_sold) continue;
+        const salePrice = Number(vehicle.sale_price || 0);
+        const saleCurrency = vehicle.sale_currency || baseCurrency;
+        if (salePrice <= 0) {
+          vehicle.sale_amount_in_current_base = 0;
+          continue;
+        }
+        if (saleCurrency === baseCurrency) {
+          vehicle.sale_amount_in_current_base = salePrice;
+        } else {
+          const cacheKey = `unsold-${saleCurrency}-${baseCurrency}-${today}`;
+          if (!(cacheKey in rateCache)) {
+            try {
+              rateCache[cacheKey] = await getOrFetchRate(
+                tenantQuery,
+                saleCurrency as SupportedCurrency,
+                baseCurrency as SupportedCurrency,
+                today
+              );
+            } catch {
+              rateCache[cacheKey] = 1;
+            }
+          }
+          vehicle.sale_amount_in_current_base = salePrice * rateCache[cacheKey];
+        }
+      }
+    }
 
     // Get installment payments in batch
     const installmentSaleIds = vehiclesArray
@@ -411,6 +591,7 @@ export class VehicleService {
         fuel: (params as any).fuel && String((params as any).fuel).trim() !== '' ? (params as any).fuel : null,
         grade: (params as any).grade && String((params as any).grade).trim() !== '' ? (params as any).grade : null,
         cc: (params as any).cc ?? null,
+        weight: (params as any).weight ?? null,
         color: (params as any).color && String((params as any).color).trim() !== '' ? (params as any).color : null,
         engine_no: (params.engine_no && params.engine_no.trim() !== '') ? params.engine_no : null,
         other: (params as any).other && String((params as any).other).trim() !== '' ? (params as any).other : null,
@@ -428,7 +609,10 @@ export class VehicleService {
       });
 
       const [rows] = await query.query("SELECT * FROM vehicles WHERE id = ? AND tenant_id = ?", [vehicleId, query.getTenantId()]);
-      return (rows as any[])[0];
+      const vehicle = (rows as any[])[0];
+      // Sync purchase price to vehicle_costs (single source of truth)
+      await this.syncPurchaseCostToVehicleCosts(query, vehicleId, vehicle);
+      return vehicle;
     }).catch((err: any) => {
       // Re-throw validation errors
       if (err.message && err.message.includes("Araç no")) {
@@ -445,7 +629,9 @@ export class VehicleService {
         throw new Error("Invalid foreign key reference. Resource does not belong to your tenant.");
       }
       
-      throw new Error("Failed to create vehicle");
+      // Log and rethrow with original message for debugging (e.g. "Unknown column" from missing migrations)
+      console.error("[VehicleService.createVehicle] Original error:", err?.message, err?.code, err?.errno);
+      throw new Error(err?.message || "Failed to create vehicle");
     });
   }
 
@@ -617,8 +803,66 @@ export class VehicleService {
     if (rowsArray.length === 0) {
       throw new Error("Vehicle not found");
     }
+    const vehicle = rowsArray[0];
+    await this.syncPurchaseCostToVehicleCosts(tenantQuery, params.id, vehicle);
+    return vehicle;
+  }
 
-    return rowsArray[0];
+  /**
+   * Lookup vehicle by chassis number for gümrük calculator.
+   * Returns maker, model, production_year, weight, fuel and "Navlun" cost if found.
+   */
+  static async lookupByChassis(
+    tenantQuery: TenantAwareQuery,
+    chassis: string
+  ): Promise<{
+    maker: string | null;
+    model: string | null;
+    production_year: number | null;
+    weight: number | null;
+    fuel: string | null;
+    gemiParasi: { amount: number; currency: string } | null;
+  } | null> {
+    const trimmed = (chassis || "").trim();
+    if (!trimmed) return null;
+
+    // Boşlukları kaldırarak karşılaştır: "E 12" ve "E12" aynı sayılır
+    const normalized = trimmed.replace(/\s+/g, "").toUpperCase();
+
+    // Sadece tam eşleşme (exact match) - GUN125ABC ≠ GUN125AB veya GUN125ABD
+    const [rows] = await tenantQuery.query(
+      `SELECT v.id, v.maker, v.model, v.production_year, v.weight, v.fuel
+       FROM vehicles v
+       WHERE v.tenant_id = ? AND REPLACE(UPPER(TRIM(v.chassis_no)), ' ', '') = ?
+       LIMIT 1`,
+      [tenantQuery.getTenantId(), normalized]
+    );
+    const arr = rows as any[];
+    if (!arr || arr.length === 0) return null;
+
+    const v = arr[0];
+
+    // Navlun maliyeti (cost_name: navlun veya gemi parası - geriye dönük uyumluluk)
+    const [costRows] = await tenantQuery.query(
+      `SELECT amount, currency FROM vehicle_costs
+       WHERE vehicle_id = ? AND tenant_id = ? AND LOWER(TRIM(cost_name)) IN ('navlun', 'gemi parası')
+       LIMIT 1`,
+      [v.id, tenantQuery.getTenantId()]
+    );
+    const costs = costRows as any[];
+    const gemiParasi =
+      costs.length > 0 && costs[0].amount != null
+        ? { amount: Number(costs[0].amount), currency: costs[0].currency || "JPY" }
+        : null;
+
+    return {
+      maker: v.maker ?? null,
+      model: v.model ?? null,
+      production_year: v.production_year ?? null,
+      weight: v.weight ?? null,
+      fuel: v.fuel ?? null,
+      gemiParasi,
+    };
   }
 
   /**

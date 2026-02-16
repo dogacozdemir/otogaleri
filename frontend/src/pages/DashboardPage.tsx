@@ -89,7 +89,7 @@ export default function DashboardPage() {
         api.get("/branches").catch(() => ({ data: { branches: [] } })),
         api.get("/followups/today").catch(() => ({ data: [] })),
         api.get("/installments/overdue").catch(() => ({ data: [] })),
-        api.get("/documents/vehicles/expiring?days=30").catch(() => ({ data: [] })),
+        api.get("/documents/expiring?days=30").catch(() => ({ data: [] })),
         api.get("/installments/active").catch(() => ({ data: [] })),
         api.get("/analytics/monthly-sales").catch(() => ({ data: null })),
         api.get("/inventory/analytics/stats").catch(() => ({ data: null })),
@@ -297,7 +297,7 @@ export default function DashboardPage() {
                       boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
                     }}
                   />
-                  <Bar dataKey="sales_count" fill="url(#salesGradient)" radius={[8, 8, 0, 0]} barSize={45} />
+                  <Bar dataKey="sales_count" name="Satış:" fill="url(#salesGradient)" radius={[8, 8, 0, 0]} barSize={45} />
                 </BarChart>
               </ResponsiveContainer>
               </div>
@@ -756,13 +756,23 @@ export default function DashboardPage() {
                   <div className="space-y-2 px-4 pb-4">
                     {expiringDocuments.map((doc: any) => (
                       <div
-                        key={doc.id}
+                        key={`${doc.source}-${doc.id}`}
                         className="flex items-start gap-3 p-3 rounded-xl hover:bg-amber-50/80 dark:hover:bg-amber-900/20 transition-all duration-200 cursor-pointer border border-transparent hover:border-amber-200 dark:hover:border-amber-800/50 hover:shadow-sm group/item"
-                        onClick={() => navigate(`/vehicles`)}
+                        onClick={() =>
+                          doc.source === "vehicle"
+                            ? navigate(`/vehicles`, { state: { selectedVehicleId: doc.vehicle_id } })
+                            : navigate(`/customers/${doc.customer_id}`)
+                        }
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <p className="text-sm font-semibold text-foreground truncate group-hover/item:text-amber-600 dark:group-hover/item:text-amber-400 transition-colors">{doc.document_name}</p>
+                            <Badge
+                              variant="secondary"
+                              className="text-[10px] px-1.5 py-0 h-4 font-medium"
+                            >
+                              {doc.source === "vehicle" ? "Araç" : "Müşteri"}
+                            </Badge>
                             <Badge
                               className={
                                 doc.days_until_expiry <= 7
@@ -776,7 +786,9 @@ export default function DashboardPage() {
                             </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground truncate mb-1">
-                            {doc.maker} {doc.model}
+                            {doc.source === "vehicle"
+                              ? `${doc.maker || ""} ${doc.model || ""} ${doc.production_year || ""}`.trim()
+                              : doc.customer_name || "Müşteri"}
                           </p>
                           {doc.expiry_date && (
                             <p className="text-xs text-muted-foreground">

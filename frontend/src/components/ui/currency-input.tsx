@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { ChevronDown } from "lucide-react"
 import { CurrencyRateEditor } from "@/components/CurrencyRateEditor"
 import { useTenant } from "@/contexts/TenantContext"
+import { api } from "@/api"
 
 const CURRENCY_ICONS: Record<string, string> = {
   TRY: "₺",
@@ -35,45 +36,68 @@ interface CurrencyInputProps extends Omit<React.InputHTMLAttributes<HTMLInputEle
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
 }
 
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  TRY: "₺",
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+  JPY: "¥",
+};
+
 const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
   ({ className, value, currency, onValueChange, onCurrencyChange, currencies = CURRENCIES, onChange, customRate, onCustomRateChange, ...props }, ref) => {
     const [open, setOpen] = React.useState(false)
+    const [liveRate, setLiveRate] = React.useState<number | null>(null)
     const { tenant } = useTenant()
     const baseCurrency = tenant?.default_currency || "TRY"
     
     const selectedCurrency = currencies.find(c => c.value === currency) || currencies[0]
     const currencyIcon = selectedCurrency.icon || CURRENCY_ICONS[selectedCurrency.value] || selectedCurrency.value
+
+    React.useEffect(() => {
+      if (currency !== baseCurrency && customRate == null) {
+        api.get("/currency/rate", { params: { from: currency, to: baseCurrency } })
+          .then((res) => res.data?.rate && setLiveRate(Number(res.data.rate)))
+          .catch(() => {})
+      } else {
+        setLiveRate(null)
+      }
+    }, [currency, baseCurrency, customRate])
     
     // Ensure value is always a string to prevent controlled/uncontrolled warning
     // Convert to string explicitly to handle all edge cases
     const inputValue = typeof value === 'string' ? value : (value != null ? String(value) : "")
 
+    const showConversionFormula = currency !== baseCurrency;
+    const rateForFormula = customRate ?? liveRate ?? null;
+
     return (
-      <div className="relative">
-        <Input
-          ref={ref}
-          type="number"
-          step="0.01"
-          value={inputValue}
-          onChange={(e) => {
-            onValueChange(e.target.value)
-            onChange?.(e)
-          }}
-          className={cn("pr-20", className)}
-          {...props}
-        />
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 px-2 hover:bg-accent"
-            >
-              <span className="text-base font-medium mr-1">{currencyIcon}</span>
-              <ChevronDown className="h-3 w-3 opacity-50" />
-            </Button>
-          </PopoverTrigger>
+      <div className="space-y-1">
+        <div className="relative">
+          <Input
+            ref={ref}
+            type="number"
+            step="0.01"
+            value={inputValue}
+            onChange={(e) => {
+              onValueChange(e.target.value)
+              onChange?.(e)
+            }}
+            className={cn("pr-20", className)}
+            {...props}
+          />
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 min-h-0 px-2 hover:bg-accent shrink-0 flex items-center"
+              >
+                <span className="text-base font-medium mr-1">{currencyIcon}</span>
+                <ChevronDown className="h-3 w-3 opacity-50 shrink-0" />
+              </Button>
+            </PopoverTrigger>
           <PopoverContent className="w-56 p-2" align="end">
             <div className="grid gap-1">
               {currencies.map((curr) => {
@@ -112,6 +136,16 @@ const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
             </div>
           </PopoverContent>
         </Popover>
+        </div>
+        {showConversionFormula && rateForFormula != null && (
+          <p className={`text-xs px-1 ${Number(rateForFormula) <= 0 ? "text-destructive font-medium" : "text-muted-foreground"}`}>
+            {Number(rateForFormula) <= 0 ? (
+              "Kur değeri 0'dan büyük olmalıdır."
+            ) : (
+              <>1 {CURRENCY_SYMBOLS[currency] || currency} = {Number(rateForFormula).toFixed(4)} {CURRENCY_SYMBOLS[baseCurrency] || baseCurrency}</>
+            )}
+          </p>
+        )}
       </div>
     )
   }

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { CheckCircle } from "lucide-react";
 import { CurrencyInput } from "@/components/ui/currency-input";
+import { normalizeCCInput } from "@/lib/utils";
 
 export type VehicleFormData = {
   vehicle_number: string;
@@ -29,6 +30,7 @@ export type VehicleFormData = {
   fuel: string;
   grade: string;
   cc: string;
+  weight: string;
   color: string;
   engine_no: string;
   other: string;
@@ -279,9 +281,25 @@ export const VehicleAddEditModal = ({
                 <div>
                   <label className="text-sm font-medium mb-1 block">CC</label>
                   <Input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     value={vehicleForm.cc}
                     onChange={(e) => onFormChange('cc', e.target.value)}
+                    onBlur={(e) => {
+                      const normalized = normalizeCCInput(e.target.value);
+                      if (normalized !== e.target.value) onFormChange('cc', normalized);
+                    }}
+                    placeholder="Örn: 1500 veya 1.500"
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Ağırlık (kg)</label>
+                  <Input
+                    type="number"
+                    value={vehicleForm.weight}
+                    onChange={(e) => onFormChange('weight', e.target.value)}
+                    placeholder="Örn: 1500"
                     className="h-8"
                   />
                 </div>
@@ -319,7 +337,7 @@ export const VehicleAddEditModal = ({
             <div className="mt-4 animate-in fade-in slide-in-from-left-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-sm font-medium mb-1 block">Önerilen Satış Fiyatı</label>
+                  <label className="text-sm font-medium mb-1 block">Liste Fiyatı</label>
                   <CurrencyInput
                     value={vehicleForm.sale_price}
                     currency={vehicleForm.sale_currency || "TRY"}

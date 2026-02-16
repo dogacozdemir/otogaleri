@@ -11,6 +11,7 @@ import {
   deleteQuote,
   convertQuoteToSale,
 } from "../controllers/quoteController";
+import { getQuoteSettings, updateQuoteSettings } from "../controllers/quoteSettingsController";
 
 const router = Router();
 
@@ -19,6 +20,8 @@ router.use(tenantGuard);
 router.use(inputSanitizer);
 
 router.get("/", paginationValidator, listQuotes);
+router.get("/settings", getQuoteSettings);
+router.put("/settings", updateQuoteSettings);
 router.post("/", createQuote);
 router.get("/:id", getQuoteById);
 router.put("/:id", updateQuote);

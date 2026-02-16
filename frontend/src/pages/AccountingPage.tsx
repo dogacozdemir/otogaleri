@@ -165,14 +165,14 @@ const AccountingPage = () => {
     description: "",
     category: "",
     amount: "",
-    currency: "TRY",
+    currency: targetCurrency,
     income_date: new Date().toISOString().split("T")[0],
   });
   const [expenseForm, setExpenseForm] = useState({
     description: "",
     category: "",
     amount: "",
-    currency: "TRY",
+    currency: targetCurrency,
     expense_date: new Date().toISOString().split("T")[0],
   });
 
@@ -376,7 +376,7 @@ const AccountingPage = () => {
       }
       setIncomeModalOpen(false);
       setEditingIncome(null);
-      setIncomeForm({ description: "", category: "", amount: "", currency: "TRY", income_date: new Date().toISOString().split("T")[0] });
+      setIncomeForm({ description: "", category: "", amount: "", currency: targetCurrency, income_date: new Date().toISOString().split("T")[0] });
       fetchIncomeList();
       fetchDateRangeData();
     } catch (error: any) {
@@ -403,7 +403,7 @@ const AccountingPage = () => {
       }
       setExpenseModalOpen(false);
       setEditingExpense(null);
-      setExpenseForm({ description: "", category: "", amount: "", currency: "TRY", expense_date: new Date().toISOString().split("T")[0] });
+      setExpenseForm({ description: "", category: "", amount: "", currency: targetCurrency, expense_date: new Date().toISOString().split("T")[0] });
       fetchExpensesList();
       fetchDateRangeData();
     } catch (error: any) {
@@ -600,7 +600,7 @@ const AccountingPage = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalIncome)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(Number.isFinite(totalIncome) ? totalIncome : 0)}</div>
             <div className="flex items-center gap-1 text-xs text-emerald-600">
               <TrendingUp className="h-3 w-3" />
               <span className="font-medium">+{incomeChange.toFixed(1)}%</span>
@@ -617,7 +617,7 @@ const AccountingPage = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalExpense)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(Number.isFinite(totalExpense) ? totalExpense : 0)}</div>
             <div className="flex items-center gap-1 text-xs text-red-600">
               <TrendingUp className="h-3 w-3" />
               <span className="font-medium">+{expenseChange.toFixed(1)}%</span>
@@ -634,7 +634,7 @@ const AccountingPage = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(netIncome)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(Number.isFinite(netIncome) ? netIncome : 0)}</div>
             <div className="flex items-center gap-1 text-xs text-emerald-600">
               <TrendingUp className="h-3 w-3" />
               <span className="font-medium">+{netIncomeChange.toFixed(1)}%</span>
@@ -651,7 +651,7 @@ const AccountingPage = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(todayIncome)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(Number.isFinite(todayIncome) ? todayIncome : 0)}</div>
             <div className="flex items-center gap-1 text-xs text-emerald-600">
               <TrendingUp className="h-3 w-3" />
               <span className="font-medium">+{todayIncomeChange.toFixed(1)}%</span>
@@ -676,7 +676,7 @@ const AccountingPage = () => {
                 <XAxis dataKey="date" className="text-xs" tick={{ fontSize: 12 }} />
                 <YAxis className="text-xs" tick={{ fontSize: 12 }} />
                 <Tooltip
-                  formatter={(value: any) => formatCurrency(value)}
+                  formatter={(value: any) => formatCurrency(Number.isFinite(Number(value)) ? Number(value) : 0)}
                   labelFormatter={(value) => value}
                 />
                 <Legend />
@@ -720,13 +720,13 @@ const AccountingPage = () => {
                         </span>
                         {item.category}
                       </span>
-                      <span className="font-bold text-green-600">{formatCurrency(item.value)}</span>
+                      <span className="font-bold text-green-600">{formatCurrency(Number.isFinite(item.value) ? item.value : 0)}</span>
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                         <div
                           className="h-full bg-primary"
                         style={{
-                          width: `${categoryData[0]?.value > 0 ? (item.value / categoryData[0].value) * 100 : 0}%`,
+                          width: `${categoryData[0]?.value > 0 && Number.isFinite(item.value) ? Math.min(100, (item.value / categoryData[0].value) * 100) : 0}%`,
                         }}
                       />
                     </div>
@@ -769,7 +769,7 @@ const AccountingPage = () => {
               <div className="mb-4 flex justify-end">
                 <Button className="gap-2 rounded-xl" style={{ backgroundColor: "#003d82" }} onClick={() => {
                   setEditingIncome(null);
-                  setIncomeForm({ description: "", category: "", amount: "", currency: "TRY", income_date: new Date().toISOString().split("T")[0] });
+                  setIncomeForm({ description: "", category: "", amount: "", currency: targetCurrency, income_date: new Date().toISOString().split("T")[0] });
                   setIncomeModalOpen(true);
                 }}>
                   <Plus className="h-4 w-4" />
@@ -885,7 +885,7 @@ const AccountingPage = () => {
               <div className="mb-4 flex justify-end">
                 <Button className="gap-2 rounded-xl bg-destructive hover:bg-destructive/90" onClick={() => {
                   setEditingExpense(null);
-                  setExpenseForm({ description: "", category: "", amount: "", currency: "TRY", expense_date: new Date().toISOString().split("T")[0] });
+                  setExpenseForm({ description: "", category: "", amount: "", currency: targetCurrency, expense_date: new Date().toISOString().split("T")[0] });
                   setExpenseModalOpen(true);
                 }}>
                   <Plus className="h-4 w-4" />

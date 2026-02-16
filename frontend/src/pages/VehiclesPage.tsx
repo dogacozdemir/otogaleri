@@ -40,6 +40,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { formatCurrency } from "@/lib/formatters";
+import { parseCC } from "@/lib/utils";
 import VehicleImageUpload from "@/components/VehicleImageUpload";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { useCurrencyRates } from "@/contexts/CurrencyRatesContext";
@@ -66,6 +67,8 @@ import { vehicleKeys } from "@/hooks/useVehiclesQuery";
 type Vehicle = VehicleType;
 
 import { useCurrency } from "@/hooks/useCurrency";
+import { useViewCurrency } from "@/contexts/ViewCurrencyContext";
+import { useViewCurrencyConversion } from "@/hooks/useViewCurrencyConversion";
 import { getApiBaseUrl } from "@/lib/utils";
 
 // Use aliased utility functions
@@ -77,6 +80,9 @@ const VehiclesPage = () => {
   const { getCustomRate } = useCurrencyRates();
   const { tenant } = useTenant();
   const baseCurrency = tenant?.default_currency || "TRY";
+  const { viewCurrency, setViewCurrency, baseCurrency: viewBaseCurrency } = useViewCurrency();
+  const { formatInViewCurrency } = useViewCurrencyConversion();
+  const displayCurrency = viewCurrency !== viewBaseCurrency ? formatInViewCurrency : currency;
   const location = useLocation();
   const queryClient = useQueryClient();
   
@@ -111,7 +117,7 @@ const VehiclesPage = () => {
     quote_date: new Date().toISOString().split("T")[0],
     valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
     sale_price: "",
-    currency: "TRY",
+    currency: baseCurrency,
     down_payment: "",
     installment_count: "",
     installment_amount: "",
@@ -124,7 +130,7 @@ const VehiclesPage = () => {
     payment_type: "installment",
     installment_number: "",
     amount: "",
-    currency: "TRY",
+    currency: baseCurrency,
     payment_date: new Date().toISOString().split('T')[0],
     notes: ""
   });
@@ -160,13 +166,14 @@ const VehiclesPage = () => {
     fuel: "",
     grade: "",
     cc: "",
+    weight: "",
     color: "",
     engine_no: "",
     other: "",
     sale_price: "",
-    sale_currency: "TRY",
+    sale_currency: baseCurrency,
     paid: "",
-    purchase_currency: "TRY",
+    purchase_currency: baseCurrency,
     delivery_date: "",
     delivery_time: "",
     status: "used",
@@ -180,7 +187,7 @@ const VehiclesPage = () => {
   const [costForm, setCostForm] = useState<CostFormData>({
     cost_name: "",
     amount: "",
-    currency: "TRY",
+    currency: baseCurrency,
     date: new Date().toISOString().split('T')[0],
     category: "other",
     customRate: null
@@ -194,7 +201,7 @@ const VehiclesPage = () => {
     plate_number: "",
     key_count: "",
     sale_price: "",
-    sale_currency: "TRY",
+    sale_currency: baseCurrency,
     sale_date: new Date().toISOString().split('T')[0],
     payment_type: "cash",
     down_payment: "",
@@ -207,7 +214,7 @@ const VehiclesPage = () => {
   // Default cost items
   const defaultCostItems = [
     'Alınış fiyatı',
-    'Gemi parası',
+    'Navlun',
     'Nakliye',
     'Havale',
     'Temizlik',
@@ -217,8 +224,7 @@ const VehiclesPage = () => {
     'Benzin',
     'Plaka',
     'Antrepo',
-    'Ortalama masraf',
-    'Hızlı kayıt'
+    'Ortalama masraf'
   ];
 
   // Para birimleri
@@ -260,7 +266,7 @@ const VehiclesPage = () => {
       quote_date: new Date().toISOString().split("T")[0],
       valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
       sale_price: vehicle.sale_price?.toString() || "",
-      currency: "TRY",
+      currency: baseCurrency,
       down_payment: "",
       installment_count: "",
       installment_amount: "",
@@ -298,7 +304,7 @@ const VehiclesPage = () => {
         quote_date: new Date().toISOString().split("T")[0],
         valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
         sale_price: "",
-        currency: "TRY",
+        currency: baseCurrency,
         down_payment: "",
         installment_count: "",
         installment_amount: "",
@@ -347,13 +353,14 @@ const VehiclesPage = () => {
       fuel: "",
       grade: "",
       cc: "",
+      weight: "",
       color: "",
       engine_no: "",
       other: "",
       sale_price: "",
-      sale_currency: "TRY",
+      sale_currency: baseCurrency,
       paid: "",
-      purchase_currency: "TRY",
+      purchase_currency: baseCurrency,
       delivery_date: "",
       delivery_time: "",
       status: "used",
@@ -432,7 +439,10 @@ const VehiclesPage = () => {
             payload[key] = featuresObj;
           }
         } else if (value) {
-          if (['km', 'cc', 'sale_price', 'target_profit', 'vehicle_number', 'production_year', 'branch_id'].includes(key)) {
+          if (key === 'cc' && (typeof value === 'string' || typeof value === 'number')) {
+            const parsed = parseCC(value);
+            if (parsed != null) payload[key] = parsed;
+          } else if (['km', 'weight', 'sale_price', 'target_profit', 'vehicle_number', 'production_year', 'branch_id'].includes(key)) {
             payload[key] = Number(value);
           } else {
             payload[key] = value;
@@ -515,7 +525,10 @@ const VehiclesPage = () => {
             payload[key] = featuresObj;
           }
         } else if (value) {
-          if (['km', 'cc', 'sale_price', 'target_profit', 'vehicle_number', 'production_year', 'branch_id'].includes(key)) {
+          if (key === 'cc' && (typeof value === 'string' || typeof value === 'number')) {
+            const parsed = parseCC(value);
+            if (parsed != null) payload[key] = parsed;
+          } else if (['km', 'weight', 'sale_price', 'target_profit', 'vehicle_number', 'production_year', 'branch_id'].includes(key)) {
             payload[key] = Number(value);
           } else {
             payload[key] = value;
@@ -625,6 +638,7 @@ const VehiclesPage = () => {
       fuel: vehicle.fuel || "",
       grade: vehicle.grade || "",
       cc: vehicle.cc?.toString() || "",
+      weight: (vehicle as any).weight?.toString() || "",
       color: vehicle.color || "",
       engine_no: vehicle.engine_no || "",
       other: vehicle.other || "",
@@ -649,7 +663,7 @@ const VehiclesPage = () => {
     setCostForm({
       cost_name: "",
       amount: "",
-      currency: "TRY",
+      currency: baseCurrency,
       date: new Date().toISOString().split('T')[0],
       category: "other",
       customRate: null
@@ -667,7 +681,7 @@ const VehiclesPage = () => {
       plate_number: "",
       key_count: "",
       sale_price: vehicle.sale_price?.toString() || "",
-      sale_currency: "TRY",
+      sale_currency: vehicle.sale_currency || baseCurrency,
       sale_date: new Date().toISOString().split('T')[0],
       payment_type: "cash",
       down_payment: "",
@@ -685,8 +699,12 @@ const VehiclesPage = () => {
       });
       return;
     }
+    const costCurrency = costForm.currency || baseCurrency;
+    if (costCurrency !== baseCurrency && costForm.customRate !== null && Number(costForm.customRate) <= 0) {
+      toast({ title: "Hata", description: "Kur değeri 0'dan büyük olmalıdır.", variant: "destructive" });
+      return;
+    }
     try {
-      const costCurrency = costForm.currency || "TRY";
       // Use form-specific customRate if set, otherwise use global context
       const customRate = costForm.customRate !== null 
         ? costForm.customRate 
@@ -706,7 +724,7 @@ const VehiclesPage = () => {
       setCostForm({
         cost_name: "",
         amount: "",
-        currency: "TRY",
+        currency: baseCurrency,
         date: new Date().toISOString().split('T')[0],
         category: "other",
         customRate: null
@@ -766,8 +784,12 @@ const VehiclesPage = () => {
       });
       return;
     }
+    const costCurrency = costForm.currency || baseCurrency;
+    if (costCurrency !== baseCurrency && costForm.customRate !== null && Number(costForm.customRate) <= 0) {
+      toast({ title: "Hata", description: "Kur değeri 0'dan büyük olmalıdır.", variant: "destructive" });
+      return;
+    }
     try {
-      const costCurrency = costForm.currency || "TRY";
       // Use form-specific customRate if set, otherwise use global context
       const customRate = costForm.customRate !== null 
         ? costForm.customRate 
@@ -788,7 +810,7 @@ const VehiclesPage = () => {
       setCostForm({
         cost_name: "",
         amount: "",
-        currency: "TRY",
+        currency: baseCurrency,
         date: new Date().toISOString().split('T')[0],
         category: "other",
         customRate: null
@@ -913,7 +935,7 @@ const VehiclesPage = () => {
         payment_type: "installment",
         installment_number: "",
         amount: "",
-        currency: "TRY",
+        currency: baseCurrency,
         payment_date: new Date().toISOString().split('T')[0],
         notes: ""
       });
@@ -970,9 +992,9 @@ const VehiclesPage = () => {
 
   // Rapor verilerini yükle
 
-  // Calculate statistics
-  const activeVehiclesCount = vehiclesData.filteredVehicles.length;
-  const soldVehiclesCount = vehiclesData.filteredSoldVehicles.length;
+  // Badge counts from hook (always correct regardless of tab)
+  const activeVehiclesCount = vehiclesData.activeVehiclesCount;
+  const soldVehiclesCount = vehiclesData.soldVehiclesCount;
   const inStockCount = vehiclesData.filteredVehicles.filter((v: Vehicle) => !v.is_sold && v.stock_status === 'in_stock').length;
 
   return (
@@ -1004,6 +1026,8 @@ const VehiclesPage = () => {
           onActiveTabChange={(tab: "vehicles" | "sold") => vehiclesData.setActiveTab(tab)}
           activeVehiclesCount={activeVehiclesCount}
           soldVehiclesCount={soldVehiclesCount}
+          viewCurrency={viewCurrency}
+          onViewCurrencyChange={(c) => setViewCurrency(c as "TRY" | "USD" | "EUR" | "GBP" | "JPY")}
           addVehicleButton={
             <VehicleAddEditModal
               open={openAdd}
@@ -1053,18 +1077,19 @@ const VehiclesPage = () => {
         />
 
         <TabsContent value="vehicles" className="space-y-6">
-          {/* Vehicles Table/Grid */}
+          {/* Vehicles Table/Grid - totalCount = mevcut (satılmamış) araç sayısı */}
           <VehicleTable
             vehicles={vehiclesData.filteredVehicles}
             loading={vehiclesData.loading}
             viewMode={viewMode}
-            currency={currency}
+            currency={displayCurrency}
+            formatInBaseCurrency={currency}
             onDetailClick={openDetailModal}
             onEditClick={openEditModal}
             onQuoteClick={openQuoteModal}
             onSellClick={openSellModal}
             onDeleteClick={handleDeleteVehicleClick}
-            totalCount={activeVehiclesCount}
+            totalCount={vehiclesData.pagination?.total}
             inStockCount={inStockCount}
           />
         </TabsContent>
@@ -1077,7 +1102,7 @@ const VehiclesPage = () => {
         vehicleCosts={vehiclesData.vehicleCosts}
         costCalculation={vehiclesData.costCalculation}
         vehicleDocuments={vehicleDocuments}
-        currency={currency}
+        currency={displayCurrency}
         onRefresh={() => {
           if (vehiclesData.selectedVehicle) {
             vehiclesData.fetchVehicleDetail(vehiclesData.selectedVehicle.id);
@@ -1153,7 +1178,7 @@ const VehiclesPage = () => {
               setCostForm({
                 cost_name: "",
                 amount: "",
-                currency: "TRY",
+                currency: baseCurrency,
                 date: new Date().toISOString().split('T')[0],
                 category: "other",
                 customRate: null
@@ -1173,7 +1198,7 @@ const VehiclesPage = () => {
           setCostForm({
             cost_name: "",
             amount: "",
-            currency: "TRY",
+            currency: baseCurrency,
             date: new Date().toISOString().split('T')[0],
             category: "other",
             customRate: null
@@ -1191,7 +1216,10 @@ const VehiclesPage = () => {
         vehicle={vehiclesData.selectedVehicle}
         sellForm={sellForm}
         onFormChange={(field: keyof SellFormData, value: any) => {
-          setSellForm({ ...sellForm, [field]: value });
+          setSellForm((prev) => ({ ...prev, [field]: value }));
+        }}
+        onFormChangeBatch={(updates: Partial<SellFormData>) => {
+          setSellForm((prev) => ({ ...prev, ...updates }));
         }}
         onSubmit={handleSell}
         currencies={currencies}
@@ -1209,7 +1237,7 @@ const VehiclesPage = () => {
             payment_type: "installment",
             installment_number: "",
             amount: "",
-            currency: "TRY",
+            currency: baseCurrency,
             payment_date: new Date().toISOString().split('T')[0],
             notes: ""
           });
@@ -1229,7 +1257,7 @@ const VehiclesPage = () => {
                 payment_type: "installment",
                 installment_number: "",
                 amount: "",
-                currency: "TRY",
+                currency: baseCurrency,
                 payment_date: new Date().toISOString().split('T')[0],
                 notes: ""
               });
@@ -1289,13 +1317,14 @@ const VehiclesPage = () => {
       />
 
         <TabsContent value="sold" className="space-y-6">
-          {/* Sold Vehicles Table/Grid - uses same viewMode as Mevcut Araçlar (controlled by switch in VehicleFilters) */}
+          {/* Sold Vehicles Table/Grid - totalCount = satılan araç sayısı */}
           <SoldVehiclesTable
             vehicles={vehiclesData.filteredSoldVehicles}
             loading={vehiclesData.loading}
             viewMode={viewMode}
-            currency={currency}
+            currency={displayCurrency}
             onDetailClick={openDetailModal}
+            totalCount={vehiclesData.pagination?.total}
           />
         </TabsContent>
         </Tabs>

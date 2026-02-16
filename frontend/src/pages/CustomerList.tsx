@@ -596,9 +596,9 @@ const CustomerList = () => {
                 </Button>
             </div>
 
-            {/* Right Section - View Mode Switch */}
+            {/* Right Section - View Mode */}
             <div className="flex items-center gap-3">
-                  <span className="text-sm text-muted-foreground">Görünüm:</span>
+              <span className="text-sm text-muted-foreground">Görünüm:</span>
               <div className="flex bg-muted rounded-xl p-1 gap-1">
                     <Button
                       variant={viewMode === "table" ? "default" : "ghost"}

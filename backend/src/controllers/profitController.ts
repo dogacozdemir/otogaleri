@@ -4,6 +4,7 @@ import { dbPool } from "../config/database";
 import { getOrFetchRate } from "../services/fxCacheService";
 import { SupportedCurrency } from "../services/currencyService";
 import { MoneyService } from "../services/moneyService";
+import { safeDivide } from "../utils/safeDivide";
 
 export async function calculateVehicleProfit(req: AuthRequest, res: Response) {
   const vehicle_id = req.params.vehicle_id || req.params.id;
@@ -19,48 +20,65 @@ export async function calculateVehicleProfit(req: AuthRequest, res: Response) {
     }
 
     const vehicle = vehicleRowsArray[0] as any;
+    // Single source of truth: ALL costs (including purchase) come from vehicle_costs
+    // Each cost: amount * fx_rate_to_base converts to base. Use COALESCE(NULLIF(...,0),1) to avoid 0 multiplication (legacy data)
     const [costRows] = await dbPool.query(
-      "SELECT SUM(amount * fx_rate_to_base) as total_costs FROM vehicle_costs WHERE vehicle_id = ? AND tenant_id = ?",
+      `SELECT SUM(amount * COALESCE(NULLIF(fx_rate_to_base, 0), 1)) as total_costs 
+       FROM vehicle_costs 
+       WHERE vehicle_id = ? AND tenant_id = ?`,
       [vehicle_id, req.tenantId]
     );
-    const totalCosts = (costRows as any[])[0]?.total_costs || 0;
+    const totalCostsBase = Number((costRows as any[])[0]?.total_costs) || 0;
 
     // Get tenant's base currency for MoneyService
     const [tenantRows] = await dbPool.query("SELECT default_currency FROM tenants WHERE id = ?", [req.tenantId]);
     const baseCurrency = ((tenantRows as any[])[0]?.default_currency || "TRY") as SupportedCurrency;
 
-    // Use MoneyService for precise financial calculations
-    const purchaseAmountBase = vehicle.purchase_amount && vehicle.purchase_fx_rate_to_base
-      ? MoneyService.convertCurrency(
-          vehicle.purchase_amount,
-          (vehicle.purchase_currency || baseCurrency) as SupportedCurrency,
-          baseCurrency,
-          vehicle.purchase_fx_rate_to_base
-        )
-      : 0;
-    
-    const totalCostsBase = MoneyService.add(totalCosts, purchaseAmountBase, baseCurrency);
+    // STRICT: For sold vehicles, ONLY use vehicle_sales (single source of truth — zero drift with reports)
+    let saleAmountBase = 0;
+    let salePrice: number | null = null;
+    let saleCurrency = baseCurrency;
+    let saleFxRateToBase: number | null = null;
 
-    const saleAmountBase = vehicle.sale_price && vehicle.sale_fx_rate_to_base
-      ? MoneyService.convertCurrency(
-          vehicle.sale_price,
-          (vehicle.sale_currency || baseCurrency) as SupportedCurrency,
-          baseCurrency,
-          vehicle.sale_fx_rate_to_base
-        )
-      : 0;
+    if (vehicle.is_sold) {
+      const [saleRows] = await dbPool.query(
+        "SELECT sale_amount, sale_currency, sale_fx_rate_to_base FROM vehicle_sales WHERE vehicle_id = ? AND tenant_id = ? ORDER BY sale_date DESC LIMIT 1",
+        [vehicle_id, req.tenantId]
+      );
+      const saleRow = (saleRows as any[])[0];
+      if (saleRow) {
+        salePrice = saleRow.sale_amount;
+        saleCurrency = saleRow.sale_currency || baseCurrency;
+        saleFxRateToBase = saleRow.sale_fx_rate_to_base;
+      }
+    } else {
+      salePrice = vehicle.sale_price;
+      saleCurrency = vehicle.sale_currency || baseCurrency;
+      saleFxRateToBase = vehicle.sale_fx_rate_to_base;
+    }
 
-    const profitBase = MoneyService.subtract(saleAmountBase, totalCostsBase, baseCurrency);
-    
-    // Calculate percentages (profit margin and ROI)
-    // profitMargin = (profit / sale) * 100
-    // roi = (profit / costs) * 100
-    const profitMargin = !MoneyService.isZero(saleAmountBase, baseCurrency)
-      ? (profitBase / saleAmountBase) * 100
-      : 0;
-    const roi = !MoneyService.isZero(totalCostsBase, baseCurrency)
-      ? (profitBase / totalCostsBase) * 100
-      : 0;
+    // Sale amount in base: use stored rate; fallback to 1 when 0/null (same currency or legacy)
+    const effectiveSaleRate = saleFxRateToBase && saleFxRateToBase > 0 ? saleFxRateToBase : 1;
+    if (salePrice != null) {
+      saleAmountBase = MoneyService.convertCurrency(
+        salePrice,
+        saleCurrency as SupportedCurrency,
+        baseCurrency,
+        effectiveSaleRate
+      );
+    }
+
+    const grossProfit = MoneyService.subtract(saleAmountBase, totalCostsBase, baseCurrency);
+
+    // ROI = (Net Profit / Total Cost) * 100. Profit Margin = (Net Profit / Sales Price) * 100
+    // safeDivide returns 0 when denominator is 0 (prevents NaN/crash)
+    const roi = safeDivide(grossProfit, totalCostsBase) * 100;
+    const profitMargin = safeDivide(grossProfit, saleAmountBase) * 100;
+
+    const targetProfit = vehicle.target_profit ? Number(vehicle.target_profit) : null;
+    const targetProfitVariance = targetProfit !== null
+      ? MoneyService.subtract(grossProfit, targetProfit, baseCurrency)
+      : null;
 
     const [costs] = await dbPool.query(
       "SELECT * FROM vehicle_costs WHERE vehicle_id = ? AND tenant_id = ? ORDER BY cost_date DESC",
@@ -75,20 +93,27 @@ export async function calculateVehicleProfit(req: AuthRequest, res: Response) {
         purchase_amount: vehicle.purchase_amount,
         purchase_currency: vehicle.purchase_currency,
         purchase_fx_rate_to_base: vehicle.purchase_fx_rate_to_base,
-        sale_price: vehicle.sale_price,
-        sale_currency: vehicle.sale_currency,
-        sale_fx_rate_to_base: vehicle.sale_fx_rate_to_base,
+        sale_price: salePrice,
+        sale_currency: saleCurrency,
+        sale_fx_rate_to_base: saleFxRateToBase,
       },
       costs,
+      financialSummary: {
+        totalCostBase: totalCostsBase,
+        totalCostViewCurrency: totalCostsBase,
+        grossProfit,
+        roi: Number.isFinite(roi) ? Number(roi.toFixed(2)) : 0,
+        profitMargin: Number.isFinite(profitMargin) ? Number(profitMargin.toFixed(2)) : 0,
+        targetProfitVariance,
+      },
       totals: {
-        purchase_amount_base: purchaseAmountBase,
         total_costs_base: totalCostsBase,
         sale_amount_base: saleAmountBase,
-        profit_base: profitBase,
-        profit_margin_percent: Number(profitMargin.toFixed(2)),
-        roi_percent: Number(roi.toFixed(2)),
+        profit_base: grossProfit,
+        profit_margin_percent: Number.isFinite(profitMargin) ? Number(profitMargin.toFixed(2)) : 0,
+        roi_percent: Number.isFinite(roi) ? Number(roi.toFixed(2)) : 0,
       },
-      target_profit: vehicle.target_profit ? Number(vehicle.target_profit) : null,
+      target_profit: targetProfit,
     });
   } catch (err) {
     console.error("[profit] Calculate error", err);
@@ -137,12 +162,12 @@ export async function convertCostsToCurrency(req: AuthRequest, res: Response) {
       const costCurrency = (cost.currency || baseCurrency) as SupportedCurrency;
       const costDate = cost.cost_date;
       const costAmount = Number(cost.amount);
+      const storedBaseCurrency = cost.base_currency_at_transaction || baseCurrency;
 
       let rateToTarget = 1;
       let rateSource: 'custom' | 'api' = 'api';
 
       if (costCurrency === target_currency) {
-        // Same currency, no conversion needed
         convertedAmounts.push(costAmount);
         conversionDetails.push({
           cost_name: cost.cost_name,
@@ -156,9 +181,8 @@ export async function convertCostsToCurrency(req: AuthRequest, res: Response) {
         continue;
       }
 
-      // Convert directly from cost currency to target currency using date-based rate
-      // If custom_rate exists, it's the rate from cost currency to base currency
-      // We need to convert: costCurrency -> targetCurrency using the cost date
+      // Use stored fx_rate_to_base (rate at transaction) for historical accuracy
+      // base_currency_at_transaction ensures reports stay correct if tenant changes default_currency
       
       if (cost.custom_rate !== null && cost.custom_rate !== undefined) {
         // Custom rate is from costCurrency to baseCurrency
@@ -212,46 +236,85 @@ export async function convertCostsToCurrency(req: AuthRequest, res: Response) {
         continue;
       }
       
-      // No custom rate - use date-based rate directly from costCurrency to targetCurrency
-      if (target_currency !== baseCurrency || costCurrency !== baseCurrency) {
-        // Convert: costCurrency -> targetCurrency using date-based rate
-        if (!req.tenantQuery) {
-          return res.status(500).json({ error: "Tenant query not available" });
+      // No custom rate - use stored fx_rate_to_base for historical accuracy when base_currency_at_transaction exists
+      if (cost.base_currency_at_transaction && cost.fx_rate_to_base) {
+        const amountInStoredBase = costAmount * Number(cost.fx_rate_to_base);
+        if (target_currency === storedBaseCurrency) {
+          convertedAmounts.push(amountInStoredBase);
+          conversionDetails.push({
+            cost_name: cost.cost_name,
+            amount: costAmount,
+            currency: costCurrency,
+            cost_date: costDate,
+            converted_amount: amountInStoredBase,
+            rate_used: Number(cost.fx_rate_to_base),
+            rate_source: 'api'
+          });
+        } else {
+          if (!req.tenantQuery) {
+            return res.status(500).json({ error: "Tenant query not available" });
+          }
+          rateToTarget = await getOrFetchRate(
+            req.tenantQuery,
+            storedBaseCurrency as SupportedCurrency,
+            target_currency as SupportedCurrency,
+            costDate
+          );
+          const convertedAmount = MoneyService.convertCurrency(
+            amountInStoredBase,
+            storedBaseCurrency as SupportedCurrency,
+            target_currency as SupportedCurrency,
+            rateToTarget
+          );
+          convertedAmounts.push(convertedAmount);
+          conversionDetails.push({
+            cost_name: cost.cost_name,
+            amount: costAmount,
+            currency: costCurrency,
+            cost_date: costDate,
+            converted_amount: convertedAmount,
+            rate_used: rateToTarget,
+            rate_source: rateSource
+          });
         }
-        rateToTarget = await getOrFetchRate(
-          req.tenantQuery,
+      } else {
+        // Fallback: direct conversion
+        if (target_currency !== baseCurrency || costCurrency !== baseCurrency) {
+          if (!req.tenantQuery) {
+            return res.status(500).json({ error: "Tenant query not available" });
+          }
+          rateToTarget = await getOrFetchRate(
+            req.tenantQuery,
+            costCurrency,
+            target_currency as SupportedCurrency,
+            costDate
+          );
+        } else {
+          rateToTarget = 1;
+        }
+        const convertedAmount = MoneyService.convertCurrency(
+          costAmount,
           costCurrency,
           target_currency as SupportedCurrency,
-          costDate
+          rateToTarget
         );
-      } else {
-        rateToTarget = 1;
+        convertedAmounts.push(convertedAmount);
+        conversionDetails.push({
+          cost_name: cost.cost_name,
+          amount: costAmount,
+          currency: costCurrency,
+          cost_date: costDate,
+          converted_amount: convertedAmount,
+          rate_used: rateToTarget,
+          rate_source: rateSource
+        });
       }
-
-      // Use MoneyService for precise currency conversion
-      const convertedAmount = MoneyService.convertCurrency(
-        costAmount,
-        costCurrency,
-        target_currency as SupportedCurrency,
-        rateToTarget
-      );
-      convertedAmounts.push(convertedAmount);
-
-      conversionDetails.push({
-        cost_name: cost.cost_name,
-        amount: costAmount,
-        currency: costCurrency,
-        cost_date: costDate,
-        converted_amount: convertedAmount,
-        rate_used: rateToTarget,
-        rate_source: rateSource
-      });
     }
 
     // Use MoneyService to sum all converted amounts with precision
     const totalConverted = MoneyService.sum(convertedAmounts, target_currency as SupportedCurrency);
 
-    // Get vehicle information for sale price and profit conversion
+    // Get vehicle and sale info — for sold vehicles use vehicle_sales (single source of truth)
     const [vehicleRows] = await dbPool.query("SELECT * FROM vehicles WHERE id = ? AND tenant_id = ?", [
       vehicle_id,
       req.tenantId,
@@ -259,14 +322,33 @@ export async function convertCostsToCurrency(req: AuthRequest, res: Response) {
     const vehicleRowsArray = vehicleRows as any[];
     const vehicle = vehicleRowsArray.length > 0 ? vehicleRowsArray[0] : null;
 
+    let saleAmount = 0;
+    let saleCurrencyForConvert = baseCurrency;
+    let saleFxRateForConvert: number | null = null;
+    if (vehicle?.is_sold) {
+      const [saleRows] = await dbPool.query(
+        "SELECT sale_amount, sale_currency, sale_fx_rate_to_base FROM vehicle_sales WHERE vehicle_id = ? AND tenant_id = ? ORDER BY sale_date DESC LIMIT 1",
+        [vehicle_id, req.tenantId]
+      );
+      const saleRow = (saleRows as any[])[0];
+      if (saleRow) {
+        saleAmount = Number(saleRow.sale_amount || 0);
+        saleCurrencyForConvert = saleRow.sale_currency || baseCurrency;
+        saleFxRateForConvert = saleRow.sale_fx_rate_to_base;
+      }
+    } else if (vehicle?.sale_price) {
+      saleAmount = Number(vehicle.sale_price);
+      saleCurrencyForConvert = vehicle.sale_currency || baseCurrency;
+      saleFxRateForConvert = vehicle.sale_fx_rate_to_base;
+    }
+
     // Convert sale price to target currency
     let salePriceConverted = 0;
     let salePriceRate = 1;
     let salePriceRateSource: 'custom' | 'api' = 'api';
     
-    if (vehicle && vehicle.sale_price) {
-      const saleCurrency = (vehicle.sale_currency || baseCurrency) as SupportedCurrency;
-      const saleAmount = Number(vehicle.sale_price);
+    if (saleAmount > 0) {
+      const saleCurrency = saleCurrencyForConvert as SupportedCurrency;
       
       if (saleCurrency === target_currency) {
         salePriceConverted = saleAmount;
@@ -274,13 +356,13 @@ export async function convertCostsToCurrency(req: AuthRequest, res: Response) {
       } else {
         // Use sale_fx_rate_to_base if available (for historical conversion)
         // Otherwise, use current date rate
-        if (vehicle.sale_fx_rate_to_base && saleCurrency !== baseCurrency) {
+        if (saleFxRateForConvert && saleCurrency !== baseCurrency) {
           // Convert: saleCurrency -> baseCurrency (using stored rate) -> targetCurrency (using current rate)
           const amountInBase = MoneyService.convertCurrency(
             saleAmount,
             saleCurrency,
             baseCurrency as SupportedCurrency,
-            vehicle.sale_fx_rate_to_base
+            saleFxRateForConvert
           );
           
           if (target_currency !== baseCurrency) {
@@ -303,7 +385,7 @@ export async function convertCostsToCurrency(req: AuthRequest, res: Response) {
             );
           } else {
             salePriceConverted = amountInBase;
-            salePriceRate = vehicle.sale_fx_rate_to_base;
+            salePriceRate = saleFxRateForConvert;
             salePriceRateSource = 'custom'; // Using stored rate
           }
         } else {

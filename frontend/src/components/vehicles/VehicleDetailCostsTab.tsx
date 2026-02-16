@@ -31,19 +31,22 @@ export const VehicleDetailCostsTab = ({
   onOpenEditCostModal,
   onDeleteCost,
 }: VehicleDetailCostsTabProps) => {
-  const { formatCurrencyWithCurrency } = useCurrency();
-  
-  // Harcamaları dövizlerine göre grupla ve her döviz için toplam hesapla
-  const totalsByCurrency = vehicleCosts.reduce((acc, cost) => {
-    const currency = (cost as any).currency || "TRY";
-    if (!acc[currency]) {
-      acc[currency] = 0;
+  const { formatCurrency, formatCurrencyWithCurrency } = useCurrency();
+
+  // Amount in current base currency - use backend's amount_in_current_base when available (historical rate at cost_date)
+  const getAmountBase = (cost: VehicleCost) => {
+    const amountInCurrentBase = (cost as any).amount_in_current_base;
+    if (amountInCurrentBase != null && Number.isFinite(amountInCurrentBase)) {
+      return amountInCurrentBase;
     }
-    // Ensure amount is a number (handle both string and number types)
     const amount = typeof cost.amount === 'string' ? parseFloat(cost.amount) || 0 : (cost.amount || 0);
-    acc[currency] += amount;
-    return acc;
-  }, {} as Record<string, number>);
+    const fxRate = (cost as any).fx_rate_to_base;
+    const effectiveRate = fxRate != null && fxRate > 0 ? fxRate : 1;
+    return amount * effectiveRate;
+  };
+
+  // Total in current base currency (backend converts with historical rates when base changed)
+  const totalBase = vehicleCosts.reduce((sum, cost) => sum + getAmountBase(cost), 0);
 
   return (
     <>
@@ -85,7 +88,7 @@ export const VehicleDetailCostsTab = ({
                       (cost as any).currency
                     )}
                   </TableCell>
-                  <TableCell>{formatDate(cost.date)}</TableCell>
+                  <TableCell>{formatDate((cost as any).cost_date ?? cost.date)}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
                       <Button
@@ -119,9 +122,7 @@ export const VehicleDetailCostsTab = ({
               </TableCell>
               <TableCell colSpan={3}>
                 <span className="font-semibold">
-                  {Object.entries(totalsByCurrency)
-                    .map(([currency, total]) => formatCurrencyWithCurrency(total, currency))
-                    .join(" + ")}
+                  {formatCurrency(totalBase)}
                 </span>
               </TableCell>
             </TableRow>

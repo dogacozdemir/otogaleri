@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/collapsible";
 import { ChevronDown, ChevronUp, Calculator, AlertTriangle, RefreshCw } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useTenant } from "@/contexts/TenantContext";
 import { useCurrencyRates } from "@/contexts/CurrencyRatesContext";
 import {
   calculateCustomsTax,
@@ -34,7 +35,8 @@ import {
   type InputMode,
   type JaponKiymetData,
 } from "@/services/calculatorService";
-import { cn } from "@/lib/utils";
+import { cn, parseCC } from "@/lib/utils";
+import { safeDivide } from "@/lib/safeDivide";
 
 const FUEL_TYPES: { value: FuelType; label: string }[] = [
   { value: "benzinli", label: "Benzinli" },
@@ -44,25 +46,25 @@ const FUEL_TYPES: { value: FuelType; label: string }[] = [
   { value: "is_araci", label: "İş Aracı (Çift Kabin/Panel Van)" },
 ];
 
-const KUR_CACHE_KEY = "japon_calc_jpy_try_rate";
+const KUR_CACHE_KEY_PREFIX = "japon_calc_jpy_base_";
 const KUR_CACHE_EXPIRY_MS = 60 * 60 * 1000; // 1 saat
 
-function formatTRY(n: number): string {
+function formatInCurrencyDisplay(n: number, currency: string): string {
   return new Intl.NumberFormat("tr-TR", {
     style: "currency",
-    currency: "TRY",
+    currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(n);
 }
 
 /** Genel toplam değeri - KDV slider değişince akıcı güncelleme */
-function AnimatedValue({ value, className }: { value: number; className?: string }) {
+function AnimatedValue({ value, currency, className }: { value: number; currency: string; className?: string }) {
   const [display, setDisplay] = useState(value);
   useEffect(() => {
     setDisplay(value);
   }, [value]);
-  return <span className={cn("transition-opacity duration-200", className)}>{formatTRY(display)}</span>;
+  return <span className={cn("transition-opacity duration-200", className)}>{formatInCurrencyDisplay(display, currency)}</span>;
 }
 
 const CURRENCIES_OPTIONS = CURRENCIES.map((c) => ({ value: c.value, label: c.label }));
@@ -86,6 +88,8 @@ function formatInCurrency(value: number, currency: string): string {
 
 export default function JapaneseCalculatorPage() {
   const isMobile = useIsMobile();
+  const { tenant } = useTenant();
+  const baseCurrency = tenant?.default_currency || "TRY";
   const { getCustomRate } = useCurrencyRates();
   const [inputMode, setInputMode] = useState<InputMode>("vehicle_select");
   const [chassisNo, setChassisNo] = useState("");
@@ -99,9 +103,6 @@ export default function JapaneseCalculatorPage() {
   const [gumrukAmount, setGumrukAmount] = useState("5000");
   const [gumrukCurrency, setGumrukCurrency] = useState("TRY");
   const [gumrukCustomRate, setGumrukCustomRate] = useState<number | null>(null);
-  const [ardiyeAmount, setArdiyeAmount] = useState("");
-  const [ardiyeCurrency, setArdiyeCurrency] = useState("TRY");
-  const [ardiyeCustomRate, setArdiyeCustomRate] = useState<number | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   // Kıymet gösterimi: döviz seçimi + kur düzenleme (JPY->TRY)
@@ -122,8 +123,9 @@ export default function JapaneseCalculatorPage() {
   // Kur state (API + 1hr cache)
   const [cachedKur, setCachedKur] = useState<{ rate: number; ts: number } | null>(null);
 
-  const fetchJpyTryRate = useCallback(async () => {
-    const cached = localStorage.getItem(KUR_CACHE_KEY);
+  const fetchJpyToBaseRate = useCallback(async () => {
+    const cacheKey = `${KUR_CACHE_KEY_PREFIX}${baseCurrency}`;
+    const cached = localStorage.getItem(cacheKey);
     if (cached) {
       try {
         const { rate, ts } = JSON.parse(cached);
@@ -134,14 +136,14 @@ export default function JapaneseCalculatorPage() {
       } catch (_) {}
     }
     const { data } = await api.get("/currency/rate", {
-      params: { from: "JPY", to: "TRY" },
+      params: { from: "JPY", to: baseCurrency },
     });
     const rate = data?.rate ?? 0;
     const entry = { rate, ts: Date.now() };
-    localStorage.setItem(KUR_CACHE_KEY, JSON.stringify(entry));
+    localStorage.setItem(cacheKey, JSON.stringify(entry));
     setCachedKur(entry);
     return rate;
-  }, []);
+  }, [baseCurrency]);
 
   const { data: kiymetData, isLoading: kiymetLoading } = useQuery({
     queryKey: ["japon-kiymet"],
@@ -152,47 +154,54 @@ export default function JapaneseCalculatorPage() {
     staleTime: Infinity,
   });
 
-  const { data: jpyTryRate, isLoading: kurLoading, refetch: refetchKur } = useQuery({
-    queryKey: ["jpy-try-rate"],
-    queryFn: fetchJpyTryRate,
+  const { data: jpyToBaseRate, isLoading: kurLoading, refetch: refetchKur } = useQuery({
+    queryKey: ["jpy-to-base-rate", baseCurrency],
+    queryFn: fetchJpyToBaseRate,
     staleTime: KUR_CACHE_EXPIRY_MS,
   });
 
-  // Kur oranları: döviz -> TRY (gümrük ücretleri için)
+  // Kur oranları: döviz -> varsayılan para birimi (baseCurrency)
   const fetchRate = useCallback(async (from: string, to: string) => {
     if (from === to) return 1;
     const { data } = await api.get("/currency/rate", { params: { from, to } });
     return data?.rate ?? 1;
   }, []);
 
-  const { data: gemiRateToTry } = useQuery({
-    queryKey: ["currency-rate", gemiParasiCurrency, "TRY"],
-    queryFn: () => fetchRate(gemiParasiCurrency, "TRY"),
-    enabled: !!gemiParasiCurrency && gemiParasiCurrency !== "TRY",
+  const { data: gemiRateToBase } = useQuery({
+    queryKey: ["currency-rate", gemiParasiCurrency, baseCurrency],
+    queryFn: () => fetchRate(gemiParasiCurrency, baseCurrency),
+    enabled: !!gemiParasiCurrency && gemiParasiCurrency !== baseCurrency,
   });
-  const { data: gumrukRateToTry } = useQuery({
-    queryKey: ["currency-rate", gumrukCurrency, "TRY"],
-    queryFn: () => fetchRate(gumrukCurrency, "TRY"),
-    enabled: !!gumrukCurrency && gumrukCurrency !== "TRY",
+  const { data: gumrukRateToBase } = useQuery({
+    queryKey: ["currency-rate", gumrukCurrency, baseCurrency],
+    queryFn: () => fetchRate(gumrukCurrency, baseCurrency),
+    enabled: !!gumrukCurrency && gumrukCurrency !== baseCurrency,
   });
-  const { data: ardiyeRateToTry } = useQuery({
-    queryKey: ["currency-rate", ardiyeCurrency, "TRY"],
-    queryFn: () => fetchRate(ardiyeCurrency, "TRY"),
-    enabled: !!ardiyeCurrency && ardiyeCurrency !== "TRY",
+  // Gümrük hesaplaması Türk mevzuatına göre TRY cinsinden yapılır; baseCurrency'den TRY'ye çevrim gerekir
+  const { data: baseToTryRate } = useQuery({
+    queryKey: ["currency-rate", baseCurrency, "TRY"],
+    queryFn: () => fetchRate(baseCurrency, "TRY"),
+    enabled: baseCurrency !== "TRY",
+  });
+  // Sonuç TRY'de; varsayılan para biriminde göstermek için TRY->base dönüşümü
+  const { data: tryToBaseRate } = useQuery({
+    queryKey: ["currency-rate", "TRY", baseCurrency],
+    queryFn: () => fetchRate("TRY", baseCurrency),
+    enabled: baseCurrency !== "TRY",
   });
 
   const jpyTryKuru = inputMode === "manual" && manuelKur
     ? parseFloat(manuelKur) || 0
-    : (jpyTryRate ?? 0);
+    : (baseCurrency === "TRY" ? (jpyToBaseRate ?? 0) : (jpyToBaseRate ?? 0) * (baseToTryRate ?? 1));
 
-  // Kıymet için efektif JPY->TRY kuru (düzenlenebilir)
+  // Kıymet için efektif JPY->TRY kuru (hesaplama için; düzenlenebilir)
   const effectiveJpyTryKuru = kiymetCustomRate ?? jpyTryKuru;
 
-  // Kıymet gösterimi için JPY->diğer döviz kurları
+  // Kıymet gösterimi için JPY->görüntüleme dövizi kurları
   const { data: jpyToDisplayRate, isLoading: jpyToDisplayRateLoading } = useQuery({
     queryKey: ["currency-rate", "JPY", kiymetDisplayCurrency],
     queryFn: () => fetchRate("JPY", kiymetDisplayCurrency),
-    enabled: !!kiymetDisplayCurrency && kiymetDisplayCurrency !== "JPY" && kiymetDisplayCurrency !== "TRY",
+    enabled: !!kiymetDisplayCurrency && kiymetDisplayCurrency !== "JPY" && kiymetDisplayCurrency !== baseCurrency,
   });
 
   // Manuel seçim: Marka -> Model -> Yıl (Kod otomatik, ilk kod seçilir)
@@ -221,6 +230,59 @@ export default function JapaneseCalculatorPage() {
     if (inputMode !== "chassis_query" || !chassisNo.trim() || !kiymetData) return null;
     return findChassisMatchInJson(chassisNo, kiymetData);
   }, [inputMode, chassisNo, kiymetData]);
+
+  // Araçlar veritabanından şasi ile araç bilgisi çek (debounce 400ms)
+  const [debouncedChassis, setDebouncedChassis] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedChassis(chassisNo.trim()), 400);
+    return () => clearTimeout(t);
+  }, [chassisNo]);
+
+  const { data: vehicleLookup } = useQuery({
+    queryKey: ["vehicle-lookup-chassis", debouncedChassis],
+    queryFn: async () => {
+      const { data } = await api.get("/vehicles/lookup-by-chassis", {
+        params: { chassis: debouncedChassis },
+      });
+      return data as {
+        maker: string | null;
+        model: string | null;
+        production_year: number | null;
+        weight: number | null;
+        fuel: string | null;
+        gemiParasi: { amount: number; currency: string } | null;
+      } | null;
+    },
+    enabled: inputMode === "chassis_query" && debouncedChassis.length > 0,
+    staleTime: 60000,
+  });
+
+  // Araç bulunduğunda form alanlarını otomatik doldur (eksik olanları atla)
+  useEffect(() => {
+    if (!vehicleLookup) return;
+    if (vehicleLookup.maker) setSelectedMarka(vehicleLookup.maker);
+    if (vehicleLookup.model) setSelectedModel(vehicleLookup.model);
+    if (vehicleLookup.production_year != null)
+      setSelectedYil(String(vehicleLookup.production_year));
+    if (vehicleLookup.weight != null && vehicleLookup.weight > 0)
+      setAgirlikKg(vehicleLookup.weight);
+    if (vehicleLookup.fuel) {
+      const f = vehicleLookup.fuel.toLowerCase();
+      const map: Record<string, FuelType> = {
+        benzin: "benzinli",
+        dizel: "dizel",
+        hybrid: "hybrid",
+        elektrik: "elektrikli",
+        elektrikli: "elektrikli",
+      };
+      const mapped = map[f] || (f.includes("benzin") ? "benzinli" : f.includes("dizel") ? "dizel" : f.includes("hybrid") ? "hybrid" : f.includes("elektrik") ? "elektrikli" : null);
+      if (mapped) setYakıtTipi(mapped);
+    }
+    if (vehicleLookup.gemiParasi && vehicleLookup.gemiParasi.amount > 0) {
+      setGemiParasiAmount(String(vehicleLookup.gemiParasi.amount));
+      setGemiParasiCurrency(vehicleLookup.gemiParasi.currency);
+    }
+  }, [vehicleLookup]);
 
   // Şasi eşleşmesi değişince yıl seçimini sıfırla (yeni araçta farklı yıllar olabilir)
   useEffect(() => {
@@ -266,24 +328,22 @@ export default function JapaneseCalculatorPage() {
   const gemiParasiJPY = useMemo(() => {
     const amt = parseFloat(gemiParasiAmount) || 0;
     if (amt <= 0) return 0;
-    let rateToTry = 1;
-    if (gemiParasiCurrency === "TRY") rateToTry = 1;
-    else if (gemiParasiCurrency === "JPY") rateToTry = effectiveJpyTryKuru;
-    else rateToTry = gemiParasiCustomRate ?? getCustomRate(gemiParasiCurrency, "TRY") ?? gemiRateToTry ?? 1;
-    return (amt * rateToTry) / (effectiveJpyTryKuru || 1);
-  }, [gemiParasiAmount, gemiParasiCurrency, gemiParasiCustomRate, gemiRateToTry, effectiveJpyTryKuru, getCustomRate]);
+    let rateToBase = 1;
+    if (gemiParasiCurrency === baseCurrency) rateToBase = 1;
+    else if (gemiParasiCurrency === "JPY") rateToBase = jpyToBaseRate ?? 0;
+    else rateToBase = gemiParasiCustomRate ?? getCustomRate(gemiParasiCurrency, baseCurrency) ?? gemiRateToBase ?? 1;
+    const amtBase = amt * rateToBase;
+    const baseToTry = baseCurrency === "TRY" ? 1 : (baseToTryRate ?? 1);
+    return safeDivide(amtBase * baseToTry, effectiveJpyTryKuru || 1);
+  }, [gemiParasiAmount, gemiParasiCurrency, gemiParasiCustomRate, gemiRateToBase, jpyToBaseRate, baseToTryRate, baseCurrency, effectiveJpyTryKuru, getCustomRate]);
 
   const gumrukKomisyonuTRY = useMemo(() => {
     const amt = parseFloat(gumrukAmount) || 0;
-    const rateToTry = gumrukCurrency === "TRY" ? 1 : gumrukCustomRate ?? getCustomRate(gumrukCurrency, "TRY") ?? gumrukRateToTry ?? 1;
-    return amt * rateToTry;
-  }, [gumrukAmount, gumrukCurrency, gumrukCustomRate, gumrukRateToTry, getCustomRate]);
-
-  const ardiyeTRY = useMemo(() => {
-    const amt = parseFloat(ardiyeAmount) || 0;
-    const rateToTry = ardiyeCurrency === "TRY" ? 1 : ardiyeCustomRate ?? getCustomRate(ardiyeCurrency, "TRY") ?? ardiyeRateToTry ?? 1;
-    return amt * rateToTry;
-  }, [ardiyeAmount, ardiyeCurrency, ardiyeCustomRate, ardiyeRateToTry, getCustomRate]);
+    const rateToBase = gumrukCurrency === baseCurrency ? 1 : gumrukCustomRate ?? getCustomRate(gumrukCurrency, baseCurrency) ?? gumrukRateToBase ?? 1;
+    const amtBase = amt * rateToBase;
+    const baseToTry = baseCurrency === "TRY" ? 1 : (baseToTryRate ?? 1);
+    return amtBase * baseToTry;
+  }, [gumrukAmount, gumrukCurrency, gumrukCustomRate, gumrukRateToBase, baseToTryRate, baseCurrency, getCustomRate]);
 
   const result = useMemo(() => {
     return calculateCustomsTax({
@@ -298,7 +358,6 @@ export default function JapaneseCalculatorPage() {
       isAraciYakitTipi: yakıtTipi === "is_araci" ? isAraciYakitTipi : undefined,
       kdvOrani,
       gumrukKomisyonu: gumrukKomisyonuTRY,
-      ardiye: ardiyeTRY,
     });
   }, [
     effectiveKiymetJPY,
@@ -313,10 +372,9 @@ export default function JapaneseCalculatorPage() {
     isAraciYakitTipi,
     kdvOrani,
     gumrukKomisyonuTRY,
-    ardiyeTRY,
   ]);
 
-  // Hesaplama için 4 zorunlu bilgi: Kıymet, Gemi Parası, Ağırlık, Yakıt Tipi (+ Kur + Motor manuel için)
+  // Hesaplama için 4 zorunlu bilgi: Kıymet, Navlun, Ağırlık, Yakıt Tipi (+ Kur + Motor manuel için)
   const hasKiymet = Boolean(effectiveKiymetJPY ?? (inputMode === "manual" && manuelKiymetJPY > 0));
   const hasGemiParasi = (parseFloat(gemiParasiAmount) || 0) > 0;
   const hasAgirlik = agirlikKg > 0;
@@ -436,7 +494,15 @@ export default function JapaneseCalculatorPage() {
                     value={chassisNo}
                     onChange={(e) => setChassisNo(e.target.value.toUpperCase())}
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Araçlar bölümünde kayıtlıysa marka, model, yıl, ağırlık, yakıt ve navlun otomatik doldurulur.
+                  </p>
                 </div>
+                {vehicleLookup && (
+                  <p className="text-sm text-green-600 dark:text-green-400">
+                    Araç bilgileri sistemden yüklendi.
+                  </p>
+                )}
                 {chassisNo.trim() && (
                   chassisMatch ? (
                     <div className="space-y-3">
@@ -492,11 +558,12 @@ export default function JapaneseCalculatorPage() {
                 <div>
                   <Label>Motor Hacmi (CC)</Label>
                   <Input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     min={0}
                     value={manuelMotorCC || ""}
-                    onChange={(e) => setManuelMotorCC(parseInt(e.target.value, 10) || 0)}
-                    placeholder="Örn: 1997"
+                    onChange={(e) => setManuelMotorCC(parseCC(e.target.value) ?? 0)}
+                    placeholder="Örn: 1997 veya 1.997"
                   />
                 </div>
                 <div>
@@ -507,7 +574,7 @@ export default function JapaneseCalculatorPage() {
                     min={0}
                     value={manuelKur}
                     onChange={(e) => setManuelKur(e.target.value)}
-                    placeholder={jpyTryRate ? `Güncel: ${jpyTryRate.toFixed(4)}` : "Kur girin"}
+                    placeholder={jpyToBaseRate ? `Güncel: ${jpyToBaseRate.toFixed(4)}` : "Kur girin"}
                     className={inputMode === "manual" && eksikKur ? "border-amber-500" : ""}
                   />
                   {inputMode === "manual" && eksikKur && (
@@ -518,7 +585,7 @@ export default function JapaneseCalculatorPage() {
             </Card>
           )}
 
-          {/* Ortak alanlar - Kıymet, Gemi Parası, Ağırlık, Yakıt Tipi zorunlu */}
+          {/* Ortak alanlar - Kıymet, Navlun, Ağırlık, Yakıt Tipi zorunlu */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Diğer Bilgiler</CardTitle>
@@ -537,7 +604,7 @@ export default function JapaneseCalculatorPage() {
                           (() => {
                             const k = effectiveKiymetJPY ?? manuelKiymetJPY ?? 0;
                             if (kiymetDisplayCurrency === "JPY") return k;
-                            if (kiymetDisplayCurrency === "TRY") return k * effectiveJpyTryKuru;
+                            if (kiymetDisplayCurrency === baseCurrency) return k * (baseCurrency === "TRY" ? effectiveJpyTryKuru : (jpyToBaseRate ?? 0));
                             return k * (jpyToDisplayRate ?? 1);
                           })(),
                           kiymetDisplayCurrency
@@ -572,11 +639,11 @@ export default function JapaneseCalculatorPage() {
                                   <span className="text-base font-medium w-6">{icon}</span>
                                   <span className="flex-1">{curr.label}</span>
                                 </button>
-                                {(curr.value === "JPY" || curr.value === "TRY") && (
+                                {(curr.value === "JPY" || curr.value === baseCurrency) && (
                                   <CurrencyRateEditor
                                     fromCurrency="JPY"
-                                    toCurrency="TRY"
-                                    baseCurrency="TRY"
+                                    toCurrency={baseCurrency}
+                                    baseCurrency={baseCurrency}
                                     customRate={kiymetCustomRate ?? undefined}
                                     onRateChange={setKiymetCustomRate}
                                   />
@@ -591,7 +658,7 @@ export default function JapaneseCalculatorPage() {
                 </div>
               )}
               <div>
-                <Label>Gemi Parası</Label>
+                <Label>Navlun</Label>
                 <CurrencyInput
                   value={gemiParasiAmount}
                   currency={gemiParasiCurrency}
@@ -603,7 +670,7 @@ export default function JapaneseCalculatorPage() {
                   className={eksikGemiParasi && (hasKiymet || inputMode === "manual") ? "border-amber-500" : ""}
                 />
                 {eksikGemiParasi && (hasKiymet || inputMode === "manual") && (
-                  <p className="text-xs text-amber-600 mt-1">Lütfen gemi parası giriniz.</p>
+                  <p className="text-xs text-amber-600 mt-1">Lütfen navlun giriniz.</p>
                 )}
               </div>
               <div>
@@ -668,18 +735,6 @@ export default function JapaneseCalculatorPage() {
                   currencies={CURRENCIES_OPTIONS}
                 />
               </div>
-              <div>
-                <Label>Ardiye</Label>
-                <CurrencyInput
-                  value={ardiyeAmount}
-                  currency={ardiyeCurrency}
-                  onValueChange={setArdiyeAmount}
-                  onCurrencyChange={setArdiyeCurrency}
-                  customRate={ardiyeCustomRate}
-                  onCustomRateChange={setArdiyeCustomRate}
-                  currencies={CURRENCIES_OPTIONS}
-                />
-              </div>
             </CardContent>
           </Card>
 
@@ -687,7 +742,7 @@ export default function JapaneseCalculatorPage() {
           {inputMode !== "manual" && (
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-sm">
-                <span className="text-muted-foreground">JPY/TRY:</span>
+                <span className="text-muted-foreground">JPY/{baseCurrency}:</span>
                 {kurLoading ? (
                   <span>Yükleniyor...</span>
                 ) : (
@@ -746,7 +801,11 @@ export default function JapaneseCalculatorPage() {
                 </div>
               )}
               <div className="text-2xl font-bold">
-                <AnimatedValue value={result.genelToplam} className="text-primary" />
+                <AnimatedValue
+                  value={baseCurrency === "TRY" ? result.genelToplam : result.genelToplam * (tryToBaseRate ?? 1)}
+                  currency={baseCurrency}
+                  className="text-primary"
+                />
               </div>
 
               {/* Collapsible detay */}
@@ -760,22 +819,22 @@ export default function JapaneseCalculatorPage() {
                 <CollapsibleContent>
                   <div className="mt-4 space-y-2 text-sm border rounded-lg p-4 bg-muted/30">
                     <div className="font-medium text-muted-foreground">Kalem Fiyatı (CIF)</div>
-                    <DetailRow label="Araç kıymeti + Gemi parası" value={result.cifTRY} />
+                    <DetailRow label="Araç kıymeti + Navlun" value={result.cifTRY} currency={baseCurrency} tryToBaseRate={baseCurrency === "TRY" ? 1 : (tryToBaseRate ?? 1)} />
                     <div className="border-t pt-2 mt-2 font-medium text-muted-foreground">1. Kalem (kalem fiyat üzerinden)</div>
-                    <DetailRowWithOran label="Stopaj" oran={4} value={result.stopaj} />
-                    <DetailRowWithOran label="KDV" oran={kdvOrani * 100} value={result.kdv} />
-                    <DetailRowWithOran label="FİF salon arabalar" oran={getFIFRateFromCC(motorGucuCC) * 100} value={result.fif} />
-                    <DetailRowWithOran label="İthalat-İhracat" oran={4.4} value={result.ithalatIhracat} />
-                    <DetailRowWithOran label="GK Güç Fonu" oran={2.5} value={result.gkGucFonu} />
-                    <DetailRow label="Bandrol (sabit)" value={result.bandrol} />
-                    <DetailRowWithOran label="Gümrük Resmi" oran={10} value={result.gumrukResmi} />
-                    <div className="font-medium">1. Kalem Toplam: {formatTRY(result.birinciKalem)}</div>
+                    <DetailRowWithOran label="Stopaj" oran={4} value={result.stopaj} currency={baseCurrency} tryToBaseRate={baseCurrency === "TRY" ? 1 : (tryToBaseRate ?? 1)} />
+                    <DetailRowWithOran label="KDV" oran={kdvOrani * 100} value={result.kdv} currency={baseCurrency} tryToBaseRate={baseCurrency === "TRY" ? 1 : (tryToBaseRate ?? 1)} />
+                    <DetailRowWithOran label="FİF salon arabalar" oran={getFIFRateFromCC(motorGucuCC) * 100} value={result.fif} currency={baseCurrency} tryToBaseRate={baseCurrency === "TRY" ? 1 : (tryToBaseRate ?? 1)} />
+                    <DetailRowWithOran label="İthalat-İhracat" oran={4.4} value={result.ithalatIhracat} currency={baseCurrency} tryToBaseRate={baseCurrency === "TRY" ? 1 : (tryToBaseRate ?? 1)} />
+                    <DetailRowWithOran label="GK Güç Fonu" oran={2.5} value={result.gkGucFonu} currency={baseCurrency} tryToBaseRate={baseCurrency === "TRY" ? 1 : (tryToBaseRate ?? 1)} />
+                    <DetailRow label="Bandrol (sabit)" value={result.bandrol} currency={baseCurrency} tryToBaseRate={baseCurrency === "TRY" ? 1 : (tryToBaseRate ?? 1)} />
+                    <DetailRowWithOran label="Gümrük Resmi" oran={10} value={result.gumrukResmi} currency={baseCurrency} tryToBaseRate={baseCurrency === "TRY" ? 1 : (tryToBaseRate ?? 1)} />
+                    <div className="font-medium">1. Kalem Toplam: {formatInCurrencyDisplay(result.birinciKalem * (baseCurrency === "TRY" ? 1 : (tryToBaseRate ?? 1)), baseCurrency)}</div>
                     <div className="border-t pt-2 mt-2">
-                      <DetailRow label="2. Kayıt Parası" value={result.kayitParasi} />
-                      <DetailRow label="3. Gümrük Komisyonu" value={result.gumrukKomisyonu} />
-                      <DetailRow label="4. Ağırlık Katsayısı" value={result.agirlikKatsayisi} />
+                      <DetailRow label="2. Kayıt Parası" value={result.kayitParasi} currency={baseCurrency} tryToBaseRate={baseCurrency === "TRY" ? 1 : (tryToBaseRate ?? 1)} />
+                      <DetailRow label="3. Gümrük Komisyonu" value={result.gumrukKomisyonu} currency={baseCurrency} tryToBaseRate={baseCurrency === "TRY" ? 1 : (tryToBaseRate ?? 1)} />
+                      <DetailRow label="4. Ağırlık Katsayısı" value={result.agirlikKatsayisi} currency={baseCurrency} tryToBaseRate={baseCurrency === "TRY" ? 1 : (tryToBaseRate ?? 1)} />
                     </div>
-                    <div className="border-t pt-2 mt-2 font-bold">Genel Toplam: {formatTRY(result.genelToplam)}</div>
+                    <div className="border-t pt-2 mt-2 font-bold">Genel Toplam: {formatInCurrencyDisplay(result.genelToplam * (baseCurrency === "TRY" ? 1 : (tryToBaseRate ?? 1)), baseCurrency)}</div>
                   </div>
                 </CollapsibleContent>
               </Collapsible>
@@ -799,14 +858,14 @@ export default function JapaneseCalculatorPage() {
               ) : (
                 <>
                   <div className="space-y-2 text-sm">
-                    <DetailRow label="CIF (Kalem fiyat)" value={result.cifTRY} />
-                    <DetailRow label="1. Kalem" value={result.birinciKalem} />
+                    <DetailRow label="CIF (Kalem fiyat)" value={result.cifTRY} currency={baseCurrency} tryToBaseRate={baseCurrency === "TRY" ? 1 : (tryToBaseRate ?? 1)} />
+                    <DetailRow label="1. Kalem" value={result.birinciKalem} currency={baseCurrency} tryToBaseRate={baseCurrency === "TRY" ? 1 : (tryToBaseRate ?? 1)} />
                     <div className="border-t pt-2">
-                      <DetailRow label="Matrah" value={result.faturaMatrah} />
-                      <DetailRow label={`KDV (%${(kdvOrani * 100).toFixed(0)})`} value={result.faturaVergi} />
+                      <DetailRow label="Matrah" value={result.faturaMatrah} currency={baseCurrency} tryToBaseRate={baseCurrency === "TRY" ? 1 : (tryToBaseRate ?? 1)} />
+                      <DetailRow label={`KDV (%${(kdvOrani * 100).toFixed(0)})`} value={result.faturaVergi} currency={baseCurrency} tryToBaseRate={baseCurrency === "TRY" ? 1 : (tryToBaseRate ?? 1)} />
                     </div>
                     <div className="border-t pt-2 mt-2 font-bold text-primary">
-                      Fatura Toplam: {formatTRY(result.faturaToplam)}
+                      Fatura Toplam: {formatInCurrencyDisplay(result.faturaToplam * (baseCurrency === "TRY" ? 1 : (tryToBaseRate ?? 1)), baseCurrency)}
                     </div>
                   </div>
                 </>
@@ -819,20 +878,20 @@ export default function JapaneseCalculatorPage() {
   );
 }
 
-function DetailRow({ label, value }: { label: string; value: number }) {
+function DetailRow({ label, value, currency, tryToBaseRate = 1 }: { label: string; value: number; currency: string; tryToBaseRate?: number }) {
   return (
     <div className="flex justify-between">
       <span className="text-muted-foreground">{label}</span>
-      <span className="font-mono">{formatTRY(value)}</span>
+      <span className="font-mono">{formatInCurrencyDisplay(value * tryToBaseRate, currency)}</span>
     </div>
   );
 }
 
-function DetailRowWithOran({ label, oran, value }: { label: string; oran: number; value: number }) {
+function DetailRowWithOran({ label, oran, value, currency, tryToBaseRate = 1 }: { label: string; oran: number; value: number; currency: string; tryToBaseRate?: number }) {
   return (
     <div className="flex justify-between">
       <span className="text-muted-foreground">{label} (%{oran.toFixed(1)})</span>
-      <span className="font-mono">{formatTRY(value)}</span>
+      <span className="font-mono">{formatInCurrencyDisplay(value * tryToBaseRate, currency)}</span>
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   updateVehicle,
   deleteVehicle,
   getNextVehicleNumber,
+  lookupByChassis,
   validateCreateVehicle,
   validateUpdateVehicle,
   validateVehicleId,
@@ -22,6 +23,7 @@ import {
 } from "../controllers/vehicleCostController";
 import { markVehicleAsSold } from "../controllers/vehicleSaleController";
 import { calculateVehicleProfit, convertCostsToCurrency } from "../controllers/profitController";
+import { reSyncVehicleCostFxRates } from "../controllers/fxResyncController";
 import { listVehicleImages, uploadVehicleImage, deleteVehicleImage, setPrimaryImage, updateImageOrder, upload } from "../controllers/vehicleImageController";
 import { bulkImportVehicles, bulkImportCosts, upload as bulkUpload } from "../controllers/bulkImportController";
 import { uploadLimiter } from "../middleware/rateLimiter";
@@ -50,6 +52,7 @@ router.get("/analytics/monthly-comparison", getMonthlyComparison);
 router.get("/analytics/category-costs", getCategoryCosts);
 
 router.get("/", paginationValidator, listVehicles);
+router.get("/lookup-by-chassis", lookupByChassis);
 router.get("/next-number", getNextVehicleNumber);
 router.post("/", validateCreateVehicle, createVehicle);
 // Apply upload rate limiting to bulk imports
@@ -64,6 +67,7 @@ router.delete("/:id/costs/:cost_id", deleteVehicleCost);
 router.get("/:id/calculate-costs", calculateVehicleProfit);
 router.get("/:id/profit", calculateVehicleProfit);
 router.post("/:id/convert-costs", convertCostsToCurrency);
+router.post("/:id/resync-fx-rates", reSyncVehicleCostFxRates);
 router.post("/:id/sell", markVehicleAsSold);
 router.get("/:id/images", listVehicleImages);
 // Apply upload rate limiting to image uploads

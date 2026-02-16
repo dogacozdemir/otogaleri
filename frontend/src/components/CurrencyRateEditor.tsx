@@ -89,7 +89,7 @@ export function CurrencyRateEditor({
     if (isNaN(rate) || rate <= 0) {
       toast({
         title: "Geçersiz Kur",
-        description: "Lütfen geçerli bir kur değeri girin.",
+        description: "Kur değeri 0'dan büyük olmalıdır.",
         variant: "destructive",
       })
       return

@@ -45,6 +45,8 @@ export const VehicleDetailDocumentsTab = ({
       inspection: "Muayene",
       customs: "Gümrük",
       invoice: "Fatura",
+      eksper: "Eksper",
+      grade: "Grade",
     };
     return labels[type] || "Diğer";
   };

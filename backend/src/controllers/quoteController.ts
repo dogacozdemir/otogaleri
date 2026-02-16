@@ -3,6 +3,7 @@ import { AuthRequest } from "../middleware/auth";
 import { dbPool } from "../config/database";
 import { getOrFetchRate } from "../services/fxCacheService";
 import { SupportedCurrency } from "../services/currencyService";
+import { StorageService } from "../services/storage/storageService";
 
 /**
  * Generate unique quote number (format: Q-YYYYMMDD-XXX)
@@ -44,10 +45,14 @@ export async function listQuotes(req: AuthRequest, res: Response) {
       SELECT 
         vq.*,
         v.maker, v.model, v.production_year, v.chassis_no, v.vehicle_number,
+        v.transmission, v.km, v.fuel, v.cc, v.color, v.sale_price as vehicle_sale_price,
+        (SELECT image_path FROM vehicle_images 
+         WHERE vehicle_id = vq.vehicle_id AND tenant_id = vq.tenant_id 
+         ORDER BY is_primary DESC, display_order ASC, created_at ASC LIMIT 1) as primary_image_path,
         c.name as customer_name_full, c.phone as customer_phone_full,
         u.name as created_by_name
       FROM vehicle_quotes vq
-      LEFT JOIN vehicles v ON vq.vehicle_id = v.id
+      LEFT JOIN vehicles v ON vq.vehicle_id = v.id AND v.tenant_id = vq.tenant_id
       LEFT JOIN customers c ON vq.customer_id = c.id
       LEFT JOIN users u ON vq.created_by = u.id
       WHERE vq.tenant_id = ?
@@ -117,10 +122,14 @@ export async function getQuoteById(req: AuthRequest, res: Response) {
       `SELECT 
         vq.*,
         v.maker, v.model, v.production_year, v.chassis_no, v.vehicle_number, v.sale_price as vehicle_sale_price,
+        v.transmission, v.km, v.fuel, v.cc, v.color,
+        (SELECT image_path FROM vehicle_images 
+         WHERE vehicle_id = vq.vehicle_id AND tenant_id = vq.tenant_id 
+         ORDER BY is_primary DESC, display_order ASC, created_at ASC LIMIT 1) as primary_image_path,
         c.name as customer_name_full, c.phone as customer_phone_full, c.address as customer_address_full,
         u.name as created_by_name
       FROM vehicle_quotes vq
-      LEFT JOIN vehicles v ON vq.vehicle_id = v.id
+      LEFT JOIN vehicles v ON vq.vehicle_id = v.id AND v.tenant_id = vq.tenant_id
       LEFT JOIN customers c ON vq.customer_id = c.id
       LEFT JOIN users u ON vq.created_by = u.id
       WHERE vq.id = ? AND vq.tenant_id = ?`,
@@ -132,7 +141,20 @@ export async function getQuoteById(req: AuthRequest, res: Response) {
       return res.status(404).json({ error: "Quote not found" });
     }
 
-    res.json(rowsArray[0]);
+    const quote = rowsArray[0] as any;
+    if (quote.primary_image_path) {
+      try {
+        const key = quote.primary_image_path.replace(/^\/uploads\//, "");
+        quote.primary_image_url = await StorageService.getUrl(key, true);
+      } catch {
+        quote.primary_image_url = null;
+      }
+    } else {
+      quote.primary_image_url = null;
+    }
+    delete quote.primary_image_path;
+
+    res.json(quote);
   } catch (err) {
     console.error("[quote] Get by ID error", err);
     res.status(500).json({ error: "Failed to get quote" });
@@ -150,6 +172,7 @@ export async function createQuote(req: AuthRequest, res: Response) {
     valid_until,
     sale_price,
     currency,
+    discount_amount,
     down_payment,
     installment_count,
     installment_amount,
@@ -216,14 +239,16 @@ export async function createQuote(req: AuthRequest, res: Response) {
     // Generate quote number
     const quoteNumber = await generateQuoteNumber(req.tenantId);
 
+    const discountVal = discount_amount != null ? Number(discount_amount) : null;
+
     // Insert quote
     const [result] = await conn.query(
       `INSERT INTO vehicle_quotes (
         tenant_id, vehicle_id, customer_id, quote_number,
-        quote_date, valid_until, sale_price, currency, fx_rate_to_base,
+        quote_date, valid_until, sale_price, discount_amount, currency, fx_rate_to_base,
         down_payment, installment_count, installment_amount,
         status, notes, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?)`,
       [
         req.tenantId,
         vehicle_id,
@@ -232,6 +257,7 @@ export async function createQuote(req: AuthRequest, res: Response) {
         quote_date,
         valid_until,
         sale_price,
+        discountVal,
         quoteCurrency,
         fxRate,
         down_payment || null,
@@ -277,6 +303,7 @@ export async function updateQuote(req: AuthRequest, res: Response) {
     valid_until,
     sale_price,
     currency,
+    discount_amount,
     down_payment,
     installment_count,
     installment_amount,
@@ -322,6 +349,8 @@ export async function updateQuote(req: AuthRequest, res: Response) {
       );
     }
 
+    const discountVal = discount_amount !== undefined ? (discount_amount != null ? Number(discount_amount) : null) : existingQuote.discount_amount;
+
     // Update quote
     await dbPool.query(
       `UPDATE vehicle_quotes SET
@@ -330,6 +359,7 @@ export async function updateQuote(req: AuthRequest, res: Response) {
         quote_date = COALESCE(?, quote_date),
         valid_until = COALESCE(?, valid_until),
         sale_price = COALESCE(?, sale_price),
+        discount_amount = ?,
         currency = COALESCE(?, currency),
         fx_rate_to_base = ?,
         down_payment = ?,
@@ -344,6 +374,7 @@ export async function updateQuote(req: AuthRequest, res: Response) {
         quote_date || null,
         valid_until || null,
         sale_price || null,
+        discountVal,
         quoteCurrency,
         fxRate,
         down_payment !== undefined ? down_payment : null,
@@ -498,15 +529,24 @@ export async function convertQuoteToSale(req: AuthRequest, res: Response) {
       }
     }
 
-    // Create sale record
-    const saleAmountBase = Number(quote.sale_price) * Number(quote.fx_rate_to_base);
+    // Final sale amount = list price - discount (in quote currency)
+    const discountVal = Number(quote.discount_amount || 0);
+    const finalSalePrice = Math.max(0, Number(quote.sale_price) - discountVal);
+
+    // Create sale record - freeze FX rate and base currency at sale time
+    const saleAmountBase = finalSalePrice * Number(quote.fx_rate_to_base);
+    if (Number(quote.fx_rate_to_base) <= 0) {
+      await conn.rollback();
+      conn.release();
+      return res.status(400).json({ error: "Kur değeri 0'dan büyük olmalıdır." });
+    }
     const [saleResult] = await conn.query(
       `INSERT INTO vehicle_sales (
         tenant_id, vehicle_id, branch_id, staff_id,
         customer_name, customer_phone, customer_address,
         plate_number, key_count,
-        sale_amount, sale_currency, sale_fx_rate_to_base, sale_date
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        sale_amount, sale_currency, sale_fx_rate_to_base, sale_date, base_currency_at_sale
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.tenantId,
         quote.vehicle_id,
@@ -517,10 +557,11 @@ export async function convertQuoteToSale(req: AuthRequest, res: Response) {
         finalCustomerAddress,
         plate_number || null,
         key_count || null,
-        quote.sale_price,
+        finalSalePrice,
         quote.currency,
         quote.fx_rate_to_base,
         finalSaleDate,
+        baseCurrency,
       ]
     );
 
@@ -529,7 +570,7 @@ export async function convertQuoteToSale(req: AuthRequest, res: Response) {
     // Update vehicle as sold
     await conn.query(
       "UPDATE vehicles SET is_sold = TRUE, stock_status = 'sold', sale_price = ?, sale_currency = ?, sale_fx_rate_to_base = ?, sale_date = ? WHERE id = ?",
-      [quote.sale_price, quote.currency, quote.fx_rate_to_base, finalSaleDate, quote.vehicle_id]
+      [finalSalePrice, quote.currency, quote.fx_rate_to_base, finalSaleDate, quote.vehicle_id]
     );
 
     // Update customer total spent
@@ -542,9 +583,6 @@ export async function convertQuoteToSale(req: AuthRequest, res: Response) {
 
     // Create installment sale if applicable
     if (quote.installment_count && quote.installment_count > 0 && quote.down_payment && quote.installment_amount) {
-      const { createInstallmentSale } = await import("./installmentController");
-      // Note: We'll need to call this differently since it's a controller function
-      // For now, we'll create the installment sale directly
       await conn.query(
         `INSERT INTO vehicle_installment_sales (
           tenant_id, vehicle_id, sale_id,
@@ -555,7 +593,7 @@ export async function convertQuoteToSale(req: AuthRequest, res: Response) {
           req.tenantId,
           quote.vehicle_id,
           saleId,
-          quote.sale_price,
+          finalSalePrice,
           quote.down_payment,
           quote.installment_count,
           quote.installment_amount,

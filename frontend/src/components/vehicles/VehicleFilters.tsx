@@ -7,6 +7,14 @@ import { Search, Filter, Tag, Calendar, X, Upload, FileUp, Grid3x3, List, Plus, 
 import { cn } from "@/lib/utils";
 import { ReactNode } from "react";
 
+const CURRENCY_OPTIONS = [
+  { value: "TRY", label: "₺ TRY" },
+  { value: "USD", label: "$ USD" },
+  { value: "EUR", label: "€ EUR" },
+  { value: "GBP", label: "£ GBP" },
+  { value: "JPY", label: "¥ JPY" },
+];
+
 interface VehicleFiltersProps {
   query: string;
   setQuery: (value: string) => void;
@@ -29,6 +37,9 @@ interface VehicleFiltersProps {
   onActiveTabChange?: (tab: "vehicles" | "sold") => void;
   activeVehiclesCount?: number;
   soldVehiclesCount?: number;
+  // View currency switcher (for real-time conversion)
+  viewCurrency?: string;
+  onViewCurrencyChange?: (currency: string) => void;
 }
 
 export const VehicleFilters = ({
@@ -52,6 +63,8 @@ export const VehicleFilters = ({
   onActiveTabChange,
   activeVehiclesCount,
   soldVehiclesCount,
+  viewCurrency,
+  onViewCurrencyChange,
 }: VehicleFiltersProps) => {
   // Get unique makers and years from vehicles
   const uniqueMakers = Array.from(new Set(vehicles.map(v => v.maker).filter(Boolean))).sort();
@@ -111,6 +124,22 @@ export const VehicleFilters = ({
             className="pl-12 min-h-[48px] h-12 rounded-xl border-border hover:border-primary focus-visible:ring-primary focus-visible:border-primary transition-colors"
           />
         </div>
+
+        {/* View Currency */}
+        {onViewCurrencyChange && viewCurrency && (
+          <Select value={viewCurrency} onValueChange={onViewCurrencyChange}>
+            <SelectTrigger className="w-[120px] min-h-[48px] h-12 rounded-xl">
+              <SelectValue placeholder="Para birimi" />
+            </SelectTrigger>
+            <SelectContent>
+              {CURRENCY_OPTIONS.map((c) => (
+                <SelectItem key={c.value} value={c.value}>
+                  {c.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         {/* Quick Filters */}
         <div className="flex gap-2 flex-wrap sm:flex-nowrap">

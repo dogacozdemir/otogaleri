@@ -940,7 +940,7 @@ const InventoryPage = () => {
                   <TableCell className="text-muted-foreground">
                     {(p.track_stock === true || (p.track_stock as any) === 1) ? p.min_stock : "-"}
                   </TableCell>
-                  <TableCell className="text-right font-medium">{currency(p.cost_price)}</TableCell>
+                  <TableCell className="text-right font-medium">{formatCurrencyWithCurrency(p.cost_price, p.cost_currency)}</TableCell>
                   <TableCell className="text-right font-medium">{formatCurrencyWithCurrency(p.sale_price, p.sale_currency)}</TableCell>
                   <TableCell className="text-right font-medium">{p.sales_count}</TableCell>
                   <TableCell>
@@ -1126,7 +1126,10 @@ const InventoryPage = () => {
                             </div>
                             {price > 0 && (
                               <span className={cn("font-semibold", price < 0 ? "text-red-600" : "text-green-600")}>
-                                {price < 0 ? "" : "+"}{currency(price)}
+                                {price < 0 ? "" : "+"}
+                                {flow.type === "sale"
+                                  ? formatCurrencyWithCurrency(price, flow.sale_currency)
+                                  : formatCurrencyWithCurrency(price, flow.cost_currency)}
                               </span>
                             )}
                           </div>
@@ -1153,13 +1156,13 @@ const InventoryPage = () => {
                             {flow.sale_price && flow.type === "sale" && (
                               <div className="flex items-center justify-between text-sm">
                                 <span className="text-muted-foreground">Birim Fiyat:</span>
-                                <span className="font-medium">{currency(flow.sale_price)}</span>
+                                <span className="font-medium">{formatCurrencyWithCurrency(flow.sale_price, flow.sale_currency)}</span>
                               </div>
                             )}
                             {flow.cost_price && flow.type === "in" && (
                               <div className="flex items-center justify-between text-sm">
                                 <span className="text-muted-foreground">Alış Fiyatı:</span>
-                                <span className="font-medium">{currency(flow.cost_price)}</span>
+                                <span className="font-medium">{formatCurrencyWithCurrency(flow.cost_price, flow.cost_currency)}</span>
                               </div>
                             )}
                             {flow.note && (

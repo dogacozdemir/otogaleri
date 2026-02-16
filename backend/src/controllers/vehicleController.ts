@@ -59,6 +59,7 @@ export async function createVehicle(req: AuthRequest, res: Response) {
     'production_year',
     'km',
     'cc',
+    'weight',
     'purchase_amount',
     'sale_price',
     'target_profit',
@@ -85,6 +86,8 @@ export async function createVehicle(req: AuthRequest, res: Response) {
     res.status(201).json(vehicle);
   } catch (err: any) {
     console.error("[vehicle] Create error", err);
+    console.error("[vehicle] Create error stack:", err?.stack);
+    console.error("[vehicle] Create error code:", err?.code, "errno:", err?.errno);
 
     // Handle specific error types
     if (err.message && err.message.includes("Araç no")) {
@@ -103,7 +106,11 @@ export async function createVehicle(req: AuthRequest, res: Response) {
       return res.status(409).json({ error: "Bu araç no zaten kullanılıyor." });
     }
 
-    res.status(500).json({ error: "Failed to create vehicle" });
+    // In development, include original error for debugging (e.g. missing migration columns)
+    const errorMsg = process.env.NODE_ENV === "development" && err?.message
+      ? err.message
+      : "Failed to create vehicle";
+    res.status(500).json({ error: errorMsg });
   }
 }
 
@@ -160,6 +167,21 @@ export async function updateVehicle(req: AuthRequest, res: Response) {
     }
 
     res.status(500).json({ error: "Failed to update vehicle" });
+  }
+}
+
+// Lookup vehicle by chassis for gümrük calculator
+export async function lookupByChassis(req: AuthRequest, res: Response) {
+  const chassis = (req.query.chassis as string) || "";
+  try {
+    if (!req.tenantQuery) {
+      return res.status(500).json({ error: "Tenant query not available" });
+    }
+    const result = await VehicleService.lookupByChassis(req.tenantQuery, chassis);
+    res.json(result);
+  } catch (err) {
+    console.error("[vehicle] Lookup by chassis error", err);
+    res.status(500).json({ error: "Failed to lookup vehicle" });
   }
 }
 

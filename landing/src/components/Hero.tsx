@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Rocket, Play, CreditCard, XCircle, Headphones } from "lucide-react";
 import { cn } from "@/lib/utils";
+import dashboardImage from "@/assets/dashboard.png";
 
 const trustBadges = [
   { icon: CreditCard, text: "Kredi Kartı Gerekmez" },
@@ -114,29 +115,13 @@ export function Hero() {
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4, duration: 0.6 }}
-            className="relative"
+            className="relative aspect-[16/10]"
           >
-            <div
-              className={cn(
-                "rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden",
-                "bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900",
-                "aspect-[16/10] flex items-center justify-center"
-              )}
-              role="img"
-              aria-label="Galeri envanter yönetimi dashboard önizlemesi"
-            >
-              <div className="text-center p-8">
-                <div className="inline-flex items-center gap-2 rounded-lg bg-slate-200/80 dark:bg-slate-700/50 px-4 py-2.5 mb-4">
-                  <div className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
-                  <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
-                    Dashboard Mockup
-                  </span>
-                </div>
-                <p className="text-slate-600 dark:text-slate-500 text-sm">
-                  Görsel buraya eklenecek
-                </p>
-              </div>
-            </div>
+            <img
+              src={dashboardImage}
+              alt="Akıllı Galeri dashboard önizlemesi — araç envanteri, satış performansı ve stok yönetimi"
+              className="w-full h-full object-contain object-top mix-blend-darken"
+            />
           </motion.div>
         </div>
       </div>

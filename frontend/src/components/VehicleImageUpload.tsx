@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { api } from "@/api";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, X, Star, GripVertical, Trash2, Camera, RotateCcw, Image as ImageIcon, CheckCircle2, AlertCircle, Edit } from "lucide-react";
+import { Upload, X, Star, GripVertical, Trash2, Camera, RotateCcw, Image as ImageIcon, CheckCircle2, AlertCircle, Edit, Crop } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -48,6 +48,7 @@ const VehicleImageUpload: React.FC<VehicleImageUploadProps> = ({ vehicleId, onUp
   const [imageToEdit, setImageToEdit] = useState<File | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cropFileInputRef = useRef<HTMLInputElement>(null);
   const webcamRef = useRef<Webcam>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const uploadedFileNames = useRef<Set<string>>(new Set());
@@ -312,18 +313,11 @@ const VehicleImageUpload: React.FC<VehicleImageUploadProps> = ({ vehicleId, onUp
       return;
     }
 
-    // İlk dosyayı editörde aç, diğerlerini pending'e ekle
-    if (files.length === 1) {
-      setImageToEdit(files[0]);
-      setShowImageEditor(true);
-    } else {
-      setImageToEdit(files[0]);
-      setPendingFiles(files.slice(1));
-      setShowImageEditor(true);
-    }
+    // Doğrudan yükle (kırpma zorunlu değil)
+    uploadFiles(files);
   }, [toast]);
 
-  // File input handler
+  // File input handler - doğrudan yükleme (kırpmasız)
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -338,20 +332,42 @@ const VehicleImageUpload: React.FC<VehicleImageUploadProps> = ({ vehicleId, onUp
       return;
     }
 
-    // İlk dosyayı editörde aç, diğerlerini pending'e ekle
+    // Doğrudan yükle (kırpma zorunlu değil)
+    uploadFiles(fileArray);
+
+    // Input'u temizle
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Kırp modu: dosya seçildiğinde editör aç
+  const handleCropFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const fileArray = Array.from(files);
+    if (fileArray.length > MAX_FILES) {
+      toast({
+        title: "Çok Fazla Dosya",
+        description: `Maksimum ${MAX_FILES} dosya yükleyebilirsiniz.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (fileArray.length === 1) {
       setImageToEdit(fileArray[0]);
+      setPendingFiles([]);
       setShowImageEditor(true);
     } else {
-      // Çoklu dosya: İlk dosyayı editörde aç, diğerlerini beklet
       setImageToEdit(fileArray[0]);
       setPendingFiles(fileArray.slice(1));
       setShowImageEditor(true);
     }
-    
-    // Input'u temizle
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+
+    if (cropFileInputRef.current) {
+      cropFileInputRef.current.value = '';
     }
   };
 
@@ -534,6 +550,9 @@ const VehicleImageUpload: React.FC<VehicleImageUploadProps> = ({ vehicleId, onUp
             <p className="text-xs text-muted-foreground mt-1">
               Maksimum {MAX_FILES} dosya, her biri en fazla {MAX_FILE_SIZE / 1024 / 1024}MB (JPG, JFIF, PNG, WEBP, GIF, TIFF, AVIF)
             </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Kırpmak isterseniz &quot;Kırp ve Yükle&quot; butonunu kullanın
+            </p>
           </div>
         </div>
       </div>
@@ -582,19 +601,36 @@ const VehicleImageUpload: React.FC<VehicleImageUploadProps> = ({ vehicleId, onUp
         <Button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          variant="outline"
+          variant="default"
         >
           <Upload className="h-4 w-4 mr-2" />
           {uploading ? "Yükleniyor..." : "Dosya Seç"}
         </Button>
         <Button
+          onClick={() => cropFileInputRef.current?.click()}
+          disabled={uploading}
+          variant="outline"
+        >
+          <Crop className="h-4 w-4 mr-2" />
+          Kırp ve Yükle
+        </Button>
+        <Button
           onClick={() => setShowCamera(true)}
           disabled={uploading}
-          variant="default"
+          variant="outline"
         >
           <Camera className="h-4 w-4 mr-2" />
           Kamera ile Çek
         </Button>
+        <input
+          ref={cropFileInputRef}
+          type="file"
+          accept="image/jpeg,image/jpg,image/jfif,image/png,image/webp,image/gif,image/tiff,image/avif,.jfif,.gif,.tiff,.tif,.avif"
+          multiple
+          onChange={handleCropFileSelect}
+          className="hidden"
+          id="vehicle-image-crop-upload"
+        />
       </div>
 
       {/* Image Editor Modal */}

@@ -210,6 +210,84 @@ export async function generateInvoicePDF(req: AuthRequest, res: Response) {
   }
 }
 
+export async function getExpiringDocuments(req: AuthRequest, res: Response) {
+  const { days = 30 } = req.query;
+  const daysNum = Math.max(1, Math.min(365, Number(days) || 30));
+
+  try {
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + daysNum);
+    const expiryStr = expiryDate.toISOString().split("T")[0];
+
+    // Vehicle documents
+    const [vehicleDocs] = await dbPool.query(
+      `SELECT 
+        vd.id,
+        vd.document_name,
+        vd.document_type,
+        vd.expiry_date,
+        vd.vehicle_id,
+        v.maker,
+        v.model,
+        v.production_year,
+        DATEDIFF(vd.expiry_date, CURDATE()) as days_until_expiry
+      FROM vehicle_documents vd
+      INNER JOIN vehicles v ON vd.vehicle_id = v.id
+      WHERE vd.tenant_id = ?
+        AND vd.expiry_date IS NOT NULL
+        AND vd.expiry_date >= CURDATE()
+        AND vd.expiry_date <= ?
+      ORDER BY vd.expiry_date ASC`,
+      [req.tenantId, expiryStr]
+    );
+
+    // Customer documents
+    const [customerDocs] = await dbPool.query(
+      `SELECT 
+        cd.id,
+        cd.document_name,
+        cd.document_type,
+        cd.expiry_date,
+        cd.customer_id,
+        c.name as customer_name,
+        DATEDIFF(cd.expiry_date, CURDATE()) as days_until_expiry
+      FROM customer_documents cd
+      INNER JOIN customers c ON cd.customer_id = c.id
+      WHERE cd.tenant_id = ?
+        AND cd.expiry_date IS NOT NULL
+        AND cd.expiry_date >= CURDATE()
+        AND cd.expiry_date <= ?
+      ORDER BY cd.expiry_date ASC`,
+      [req.tenantId, expiryStr]
+    );
+
+    const vehicleArr = (vehicleDocs as any[]).map((d) => ({
+      ...d,
+      source: "vehicle" as const,
+      customer_id: null,
+      customer_name: null,
+    }));
+
+    const customerArr = (customerDocs as any[]).map((d) => ({
+      ...d,
+      source: "customer" as const,
+      vehicle_id: null,
+      maker: null,
+      model: null,
+      production_year: null,
+    }));
+
+    const combined = [...vehicleArr, ...customerArr].sort(
+      (a, b) => a.days_until_expiry - b.days_until_expiry
+    );
+
+    res.json(combined);
+  } catch (error) {
+    console.error("[document] Get expiring documents error:", error);
+    res.status(500).json({ error: "Failed to fetch expiring documents" });
+  }
+}
+
 export async function getExpiringVehicleDocuments(req: AuthRequest, res: Response) {
   const { days = 30 } = req.query;
   const daysNum = Math.max(1, Math.min(365, Number(days) || 30));
@@ -299,7 +377,7 @@ export async function uploadVehicleDocument(req: AuthRequest, res: Response) {
   const expiry_date = req.body.expiry_date || null;
   const notes = req.body.notes || null;
 
-  const validTypes = ["contract", "registration", "insurance", "inspection", "customs", "invoice", "other"];
+  const validTypes = ["contract", "registration", "insurance", "inspection", "customs", "invoice", "eksper", "grade", "other"];
   if (!validTypes.includes(document_type)) {
     return res.status(400).json({ error: "Invalid document_type" });
   }

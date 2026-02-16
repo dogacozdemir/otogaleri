@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { AuthRequest } from "../middleware/auth";
 import { dbPool } from "../config/database";
+import { safeDivide } from "../utils/safeDivide";
 
 export async function getFxImpactAnalysis(req: AuthRequest, res: Response) {
   const { vehicle_id } = req.params;
@@ -21,35 +22,42 @@ export async function getFxImpactAnalysis(req: AuthRequest, res: Response) {
     }
 
     const [costRows] = await dbPool.query(
-      "SELECT SUM(amount * fx_rate_to_base) as total_costs FROM vehicle_costs WHERE vehicle_id = ?",
-      [vehicle_id]
+      "SELECT SUM(amount * fx_rate_to_base) as total_costs FROM vehicle_costs WHERE vehicle_id = ? AND tenant_id = ?",
+      [vehicle_id, req.tenantId]
     );
-    const totalCostsBase = (costRows as any[])[0]?.total_costs || 0;
+    const totalCostsBaseWithPurchase = (costRows as any[])[0]?.total_costs || 0;
 
-    const purchaseAmountBase = vehicle.purchase_amount
-      ? Number(vehicle.purchase_amount) * Number(vehicle.purchase_fx_rate_to_base || 1)
-      : 0;
-    const totalCostsBaseWithPurchase = Number(totalCostsBase) + purchaseAmountBase;
+    // Single source of truth: fetch purchase cost from vehicle_costs (is_system_cost=1, category='purchase')
+    const [purchaseCostRows] = await dbPool.query(
+      `SELECT amount, currency, fx_rate_to_base FROM vehicle_costs 
+       WHERE vehicle_id = ? AND tenant_id = ? AND is_system_cost = 1 AND category = 'purchase' LIMIT 1`,
+      [vehicle_id, req.tenantId]
+    );
+    const purchaseCost = (purchaseCostRows as any[])[0];
+    const purchaseAmountInPurchaseCurrency = purchaseCost ? Number(purchaseCost.amount) : 0;
+    const purchaseCurrency = purchaseCost?.currency || vehicle.purchase_currency || "TRY";
+    const purchaseFxRate = purchaseCost ? Number(purchaseCost.fx_rate_to_base || 1) : (vehicle.purchase_fx_rate_to_base || 1);
+    const purchaseAmountBase = purchaseAmountInPurchaseCurrency * purchaseFxRate;
 
-    const saleAmountBase = vehicle.sale_price
-      ? Number(vehicle.sale_price) * Number(vehicle.sale_fx_rate_to_base || 1)
-      : 0;
-
-    const purchaseCurrency = vehicle.purchase_currency || "TRY";
-    const saleCurrency = vehicle.sale_currency || "TRY";
+    // STRICT: Derive sale from vehicle_sales (single source of truth for sold vehicles)
+    const [saleRows] = await dbPool.query(
+      `SELECT sale_amount, sale_currency, sale_fx_rate_to_base, sale_date FROM vehicle_sales 
+       WHERE vehicle_id = ? AND tenant_id = ? ORDER BY sale_date DESC LIMIT 1`,
+      [vehicle_id, req.tenantId]
+    );
+    const saleRow = (saleRows as any[])[0];
+    const saleAmountInSaleCurrency = saleRow ? Number(saleRow.sale_amount || 0) : 0;
+    const saleCurrency = saleRow?.sale_currency || vehicle.sale_currency || "TRY";
+    const saleFxRate = saleRow ? Number(saleRow.sale_fx_rate_to_base || 1) : 1;
+    const saleAmountBase = saleAmountInSaleCurrency * saleFxRate;
 
     const [tenantRows] = await dbPool.query("SELECT default_currency FROM tenants WHERE id = ?", [req.tenantId]);
     const baseCurrency = (tenantRows as any[])[0]?.default_currency || "TRY";
-
-    const purchaseFxRate = vehicle.purchase_fx_rate_to_base || 1;
-    const saleFxRate = vehicle.sale_fx_rate_to_base || 1;
 
     let fxGainLoss = 0;
     let operationalProfit = 0;
 
     if (purchaseCurrency !== baseCurrency || saleCurrency !== baseCurrency) {
-      const purchaseAmountInPurchaseCurrency = vehicle.purchase_amount || 0;
-      const saleAmountInSaleCurrency = vehicle.sale_price || 0;
 
       const purchaseAmountAtPurchaseRate = purchaseAmountInPurchaseCurrency * purchaseFxRate;
       const saleAmountAtSaleRate = saleAmountInSaleCurrency * saleFxRate;
@@ -82,9 +90,9 @@ export async function getFxImpactAnalysis(req: AuthRequest, res: Response) {
         base_currency: baseCurrency,
       },
       amounts: {
-        purchase_amount: vehicle.purchase_amount,
+        purchase_amount: purchaseAmountInPurchaseCurrency,
         purchase_amount_base: purchaseAmountBase,
-        sale_amount: vehicle.sale_price,
+        sale_amount: saleAmountInSaleCurrency,
         sale_amount_base: saleAmountBase,
         total_costs_base: totalCostsBaseWithPurchase,
       },
@@ -101,7 +109,7 @@ export async function getFxImpactAnalysis(req: AuthRequest, res: Response) {
         days_held: Math.floor(
           (new Date(vehicle.sale_date).getTime() - new Date(vehicle.purchase_date).getTime()) / (1000 * 60 * 60 * 24)
         ),
-        fx_impact_percent: totalCostsBaseWithPurchase > 0 ? (fxGainLoss / totalCostsBaseWithPurchase) * 100 : 0,
+        fx_impact_percent: safeDivide(fxGainLoss, totalCostsBaseWithPurchase) * 100,
       },
     });
   } catch (err) {

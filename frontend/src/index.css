@@ -671,3 +671,11 @@
     border-left: 4px solid #F0A500;
   }
 }
+
+/* Quote PDF Print Styles - ensure clean print output */
+@media print {
+  .quote-pdf-print-area {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { TenantProvider } from "./contexts/TenantContext";
 import { CurrencyRatesProvider } from "./contexts/CurrencyRatesContext";
+import { ViewCurrencyProvider } from "./contexts/ViewCurrencyContext";
 import { Toaster } from "./components/ui/toaster";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import AuthPage from "./pages/AuthPage";
@@ -28,6 +29,7 @@ function App() {
       <ThemeProvider>
         <TenantProvider>
           <CurrencyRatesProvider>
+          <ViewCurrencyProvider>
           <Routes>
           <Route path="/login" element={<AuthPage />} />
           <Route path="/register" element={<AuthPage />} />
@@ -58,6 +60,7 @@ function App() {
           </Route>
           </Routes>
           <Toaster />
+          </ViewCurrencyProvider>
           </CurrencyRatesProvider>
         </TenantProvider>
       </ThemeProvider>

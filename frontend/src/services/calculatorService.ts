@@ -114,11 +114,10 @@ export interface CalculatorInput {
   isAraciYakitTipi?: "benzinli" | "dizel" | "hybrid" | "elektrikli";
   kdvOrani: number;
   gumrukKomisyonu: number;
-  ardiye: number;
 }
 
 export interface CalculatorResult {
-  /** Kalem Fiyatı (CIF) = araç kıymeti + gemi parası, TRY */
+  /** Kalem Fiyatı (CIF) = araç kıymeti + navlun, TRY */
   cifTRY: number;
   /** 1. Kalem alt bileşenleri (kalem fiyat üzerinden hesaplanan, eklenmeyen) */
   stopaj: number;
@@ -172,7 +171,7 @@ export function calculateCustomsTax(input: CalculatorInput): CalculatorResult {
     return zeroResult({ error: "Lütfen kıymet bilgisini giriniz (JPY)." });
   }
   if (gemiParasiJPY < 0) {
-    return zeroResult({ error: "Lütfen gemi parası bilgisini giriniz (JPY)." });
+    return zeroResult({ error: "Lütfen navlun bilgisini giriniz (JPY)." });
   }
   if (!jpyTryKuru || jpyTryKuru <= 0) {
     return zeroResult({ error: "Lütfen JPY/TRY kur bilgisini giriniz veya kuru yükleyiniz." });
@@ -184,7 +183,7 @@ export function calculateCustomsTax(input: CalculatorInput): CalculatorResult {
     return zeroResult({ error: "Lütfen ağırlık bilgisini giriniz (kg)." });
   }
 
-  // Kalem Fiyatı (CIF) = araç kıymeti + gemi parası
+  // Kalem Fiyatı (CIF) = araç kıymeti + navlun
   const kalemFiyat = (baseKiymetJPY + gemiParasiJPY) * jpyTryKuru;
 
   // 1. Kalem: Kalem fiyat üzerinden hesaplanan kalemler (eklenmez, toplanır)
@@ -270,12 +269,17 @@ export function calculateKayitParasi(
 /**
  * Şasi numarasında kod ara – JSON'daki TÜM kodları tara.
  */
+/** Boşlukları kaldırarak şasi/kod karşılaştırması: "E 12" ve "E12" aynı sayılır */
+function normalizeChassis(s: string): string {
+  return (s || "").trim().replace(/\s+/g, "").toUpperCase();
+}
+
 export function findChassisMatchInJson(
   chassis: string,
   data: JaponKiymetData
 ): { marka: string; model: string; kod: string; motor_gucu: string; kiymetler: Record<string, number | null> } | null {
-  const upper = chassis.trim().toUpperCase();
-  if (!upper || !data) return null;
+  const normalizedChassis = normalizeChassis(chassis);
+  if (!normalizedChassis || !data) return null;
 
   let bestMatch: { marka: string; model: string; kod: string; motor_gucu: string; kiymetler: Record<string, number | null> } | null = null;
   let bestKodLength = 0;
@@ -283,8 +287,9 @@ export function findChassisMatchInJson(
   for (const [marka, models] of Object.entries(data)) {
     for (const [model, codes] of Object.entries(models)) {
       for (const [kod, vehicleData] of Object.entries(codes)) {
-        if (upper.includes(kod) && kod.length > bestKodLength) {
-          bestKodLength = kod.length;
+        const normalizedKod = normalizeChassis(kod);
+        if (normalizedChassis.includes(normalizedKod) && normalizedKod.length > bestKodLength) {
+          bestKodLength = normalizedKod.length;
           bestMatch = {
             marka,
             model,

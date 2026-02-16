@@ -17,7 +17,10 @@ interface VehicleTableProps {
   vehicles: Vehicle[];
   loading: boolean;
   viewMode: 'table' | 'grid';
+  /** Formats amounts in base (default) currency - for cost and profit */
   currency: (amount: number | null) => string;
+  /** Formats amounts in base currency - maliyet ve kar için varsayılan döviz */
+  formatInBaseCurrency?: (amount: number | null) => string;
   onDetailClick: (vehicle: Vehicle) => void;
   onEditClick: (vehicle: Vehicle) => void;
   onQuoteClick: (vehicle: Vehicle) => void;
@@ -67,10 +70,19 @@ const getStatusBadge = (vehicle: Vehicle) => {
   );
 };
 
+/**
+ * Calculates profit in current base currency.
+ * Backend provides sale_amount_in_current_base (converted to tenant default):
+ * - Sold: historical rate at sale_date
+ * - Unsold: today's rate (sale_price in sale_currency -> base)
+ */
 const calculateProfit = (vehicle: Vehicle): number => {
-  const salePrice = vehicle.sale_price || 0;
   const totalCosts = vehicle.total_costs || 0;
-  return salePrice - totalCosts;
+  const saleAmountBase = (vehicle as any).sale_amount_in_current_base ??
+    (vehicle.is_sold && vehicle.sale_price != null && vehicle.sale_fx_rate_to_base != null
+      ? vehicle.sale_price * (vehicle.sale_fx_rate_to_base || 1)
+      : vehicle.sale_price || 0);
+  return saleAmountBase - totalCosts;
 };
 
 export const VehicleTable = ({
@@ -78,6 +90,7 @@ export const VehicleTable = ({
   loading,
   viewMode,
   currency,
+  formatInBaseCurrency,
   onDetailClick,
   onEditClick,
   onQuoteClick,
@@ -87,6 +100,7 @@ export const VehicleTable = ({
   inStockCount,
 }: VehicleTableProps) => {
   const { formatCurrencyWithCurrency } = useCurrency();
+  const formatCostProfit = formatInBaseCurrency ?? currency;
   if (viewMode === 'grid') {
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -221,7 +235,7 @@ export const VehicleTable = ({
                         "font-semibold",
                         profit >= 0 ? "text-success dark:text-success" : "text-destructive dark:text-destructive"
                       )}>
-                        {profit >= 0 ? '+' : ''}{currency(profit)}
+                        {profit >= 0 ? '+' : ''}{formatCostProfit(profit)}
                       </span>
                     </div>
                   </div>
@@ -365,13 +379,13 @@ export const VehicleTable = ({
                       {formatCurrencyWithCurrency(vehicle.sale_price, vehicle.sale_currency)}
                     </TableCell>
                     <TableCell className="text-right text-gray-600">
-                      {formatCurrencyWithCurrency(vehicle.purchase_amount || vehicle.total_costs, vehicle.purchase_currency)}
+                      {formatCostProfit(vehicle.total_costs ?? 0)}
                     </TableCell>
                     <TableCell className={cn(
                       "text-right font-semibold",
                       profit >= 0 ? "text-emerald-600" : "text-red-600"
                     )}>
-                      {profit >= 0 ? '+' : ''}{currency(profit)}
+                      {profit >= 0 ? '+' : ''}{formatCostProfit(profit)}
                     </TableCell>
                     <TableCell>{getStatusBadge(vehicle)}</TableCell>
                     <TableCell>

@@ -201,6 +201,11 @@ export const VehicleDetailInfoTab = ({
               value={vehicle.cc ? `${vehicle.cc} cc` : null}
             />
             <InfoItem
+              icon={<Package className="h-4 w-4" />}
+              label="Ağırlık"
+              value={vehicle.weight ? `${vehicle.weight} kg` : null}
+            />
+            <InfoItem
               icon={<Palette className="h-4 w-4" />}
               label="Renk"
               value={vehicle.color}

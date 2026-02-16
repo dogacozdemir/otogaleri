@@ -78,6 +78,11 @@ export async function markVehicleAsSold(req: AuthRequest, res: Response) {
         );
       }
     }
+    if (saleFxRate <= 0) {
+      await conn.rollback();
+      conn.release();
+      return res.status(400).json({ error: "Kur değeri 0'dan büyük olmalıdır." });
+    }
 
     const saleAmountBase = Number(sale_amount) * saleFxRate;
 
@@ -133,8 +138,8 @@ export async function markVehicleAsSold(req: AuthRequest, res: Response) {
         tenant_id, vehicle_id, branch_id, staff_id,
         customer_name, customer_phone, customer_address,
         plate_number, key_count,
-        sale_amount, sale_currency, sale_fx_rate_to_base, sale_date
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        sale_amount, sale_currency, sale_fx_rate_to_base, sale_date, base_currency_at_sale
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.tenantId,
         vehicle_id,
@@ -149,6 +154,7 @@ export async function markVehicleAsSold(req: AuthRequest, res: Response) {
         finalSaleCurrency,
         saleFxRate,
         sale_date,
+        baseCurrency,
       ]
     );
 

@@ -15,7 +15,17 @@ export const VehicleImportSchema = z.object({
   km: z.coerce.number().nullable().optional(),
   fuel: z.string().optional().nullable(),
   grade: z.string().optional().nullable(),
-  cc: z.coerce.number().nullable().optional(),
+  cc: z.preprocess(
+    (val) => {
+      if (val == null || val === "") return null;
+      if (typeof val === "number") return Number.isNaN(val) ? null : val;
+      const str = String(val).trim().replace(/[.,\s]/g, "");
+      if (!str) return null;
+      const num = parseInt(str, 10);
+      return Number.isNaN(num) ? null : num;
+    },
+    z.number().int().nullable().optional()
+  ),
   color: z.string().optional().nullable(),
   engine_no: z.string().optional().nullable(),
   other: z.string().optional().nullable(),

@@ -35,6 +35,7 @@ interface VehicleSellModalProps {
   vehicle: Vehicle | null;
   sellForm: SellFormData;
   onFormChange: (field: keyof SellFormData, value: any) => void;
+  onFormChangeBatch?: (updates: Partial<SellFormData>) => void;
   onSubmit: () => Promise<void>;
   currencies: Array<{ value: string; label: string }>;
 }
@@ -45,37 +46,61 @@ export const VehicleSellModal = ({
   vehicle,
   sellForm,
   onFormChange,
+  onFormChangeBatch,
   onSubmit,
   currencies,
 }: VehicleSellModalProps) => {
+  const updateBatch = onFormChangeBatch ?? ((updates: Partial<SellFormData>) => {
+    Object.entries(updates).forEach(([k, v]) => onFormChange(k as keyof SellFormData, v));
+  });
+
   const handleSalePriceChange = (salePrice: string) => {
-    onFormChange('sale_price', salePrice);
-    // Taksit tutarını otomatik hesapla
     if (sellForm.payment_type === "installment" && sellForm.down_payment && sellForm.installment_count) {
       const remaining = Number(salePrice) - Number(sellForm.down_payment);
-      const installmentAmount = remaining / Number(sellForm.installment_count);
-      onFormChange('installment_amount', installmentAmount.toFixed(2));
+      const count = Number(sellForm.installment_count);
+      if (count > 0 && remaining > 0) {
+        updateBatch({ sale_price: salePrice, installment_amount: (remaining / count).toFixed(2) });
+        return;
+      }
     }
+    onFormChange('sale_price', salePrice);
   };
 
   const handleDownPaymentChange = (downPayment: string) => {
-    onFormChange('down_payment', downPayment);
-    // Taksit tutarını otomatik hesapla
-    if (sellForm.sale_price && sellForm.installment_count) {
+    if (sellForm.payment_type === "installment" && sellForm.sale_price && sellForm.installment_count) {
       const remaining = Number(sellForm.sale_price) - Number(downPayment);
-      const installmentAmount = remaining / Number(sellForm.installment_count);
-      onFormChange('installment_amount', installmentAmount.toFixed(2));
+      const count = Number(sellForm.installment_count);
+      if (count > 0 && remaining > 0) {
+        updateBatch({ down_payment: downPayment, installment_amount: (remaining / count).toFixed(2) });
+        return;
+      }
     }
+    onFormChange('down_payment', downPayment);
   };
 
   const handleInstallmentCountChange = (installmentCount: string) => {
-    onFormChange('installment_count', installmentCount);
-    // Taksit tutarını otomatik hesapla
-    if (sellForm.sale_price && sellForm.down_payment) {
+    if (sellForm.sale_price && sellForm.down_payment && installmentCount) {
       const remaining = Number(sellForm.sale_price) - Number(sellForm.down_payment);
-      const installmentAmount = remaining / Number(installmentCount);
-      onFormChange('installment_amount', installmentAmount.toFixed(2));
+      const count = Number(installmentCount);
+      if (count > 0 && remaining > 0) {
+        updateBatch({ installment_count: installmentCount, installment_amount: (remaining / count).toFixed(2) });
+        return;
+      }
     }
+    onFormChange('installment_count', installmentCount);
+  };
+
+  const handleInstallmentAmountChange = (installmentAmount: string) => {
+    if (sellForm.sale_price && sellForm.down_payment && installmentAmount) {
+      const remaining = Number(sellForm.sale_price) - Number(sellForm.down_payment);
+      const amount = Number(installmentAmount);
+      if (amount > 0 && remaining > 0) {
+        const count = Math.round(remaining / amount);
+        updateBatch({ installment_amount: installmentAmount, installment_count: count > 0 ? String(count) : "" });
+        return;
+      }
+    }
+    onFormChange('installment_amount', installmentAmount);
   };
 
   return (
@@ -191,9 +216,8 @@ export const VehicleSellModal = ({
                   type="number"
                   step="0.01"
                   value={sellForm.installment_amount}
-                  readOnly
-                  placeholder="Otomatik hesaplanır"
-                  className="bg-muted"
+                  onChange={(e) => handleInstallmentAmountChange(e.target.value)}
+                  placeholder="Tutar veya taksit sayısı girin"
                 />
               </div>
             </div>

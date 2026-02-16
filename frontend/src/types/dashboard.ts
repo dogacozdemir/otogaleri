@@ -25,9 +25,14 @@ export interface Followup {
 export interface ExpiringDocument {
   id: number;
   document_name: string;
-  document_type: "insurance" | "inspection" | string;
+  document_type: string;
   expiry_date: string;
   days_until_expiry: number;
-  maker?: string;
-  model?: string;
+  source: "vehicle" | "customer";
+  vehicle_id?: number | null;
+  customer_id?: number | null;
+  maker?: string | null;
+  model?: string | null;
+  production_year?: number | null;
+  customer_name?: string | null;
 }

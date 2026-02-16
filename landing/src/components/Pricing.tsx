@@ -55,12 +55,10 @@ export function Pricing() {
               )}
             >
               <motion.span
-                layout
+                style={{ top: "50%", left: 0 }}
+                animate={{ x: isYearly ? 30 : 2, y: "-50%" }}
                 transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                className={cn(
-                  "pointer-events-none inline-block h-6 w-6 rounded-full bg-white shadow ring-0",
-                  isYearly ? "translate-x-7" : "translate-x-1"
-                )}
+                className="pointer-events-none absolute h-6 w-6 rounded-full bg-white shadow ring-0"
               />
             </button>
             <span
@@ -110,13 +108,13 @@ export function Pricing() {
                 transition={{ duration: 0.2 }}
                 className="text-4xl sm:text-5xl font-bold text-slate-900 dark:text-slate-50 tracking-tight"
               >
-                {isYearly ? "£1.000" : "£100"}
+                {isYearly ? "£990" : "£99"}
                 <span className="text-xl font-normal text-slate-500 dark:text-slate-400 ml-1">
                   / {isYearly ? "yıl" : "ay"}
                 </span>
               </motion.div>
               <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-                {isYearly ? "Aylık £83.33" : "Aylık faturalandırma"}
+                {isYearly ? "Aylık £82.50" : "Aylık faturalandırma"}
               </p>
             </div>
           </div>

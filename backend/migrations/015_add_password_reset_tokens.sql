@@ -1,5 +1,5 @@
 -- Şifre sıfırlama token'ları için tablo (forgot-password akışı)
--- Token hash saklanır; süre sonunda veya kullanımda silinir
+-- Token hash saklanır, süre sonunda veya kullanımda silinir
 
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
   id INT AUTO_INCREMENT PRIMARY KEY,

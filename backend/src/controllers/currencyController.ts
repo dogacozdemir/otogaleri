@@ -1,10 +1,10 @@
 import { Response } from "express";
 import { AuthRequest } from "../middleware/auth";
-import { getLatestRate, SupportedCurrency } from "../services/currencyService";
+import { getLatestRate, getHistoricalRate, SupportedCurrency } from "../services/currencyService";
 
 export async function getCurrencyRate(req: AuthRequest, res: Response) {
   try {
-    const { from, to } = req.query;
+    const { from, to, date } = req.query;
 
     if (!from || !to) {
       return res.status(400).json({ error: "from and to parameters are required" });
@@ -23,7 +23,9 @@ export async function getCurrencyRate(req: AuthRequest, res: Response) {
     const fromCurrency = (from === "YEN" ? "JPY" : from) as SupportedCurrency;
     const toCurrency = (to === "YEN" ? "JPY" : to) as SupportedCurrency;
 
-    const rate = await getLatestRate(fromCurrency, toCurrency);
+    const rate = date && typeof date === "string"
+      ? await getHistoricalRate(date, fromCurrency, toCurrency)
+      : await getLatestRate(fromCurrency, toCurrency);
 
     res.json({
       from: fromCurrency,
